@@ -190,7 +190,9 @@ pub async fn handle_query_knowledge(
     if req.include_conflicts {
         let mut seen_conflicts = std::collections::HashSet::new();
         for claim in &claims {
-            let claim_conflicts = claim_store.get_conflicts_for_claim(claim.id).await?;
+            let claim_conflicts = claim_store
+                .get_conflicts_for_claim(claim.id, tenant_id)
+                .await?;
             for c in &claim_conflicts {
                 if !seen_conflicts.contains(&c.id) {
                     seen_conflicts.insert(c.id);
@@ -360,7 +362,10 @@ pub async fn handle_query_knowledge(
 
     // 12. Update activation
     for claim in &claims {
-        claim_store.update_activation(claim.id, 0.1).await.ok();
+        claim_store
+            .update_activation(claim.id, tenant_id, 0.1)
+            .await
+            .ok();
     }
 
     Ok(response)

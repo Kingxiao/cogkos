@@ -107,7 +107,7 @@ pub async fn consolidate_claims(
             // Update confidence to aggregated value
             if let Err(e) = stores
                 .claims
-                .update_confidence(claim.id, aggregated_confidence)
+                .update_confidence(claim.id, &claim.tenant_id, aggregated_confidence)
                 .await
             {
                 warn!(error = %e, claim_id = %claim.id, "Failed to update confidence");

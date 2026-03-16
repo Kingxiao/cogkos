@@ -69,8 +69,12 @@ pub trait ClaimStore: Send + Sync {
         tenant_id: &str,
         filters: &[QueryFilter],
     ) -> Result<Vec<EpistemicClaim>>;
-    async fn update_activation(&self, id: Id, delta: f64) -> Result<()>;
-    async fn get_conflicts_for_claim(&self, claim_id: Id) -> Result<Vec<ConflictRecord>>;
+    async fn update_activation(&self, id: Id, tenant_id: &str, delta: f64) -> Result<()>;
+    async fn get_conflicts_for_claim(
+        &self,
+        claim_id: Id,
+        tenant_id: &str,
+    ) -> Result<Vec<ConflictRecord>>;
 
     async fn list_claims_needing_confidence_boost(
         &self,
@@ -91,7 +95,7 @@ pub trait ClaimStore: Send + Sync {
         query: &str,
         limit: usize,
     ) -> Result<Vec<EpistemicClaim>>;
-    async fn update_confidence(&self, id: Id, confidence: f64) -> Result<()>;
+    async fn update_confidence(&self, id: Id, tenant_id: &str, confidence: f64) -> Result<()>;
     async fn list_claims_needing_revalidation(
         &self,
         tenant_id: &str,
@@ -103,6 +107,7 @@ pub trait ClaimStore: Send + Sync {
     async fn resolve_conflict(
         &self,
         conflict_id: uuid::Uuid,
+        tenant_id: &str,
         status: ResolutionStatus,
         note: Option<String>,
     ) -> Result<()>;
@@ -346,7 +351,7 @@ impl ClaimStore for InMemoryClaimStore {
             .collect())
     }
 
-    async fn update_activation(&self, id: Id, delta: f64) -> Result<()> {
+    async fn update_activation(&self, id: Id, _tenant_id: &str, delta: f64) -> Result<()> {
         let mut claims = self.claims.write().await;
         if let Some(claim) = claims.get_mut(&id) {
             claim.record_access(delta);
@@ -354,7 +359,11 @@ impl ClaimStore for InMemoryClaimStore {
         Ok(())
     }
 
-    async fn get_conflicts_for_claim(&self, claim_id: Id) -> Result<Vec<ConflictRecord>> {
+    async fn get_conflicts_for_claim(
+        &self,
+        claim_id: Id,
+        _tenant_id: &str,
+    ) -> Result<Vec<ConflictRecord>> {
         let conflicts = self.conflicts.read().await;
         Ok(conflicts.get(&claim_id).cloned().unwrap_or_default())
     }
@@ -391,7 +400,7 @@ impl ClaimStore for InMemoryClaimStore {
         Ok(result)
     }
 
-    async fn update_confidence(&self, id: Id, confidence: f64) -> Result<()> {
+    async fn update_confidence(&self, id: Id, _tenant_id: &str, confidence: f64) -> Result<()> {
         let mut claims = self.claims.write().await;
         if let Some(claim) = claims.get_mut(&id) {
             claim.confidence = confidence;
@@ -438,6 +447,7 @@ impl ClaimStore for InMemoryClaimStore {
     async fn resolve_conflict(
         &self,
         conflict_id: uuid::Uuid,
+        _tenant_id: &str,
         status: ResolutionStatus,
         note: Option<String>,
     ) -> Result<()> {

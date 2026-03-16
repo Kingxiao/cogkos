@@ -265,7 +265,11 @@ impl IngestionPipeline {
                 .upsert(chunk_claim.id, embedding.clone(), payload)
                 .await
             {
-                tracing::warn!(claim_id = %chunk_claim.id, error = %e, "Failed to upsert vector embedding");
+                tracing::warn!(claim_id = %chunk_claim.id, error = %e, "Vector upsert failed, removing orphan claim");
+                if let Err(del_err) = claim_store.delete_claim(chunk_claim.id, &tenant_id).await {
+                    tracing::error!(claim_id = %chunk_claim.id, error = %del_err, "Failed to delete orphan claim after vector upsert failure");
+                }
+                continue;
             }
 
             // Calculate novelty
@@ -354,15 +358,26 @@ impl IngestionPipeline {
             }
         }
 
-        // 7. Detect conflicts
+        // 7. Detect conflicts — batch approach to avoid N+1
         let mut all_conflicts = Vec::new();
-        for claim in &all_claims {
-            // Search for similar claims to detect conflicts
-            let similar = claim_store
-                .search_claims(&tenant_id, &claim.content, 10)
+        if !all_claims.is_empty() {
+            // Use first 3 chunks as representative sample for a single search
+            let combined_query: String = all_claims
+                .iter()
+                .take(3)
+                .map(|c| c.content.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let candidates = claim_store
+                .search_claims(&tenant_id, &combined_query, 20)
                 .await?;
-            let conflicts = cogkos_core::evolution::detect_conflicts_batch(claim, &similar);
-            all_conflicts.extend(conflicts);
+
+            // Check each new claim against the candidates
+            for claim in &all_claims {
+                let conflicts = cogkos_core::evolution::detect_conflicts_batch(claim, &candidates);
+                all_conflicts.extend(conflicts);
+            }
         }
 
         // Store conflicts

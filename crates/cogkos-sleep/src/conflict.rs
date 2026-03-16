@@ -163,6 +163,7 @@ pub fn calculate_conflict_severity(claim_a: &EpistemicClaim, claim_b: &Epistemic
 pub async fn resolve_conflict(
     stores: &Arc<Stores>,
     conflict_id: uuid::Uuid,
+    tenant_id: &str,
     resolution: ResolutionStatus,
     note: Option<String>,
 ) -> Result<()> {
@@ -170,7 +171,7 @@ pub async fn resolve_conflict(
 
     stores
         .claims
-        .resolve_conflict(conflict_id, resolution, note)
+        .resolve_conflict(conflict_id, tenant_id, resolution, note)
         .await?;
 
     info!(conflict_id = %conflict_id, "Conflict resolved");
@@ -340,7 +341,10 @@ pub async fn get_open_conflicts(
 
     let mut conflicts = Vec::new();
     for claim in claims {
-        let claim_conflicts = stores.claims.get_conflicts_for_claim(claim.id).await?;
+        let claim_conflicts = stores
+            .claims
+            .get_conflicts_for_claim(claim.id, tenant_id)
+            .await?;
         for conflict in claim_conflicts {
             if conflict.resolution_status == ResolutionStatus::Open {
                 conflicts.push(conflict);

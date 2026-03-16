@@ -236,7 +236,10 @@ async fn test_insert_conflict() {
 
     store.insert_conflict(&conflict).await.unwrap();
 
-    let conflicts = store.get_conflicts_for_claim(claim_a.id).await.unwrap();
+    let conflicts = store
+        .get_conflicts_for_claim(claim_a.id, tenant)
+        .await
+        .unwrap();
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].severity, 0.9);
 
@@ -281,7 +284,10 @@ async fn test_update_activation() {
     let claim = make_claim(tenant, "Activation test");
     store.insert_claim(&claim).await.unwrap();
 
-    store.update_activation(claim.id, 0.3).await.unwrap();
+    store
+        .update_activation(claim.id, tenant, 0.3)
+        .await
+        .unwrap();
 
     let fetched = store.get_claim(claim.id, tenant).await.unwrap();
     assert!(
@@ -329,6 +335,7 @@ async fn test_resolve_conflict() {
     store
         .resolve_conflict(
             conflict_id,
+            tenant,
             ResolutionStatus::Accepted,
             Some("Context dependent".into()),
         )
@@ -336,7 +343,10 @@ async fn test_resolve_conflict() {
         .unwrap();
 
     // Verify resolved
-    let conflicts = store.get_conflicts_for_claim(claim_a.id).await.unwrap();
+    let conflicts = store
+        .get_conflicts_for_claim(claim_a.id, tenant)
+        .await
+        .unwrap();
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].resolution_status, ResolutionStatus::Accepted);
     assert!(conflicts[0].resolved_at.is_some());
@@ -411,7 +421,7 @@ async fn test_e2e_ingest_conflict_resolve() {
     let claims = store.query_claims(tenant, &[]).await.unwrap();
     assert_eq!(claims.len(), 3);
 
-    let conflicts = store.get_conflicts_for_claim(c1.id).await.unwrap();
+    let conflicts = store.get_conflicts_for_claim(c1.id, tenant).await.unwrap();
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].resolution_status, ResolutionStatus::Open);
 
@@ -419,6 +429,7 @@ async fn test_e2e_ingest_conflict_resolve() {
     store
         .resolve_conflict(
             conflict.id,
+            tenant,
             ResolutionStatus::Dismissed,
             Some("c2 source unreliable".into()),
         )
@@ -426,12 +437,12 @@ async fn test_e2e_ingest_conflict_resolve() {
         .unwrap();
 
     // Step 5: Update c2 confidence down (superseded)
-    store.update_confidence(c2.id, 0.1).await.unwrap();
+    store.update_confidence(c2.id, tenant, 0.1).await.unwrap();
     let updated = store.get_claim(c2.id, tenant).await.unwrap();
     assert!(updated.confidence < 0.2);
 
     // Step 6: Verify conflict resolved
-    let conflicts = store.get_conflicts_for_claim(c1.id).await.unwrap();
+    let conflicts = store.get_conflicts_for_claim(c1.id, tenant).await.unwrap();
     assert_eq!(conflicts[0].resolution_status, ResolutionStatus::Dismissed);
 
     cleanup(&pool, tenant).await;

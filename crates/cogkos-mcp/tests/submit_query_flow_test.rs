@@ -79,11 +79,15 @@ impl ClaimStore for MockClaimStore {
         Ok(claims.clone())
     }
 
-    async fn update_activation(&self, _id: Id, _delta: f64) -> Result<()> {
+    async fn update_activation(&self, _id: Id, _tenant_id: &str, _delta: f64) -> Result<()> {
         Ok(())
     }
 
-    async fn get_conflicts_for_claim(&self, _claim_id: Id) -> Result<Vec<ConflictRecord>> {
+    async fn get_conflicts_for_claim(
+        &self,
+        _claim_id: Id,
+        _tenant_id: &str,
+    ) -> Result<Vec<ConflictRecord>> {
         Ok(Vec::new())
     }
 
@@ -107,7 +111,7 @@ impl ClaimStore for MockClaimStore {
         Ok(claims.clone())
     }
 
-    async fn update_confidence(&self, _id: Id, _confidence: f64) -> Result<()> {
+    async fn update_confidence(&self, _id: Id, _tenant_id: &str, _confidence: f64) -> Result<()> {
         Ok(())
     }
 
@@ -127,6 +131,7 @@ impl ClaimStore for MockClaimStore {
     async fn resolve_conflict(
         &self,
         _conflict_id: uuid::Uuid,
+        _tenant_id: &str,
         _status: cogkos_core::models::ResolutionStatus,
         _note: Option<String>,
     ) -> Result<()> {

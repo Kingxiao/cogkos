@@ -93,7 +93,11 @@ async fn test_update_activation() {
     let id = claim.id;
     stores.claims.insert_claim(&claim).await.unwrap();
 
-    stores.claims.update_activation(id, 0.2).await.unwrap();
+    stores
+        .claims
+        .update_activation(id, "t1", 0.2)
+        .await
+        .unwrap();
     let r = stores.claims.get_claim(id, "t1").await.unwrap();
     assert!(r.activation_weight > 0.5); // default is 0.5, should increase
 }
@@ -105,7 +109,11 @@ async fn test_update_confidence() {
     let id = claim.id;
     stores.claims.insert_claim(&claim).await.unwrap();
 
-    stores.claims.update_confidence(id, 0.95).await.unwrap();
+    stores
+        .claims
+        .update_confidence(id, "t1", 0.95)
+        .await
+        .unwrap();
     let r = stores.claims.get_claim(id, "t1").await.unwrap();
     assert_eq!(r.confidence, 0.95);
 }

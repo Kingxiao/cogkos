@@ -212,7 +212,7 @@ pub(crate) async fn run_confidence_boost(
                         let new_confidence = (similar_claim.confidence + boost_factor).min(0.95);
                         if let Err(e) = stores
                             .claims
-                            .update_confidence(similar_id, new_confidence)
+                            .update_confidence(similar_id, tenant_id, new_confidence)
                             .await
                         {
                             warn!(error = %e, claim_id = %similar_id, "Failed to boost confidence");

@@ -213,7 +213,11 @@ async fn test_conflict_resolution_flow() {
     stores.claims.insert_conflict(&conflict).await.unwrap();
 
     // Verify conflict exists as Open
-    let conflicts = stores.claims.get_conflicts_for_claim(c1.id).await.unwrap();
+    let conflicts = stores
+        .claims
+        .get_conflicts_for_claim(c1.id, "t1")
+        .await
+        .unwrap();
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].resolution_status, ResolutionStatus::Open);
 
@@ -222,6 +226,7 @@ async fn test_conflict_resolution_flow() {
         .claims
         .resolve_conflict(
             conflict_id,
+            "t1",
             ResolutionStatus::Accepted,
             Some("Both claims valid in different contexts".into()),
         )
@@ -229,7 +234,11 @@ async fn test_conflict_resolution_flow() {
         .unwrap();
 
     // Verify resolution persisted
-    let conflicts = stores.claims.get_conflicts_for_claim(c1.id).await.unwrap();
+    let conflicts = stores
+        .claims
+        .get_conflicts_for_claim(c1.id, "t1")
+        .await
+        .unwrap();
     assert_eq!(conflicts[0].resolution_status, ResolutionStatus::Accepted);
     assert!(conflicts[0].resolved_at.is_some());
     assert_eq!(

@@ -1,0 +1,5 @@
+# cargo-audit configuration
+[advisories]
+# RUSTSEC-2023-0071: rsa crate Marvin Attack (timing sidechannel)
+# No patch available. Transitive dependency, not used for network-facing RSA operations.
+ignore = ["RUSTSEC-2023-0071"]

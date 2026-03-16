@@ -295,7 +295,14 @@ impl super::ClaimStore for PostgresStore {
         rows.iter().map(row_to_claim).collect()
     }
 
-    async fn update_activation(&self, id: Id, delta: f64) -> Result<()> {
+    async fn update_activation(&self, id: Id, tenant_id: &str, delta: f64) -> Result<()> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         sqlx::query(
             r#"
             UPDATE epistemic_claims SET
@@ -308,14 +315,29 @@ impl super::ClaimStore for PostgresStore {
         )
         .bind(delta)
         .bind(id)
-        .execute(&self.pool)
+        .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(())
     }
 
-    async fn get_conflicts_for_claim(&self, claim_id: Id) -> Result<Vec<ConflictRecord>> {
+    async fn get_conflicts_for_claim(
+        &self,
+        claim_id: Id,
+        tenant_id: &str,
+    ) -> Result<Vec<ConflictRecord>> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         let rows = sqlx::query(r#"
             SELECT id, tenant_id, claim_a_id, claim_b_id, conflict_type, severity,
                 description, detected_at, resolved_at, resolution, resolution_status, elevated_insight_id
@@ -323,9 +345,13 @@ impl super::ClaimStore for PostgresStore {
             WHERE claim_a_id = $1 OR claim_b_id = $1
         "#)
         .bind(claim_id)
-        .fetch_all(&self.pool)
+        .fetch_all(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter().map(row_to_conflict).collect()
     }
@@ -415,15 +441,26 @@ impl super::ClaimStore for PostgresStore {
         rows.iter().map(row_to_claim).collect()
     }
 
-    async fn update_confidence(&self, id: Id, confidence: f64) -> Result<()> {
+    async fn update_confidence(&self, id: Id, tenant_id: &str, confidence: f64) -> Result<()> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         sqlx::query(
             "UPDATE epistemic_claims SET confidence = $1, updated_at = NOW() WHERE id = $2",
         )
         .bind(confidence)
         .bind(id)
-        .execute(&self.pool)
+        .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
         Ok(())
     }
 
@@ -552,9 +589,17 @@ impl super::ClaimStore for PostgresStore {
     async fn resolve_conflict(
         &self,
         conflict_id: uuid::Uuid,
+        tenant_id: &str,
         status: cogkos_core::models::ResolutionStatus,
         note: Option<String>,
     ) -> Result<()> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         sqlx::query(
             r#"
             UPDATE conflict_records
@@ -567,9 +612,13 @@ impl super::ClaimStore for PostgresStore {
         .bind(format!("{:?}", status))
         .bind(&note)
         .bind(conflict_id)
-        .execute(&self.pool)
+        .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(())
     }
@@ -963,8 +1012,8 @@ impl From<PgGapRecord> for KnowledgeGapRecord {
 impl super::AuthStore for PostgresStore {
     async fn validate_api_key(&self, api_key: &str) -> Result<(String, Vec<String>)> {
         let result = sqlx::query(
-            "SELECT tenant_id, permissions FROM api_keys 
-             WHERE key_hash = md5($1) AND enabled = true 
+            "SELECT tenant_id, permissions FROM api_keys
+             WHERE key_hash = crypt($1, key_hash) AND enabled = true
              AND (expires_at IS NULL OR expires_at > NOW())",
         )
         .bind(api_key)
@@ -987,8 +1036,8 @@ impl super::AuthStore for PostgresStore {
         let api_key = uuid::Uuid::new_v4().to_string();
 
         sqlx::query(
-            "INSERT INTO api_keys (key_hash, tenant_id, name, permissions) 
-             VALUES (md5($1), $2, 'auto-generated', $3)",
+            "INSERT INTO api_keys (key_hash, tenant_id, name, permissions)
+             VALUES (crypt($1, gen_salt('bf')), $2, 'auto-generated', $3)",
         )
         .bind(&api_key)
         .bind(tenant_id)

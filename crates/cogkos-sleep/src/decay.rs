@@ -151,7 +151,7 @@ pub async fn decay_claims(
 
             if let Err(e) = stores
                 .claims
-                .update_confidence(claim.id, new_confidence)
+                .update_confidence(claim.id, tenant_id, new_confidence)
                 .await
             {
                 warn!(error = %e, claim_id = %claim.id, "Failed to update confidence");
@@ -204,7 +204,7 @@ pub async fn revalidate_claim(
 
     stores
         .claims
-        .update_confidence(claim_id, new_confidence)
+        .update_confidence(claim_id, tenant_id, new_confidence)
         .await?;
 
     Ok(new_confidence)
