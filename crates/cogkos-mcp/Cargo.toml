@@ -1,0 +1,45 @@
+[package]
+name = "cogkos-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "MCP Server implementation for CogKOS"
+
+[dependencies]
+cogkos-core = { path = "../cogkos-core" }
+cogkos-store = { path = "../cogkos-store" }
+cogkos-llm = { path = "../cogkos-llm" }
+cogkos-ingest = { path = "../cogkos-ingest", features = ["whisper"] }
+
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+rmcp.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+config.workspace = true
+fastembed.workspace = true
+hex.workspace = true
+sha2.workspace = true
+lru.workspace = true
+base64 = "0.22"
+rand = "0.8"
+deadpool-redis = { version = "0.23", optional = true }
+
+[features]
+default = []
+redis-ratelimit = ["dep:deadpool-redis"]
+
+[dev-dependencies]
+tokio-test.workspace = true
+mockall.workspace = true
+reqwest.workspace = true
+async-trait = "0.1"

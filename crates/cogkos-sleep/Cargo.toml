@@ -1,0 +1,33 @@
+[package]
+name = "cogkos-sleep"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CogKOS Sleep-Time Compute - Scheduler, Consolidation, Decay, and Conflict Detection"
+
+[dependencies]
+cogkos-core = { path = "../cogkos-core" }
+cogkos-store = { path = "../cogkos-store" }
+cogkos-llm = { path = "../cogkos-llm" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+futures = { workspace = true }
+tokio-util = { workspace = true }
+statrs = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
