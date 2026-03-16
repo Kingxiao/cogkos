@@ -1,0 +1,20 @@
+#!/bin/bash
+# pre-commit hook: 检查敏感信息
+
+echo "🔍 检查敏感信息..."
+
+# 检查 staged 文件中的 API Key 模式
+if git diff --cached -- '*.rs' '*.toml' '*.yaml' '*.yml' '*.json' '*.env' '*.sh' | grep -E "sk-[a-zA-Z0-9]{20,}" > /dev/null 2>&1; then
+    echo "❌ 拒绝提交：检测到疑似 API Key (sk-*)"
+    echo "请移除敏感信息后重试，或使用环境变量代替硬编码"
+    exit 1
+fi
+
+# 检查 staged 文件中的密码/密钥模式
+if git diff --cached -- '*.rs' '*.toml' '*.yaml' '*.yml' '*.json' '*.env' | grep -Ei "(password|secret|private_key|api_key)\s*[:=]\s*['\"]?[a-zA-Z0-9]" > /dev/null 2>&1; then
+    echo "⚠️ 警告：检测到疑似硬编码密码/密钥"
+    echo "建议使用环境变量或 .env 文件"
+fi
+
+echo "✅ 通过敏感信息检查"
+exit 0
