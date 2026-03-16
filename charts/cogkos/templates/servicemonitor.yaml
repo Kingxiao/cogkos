@@ -1,0 +1,23 @@
+{{- if and .Values.observability.metrics.enabled .Values.observability.metrics.serviceMonitor.enabled }}
+# Prometheus ServiceMonitor (2026年Operator标准)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "cogkos.fullname" . }}-metrics
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+  {{- if .Values.observability.metrics.serviceMonitor.namespace }}
+  namespace: {{ .Values.observability.metrics.serviceMonitor.namespace }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "cogkos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.observability.metrics.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.observability.metrics.serviceMonitor.scrapeTimeout }}
+      honorLabels: true
+{{- end }}

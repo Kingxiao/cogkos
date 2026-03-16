@@ -1,0 +1,94 @@
+{{- if .Values.sleep.enabled }}
+{{- if .Values.sleep.consolidation.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "cogkos.fullname" . }}-consolidation
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sleep-task
+spec:
+  schedule: {{ .Values.sleep.consolidation.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "cogkos.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: sleep-task
+        spec:
+          serviceAccountName: {{ include "cogkos.serviceAccountName" . }}
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: consolidator
+              image: "{{ .Values.global.imageRegistry }}{{ .Values.sleep.image.repository }}:{{ .Values.sleep.image.tag | default .Chart.AppVersion }}"
+              command: ["/app/cogkos-sleep", "consolidate"]
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "cogkos.fullname" . }}-secrets
+                      key: database-url
+              resources:
+                {{- toYaml .Values.sleep.consolidation.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+{{- end }}
+{{- if .Values.sleep.decay.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "cogkos.fullname" . }}-decay
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sleep-task
+spec:
+  schedule: {{ .Values.sleep.decay.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          serviceAccountName: {{ include "cogkos.serviceAccountName" . }}
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: decay
+              image: "{{ .Values.global.imageRegistry }}{{ .Values.sleep.image.repository }}:{{ .Values.sleep.image.tag | default .Chart.AppVersion }}"
+              command: ["/app/cogkos-sleep", "decay"]
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "cogkos.fullname" . }}-secrets
+                      key: database-url
+              resources:
+                {{- toYaml .Values.sleep.decay.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+{{- end }}
+{{- end }}

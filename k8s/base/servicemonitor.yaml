@@ -1,0 +1,22 @@
+# Prometheus ServiceMonitor (使用Prometheus Operator 2026年标准)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cogkos-metrics
+  labels:
+    app: cogkos
+spec:
+  selector:
+    matchLabels:
+      app: cogkos
+      component: mcp
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'cogkos_.*'
+          action: keep

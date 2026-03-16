@@ -1,0 +1,39 @@
+apiVersion: v2
+# Helm 3.16+ Chart版本
+name: cogkos
+description: CogKOS - Cognitive Knowledge Operating System
+# 2026年Helm Chart标准格式
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.28.0-0"
+keywords:
+  - knowledge-graph
+  - mcp
+  - ai
+  - cognitive
+home: https://cogkos.io
+sources:
+  - https://github.com/cogkos/cogkos
+maintainers:
+  - name: CogKOS Team
+    email: team@cogkos.io
+annotations:
+  category: AI/ML
+  licenses: MIT
+  # Artifact Hub注解 (2026年标准)
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/changes: |
+    - Initial release
+  artifacthub.io/images: |
+    - name: cogkos
+      image: cogkos/cogkos:v0.1.0
+    - name: cogkos-sleep
+      image: cogkos/cogkos-sleep:v0.1.0
+  artifacthub.io/links: |
+    - name: source
+      url: https://github.com/cogkos/cogkos
+    - name: support
+      url: https://github.com/cogkos/cogkos/issues
+  artifacthub.io/operator: "false"
+  artifacthub.io/requiresKubeVersion: ">= 1.28.0"

@@ -1,0 +1,29 @@
+[package]
+name = "cogkos"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "cogkos"
+path = "main.rs"
+
+[dependencies]
+cogkos-core = { path = "../crates/cogkos-core" }
+cogkos-ingest = { path = "../crates/cogkos-ingest", features = ["whisper"] }
+cogkos-llm = { path = "../crates/cogkos-llm" }
+cogkos-workflow = { path = "../crates/cogkos-workflow" }
+cogkos-store = { path = "../crates/cogkos-store" }
+cogkos-federation = { path = "../crates/cogkos-federation" }
+cogkos-external = { path = "../crates/cogkos-external" }
+cogkos-mcp = { path = "../crates/cogkos-mcp" }
+cogkos-sleep = { path = "../crates/cogkos-sleep" }
+
+tokio = { version = "1", features = ["full"] }
+env_logger = "0.11"
+toml = "0.8"
+
+[[bin]]
+name = "test_embedding"
+path = "test_embedding.rs"

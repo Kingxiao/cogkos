@@ -1,0 +1,36 @@
+{{- if .Values.mcp.autoscaling.enabled }}
+# HPA v2 - 2026年自动扩缩容标准
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "cogkos.fullname" . }}-mcp-hpa
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "cogkos.fullname" . }}-mcp
+  minReplicas: {{ .Values.mcp.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.mcp.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.mcp.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.mcp.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- with .Values.mcp.autoscaling.metrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- if .Values.mcp.autoscaling.behavior }}
+  behavior:
+    {{- toYaml .Values.mcp.autoscaling.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}

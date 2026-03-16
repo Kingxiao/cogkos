@@ -1,0 +1,18 @@
+{{/* 测试模板文件 */}}
+{{- if .Values.mcp.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "cogkos.fullname" . }}-test-connection"
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox:1.36
+      command: ['wget']
+      args: ['{{ include "cogkos.fullname" . }}-mcp:{{ .Values.mcp.service.port }}/health']
+  restartPolicy: Never
+{{- end }}

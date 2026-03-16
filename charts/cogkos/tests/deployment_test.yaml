@@ -1,0 +1,31 @@
+# Helm Chart测试文件
+suite: test cogkos deployment
+templates:
+  - deployment.yaml
+tests:
+  - it: should create deployment with correct name
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: cogkos-mcp
+
+  - it: should have correct container image
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: cogkos/cogkos:v0.1.0
+
+  - it: should have security context
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+
+  - it: should have probes
+    asserts:
+      - isNotNull:
+          path: spec.template.spec.containers[0].livenessProbe
+      - isNotNull:
+          path: spec.template.spec.containers[0].readinessProbe

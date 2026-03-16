@@ -1,0 +1,14 @@
+{{- if .Values.mcp.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cogkos.fullname" . }}-mcp-pdb
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.mcp.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "cogkos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp
+{{- end }}

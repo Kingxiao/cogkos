@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cogkos-config
+data:
+  default.toml: |
+    [server]
+    host = "0.0.0.0"
+    port = 3000
+    max_connections = 10000
+    request_timeout_secs = 30
+    
+    [cache]
+    enabled = true
+    ttl_seconds = 3600
+    max_entries = 10000
+    
+    [evolution]
+    conflict_detection_enabled = true
+    decay_interval_hours = 24
+    consolidation_interval_hours = 6
+    
+    [activation]
+    sample_rate = 1.0
+    batch_flush_interval_ms = 5000
+    batch_max_size = 1000
+    
+    [ingest]
+    max_file_size_mb = 500
+    supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx"]
+    
+    [telemetry]
+    metrics_enabled = true
+    tracing_enabled = true
+    
+    [security]
+    cors_allow_origins = ["*"]
+    rate_limit_requests_per_minute = 1000

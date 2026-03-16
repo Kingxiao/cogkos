@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cogkos-prod
+
+resources:
+  - ../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: prod
+
+replicas:
+  - name: cogkos-mcp
+    count: 5
+
+images:
+  - name: cogkos/cogkos
+    newTag: v0.1.0
+  - name: cogkos/cogkos-sleep
+    newTag: v0.1.0
+
+configMapGenerator:
+  - name: cogkos-config
+    behavior: merge
+    literals:
+      - RUST_LOG=warn
+
+secretGenerator:
+  - name: cogkos-secrets
+    behavior: merge
+    # 生产环境使用外部密钥管理，这里仅作占位
+    # 实际部署时使用: kustomize edit set secret cogkos-secrets --from-file=...
+
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: cogkos-mcp-hpa
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 5
+      - op: replace
+        path: /spec/maxReplicas
+        value: 100
+      - op: add
+        path: /spec/metrics/-
+        value:
+          type: External
+          external:
+            metric:
+              name: pubsub.googleapis.com|subscription|num_undelivered_messages
+              selector:
+                matchLabels:
+                  resource.labels.subscription_id: cogkos-tasks
+            target:
+              type: AverageValue
+              averageValue: "30"
+  - target:
+      kind: Deployment
+      name: cogkos-mcp
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "4Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "4000m"
+  - target:
+      kind: PodDisruptionBudget
+      name: cogkos-mcp-pdb
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 3

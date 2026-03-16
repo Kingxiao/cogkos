@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cogkos.fullname" . }}-config
+  labels:
+    {{- include "cogkos.labels" . | nindent 4 }}
+data:
+  default.toml: |
+    [server]
+    host = "{{ .Values.config.server.host }}"
+    port = {{ .Values.config.server.port }}
+    max_connections = {{ .Values.config.server.maxConnections }}
+    request_timeout_secs = {{ .Values.config.server.requestTimeoutSecs }}
+    
+    [cache]
+    enabled = {{ .Values.config.cache.enabled }}
+    ttl_seconds = {{ .Values.config.cache.ttlSeconds }}
+    max_entries = {{ .Values.config.cache.maxEntries }}
+    
+    [evolution]
+    conflict_detection_enabled = {{ .Values.config.evolution.conflictDetectionEnabled }}
+    decay_interval_hours = {{ .Values.config.evolution.decayIntervalHours }}
+    consolidation_interval_hours = {{ .Values.config.evolution.consolidationIntervalHours }}
+    
+    [activation]
+    sample_rate = {{ .Values.config.activation.sampleRate }}
+    batch_flush_interval_ms = {{ .Values.config.activation.batchFlushIntervalMs }}
+    batch_max_size = {{ .Values.config.activation.batchMaxSize }}
+    
+    [telemetry]
+    metrics_enabled = {{ .Values.observability.metrics.enabled }}
+    tracing_enabled = {{ .Values.observability.tracing.enabled }}
+    jaeger_endpoint = "{{ .Values.observability.tracing.jaeger.endpoint }}"
+    
+    [security]
+    rate_limit_requests_per_minute = 1000

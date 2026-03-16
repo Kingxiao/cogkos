@@ -1,0 +1,34 @@
+# Kustomization - 基础资源配置
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cogkos
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - serviceaccount.yaml
+  - service.yaml
+  - deployment.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - cronjobs.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/name: cogkos
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: cogkos/cogkos
+    newTag: v0.1.0
+  - name: cogkos/cogkos-sleep
+    newTag: v0.1.0
+
+configMapGenerator:
+  - name: cogkos-config
+    behavior: merge
+    literals:
+      - RUST_LOG=info
