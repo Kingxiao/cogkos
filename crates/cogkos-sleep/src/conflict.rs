@@ -276,47 +276,48 @@ pub async fn detect_conflicts_enhanced(
 
     // If LLM semantic detection is enabled and we have a client
     if config.use_semantic
-        && let Some(client) = llm_client {
-            let existing_claims = stores
-                .claims
-                .search_claims(
-                    &new_claim.tenant_id,
-                    &new_claim.content,
-                    config.max_comparison_batch,
-                )
-                .await?;
+        && let Some(client) = llm_client
+    {
+        let existing_claims = stores
+            .claims
+            .search_claims(
+                &new_claim.tenant_id,
+                &new_claim.content,
+                config.max_comparison_batch,
+            )
+            .await?;
 
-            // Only run LLM on pairs not already flagged by rule-based detection
-            let flagged_ids: std::collections::HashSet<_> = conflicts
-                .iter()
-                .flat_map(|c| vec![c.claim_a_id, c.claim_b_id])
-                .collect();
+        // Only run LLM on pairs not already flagged by rule-based detection
+        let flagged_ids: std::collections::HashSet<_> = conflicts
+            .iter()
+            .flat_map(|c| vec![c.claim_a_id, c.claim_b_id])
+            .collect();
 
-            for existing in &existing_claims {
-                if existing.id == new_claim.id || flagged_ids.contains(&existing.id) {
-                    continue;
-                }
+        for existing in &existing_claims {
+            if existing.id == new_claim.id || flagged_ids.contains(&existing.id) {
+                continue;
+            }
 
-                if let Some(conflict_type) =
-                    detect_llm_semantic_conflict(new_claim, existing, client).await
-                {
-                    let mut record = ConflictRecord::new(
-                        new_claim.tenant_id.clone(),
-                        new_claim.id,
-                        existing.id,
-                        conflict_type,
-                    );
-                    record.description = Some(describe_conflict(&conflict_type));
-                    record.severity = calculate_conflict_severity(new_claim, existing);
+            if let Some(conflict_type) =
+                detect_llm_semantic_conflict(new_claim, existing, client).await
+            {
+                let mut record = ConflictRecord::new(
+                    new_claim.tenant_id.clone(),
+                    new_claim.id,
+                    existing.id,
+                    conflict_type,
+                );
+                record.description = Some(describe_conflict(&conflict_type));
+                record.severity = calculate_conflict_severity(new_claim, existing);
 
-                    if let Err(e) = stores.claims.insert_conflict(&record).await {
-                        error!(error = %e, "Failed to store LLM-detected conflict");
-                    } else {
-                        conflicts.push(record);
-                    }
+                if let Err(e) = stores.claims.insert_conflict(&record).await {
+                    error!(error = %e, "Failed to store LLM-detected conflict");
+                } else {
+                    conflicts.push(record);
                 }
             }
         }
+    }
 
     Ok(conflicts)
 }

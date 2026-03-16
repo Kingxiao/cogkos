@@ -1033,10 +1033,7 @@ mod tests {
 
         let mut counts = HashMap::new();
         for i in 0..1000 {
-            if let Some(v) = fw
-                .assign_variant(&test_id, &format!("exec-{}", i))
-                .unwrap()
-            {
+            if let Some(v) = fw.assign_variant(&test_id, &format!("exec-{}", i)).unwrap() {
                 *counts.entry(v).or_insert(0u32) += 1;
             }
         }
@@ -1059,10 +1056,7 @@ mod tests {
 
         let mut counts = HashMap::new();
         for i in 0..1000 {
-            if let Some(v) = fw
-                .assign_variant(&test_id, &format!("exec-{}", i))
-                .unwrap()
-            {
+            if let Some(v) = fw.assign_variant(&test_id, &format!("exec-{}", i)).unwrap() {
                 *counts.entry(v).or_insert(0u32) += 1;
             }
         }
@@ -1070,7 +1064,12 @@ mod tests {
         let c0 = *counts.get("variant-0").unwrap_or(&0);
         let c1 = *counts.get("variant-1").unwrap_or(&0);
         // variant-0 should get ~90%, variant-1 ~10%
-        assert!(c0 > c1 * 3, "variant-0={} should dominate variant-1={}", c0, c1);
+        assert!(
+            c0 > c1 * 3,
+            "variant-0={} should dominate variant-1={}",
+            c0,
+            c1
+        );
     }
 
     #[test]
@@ -1111,10 +1110,7 @@ mod tests {
 
         let mut counts = HashMap::new();
         for i in 0..900 {
-            if let Some(v) = fw
-                .assign_variant(&test_id, &format!("exec-{}", i))
-                .unwrap()
-            {
+            if let Some(v) = fw.assign_variant(&test_id, &format!("exec-{}", i)).unwrap() {
                 *counts.entry(v).or_insert(0u32) += 1;
             }
         }

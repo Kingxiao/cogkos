@@ -551,15 +551,15 @@ impl LlmClient for AnthropicClient {
                         for line in text.lines() {
                             if let Some(data) = line.strip_prefix("data: ")
                                 && let Ok(event) = serde_json::from_str::<serde_json::Value>(data)
-                                    && event.get("type").and_then(|t| t.as_str())
-                                        == Some("content_block_delta")
-                                        && let Some(text) = event
-                                            .get("delta")
-                                            .and_then(|d| d.get("text"))
-                                            .and_then(|t| t.as_str())
-                                        {
-                                            contents.push(Ok(text.to_string()));
-                                        }
+                                && event.get("type").and_then(|t| t.as_str())
+                                    == Some("content_block_delta")
+                                && let Some(text) = event
+                                    .get("delta")
+                                    .and_then(|d| d.get("text"))
+                                    .and_then(|t| t.as_str())
+                            {
+                                contents.push(Ok(text.to_string()));
+                            }
                         }
 
                         Some(futures::stream::iter(contents))

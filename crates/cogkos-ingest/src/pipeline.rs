@@ -349,9 +349,9 @@ impl IngestionPipeline {
                 && let Err(e) = graph_store
                     .create_edge(file_claim_id, chunk_claim.id, "CONTAINS", 1.0)
                     .await
-                {
-                    tracing::warn!(error = %e, "Failed to create graph edge");
-                }
+            {
+                tracing::warn!(error = %e, "Failed to create graph edge");
+            }
         }
 
         // 7. Detect conflicts
@@ -380,7 +380,8 @@ impl IngestionPipeline {
             1.0
         };
 
-        cogkos_core::monitoring::METRICS.record_duration("cogkos_ingest_duration_seconds", ingest_start.elapsed());
+        cogkos_core::monitoring::METRICS
+            .record_duration("cogkos_ingest_duration_seconds", ingest_start.elapsed());
         cogkos_core::monitoring::METRICS.inc_counter("cogkos_ingest_total", 1);
 
         Ok(IngestResult {

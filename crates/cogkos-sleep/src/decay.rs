@@ -8,13 +8,13 @@
 //! - Business knowledge: StepFunction (version replacement, no natural decay)
 //! - Experiential/Learned knowledge: ExponentialDecay
 
-use serde::{Deserialize, Serialize};
 use cogkos_core::Result;
 use cogkos_core::evolution::decay::{
     calculate_decay, calculate_decay_with_revalidation, calculate_effective_durability,
     needs_revalidation,
 };
 use cogkos_store::Stores;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 

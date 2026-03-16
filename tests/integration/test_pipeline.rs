@@ -120,7 +120,10 @@ async fn test_pipeline_ingest_text_document() {
         .unwrap();
 
     // Verify results
-    assert!(!result.chunk_claim_ids.is_empty(), "Should have chunk claims");
+    assert!(
+        !result.chunk_claim_ids.is_empty(),
+        "Should have chunk claims"
+    );
     assert!(result.novelty_score >= 0.0 && result.novelty_score <= 1.0);
     assert!(result.deep_classification.is_some());
 

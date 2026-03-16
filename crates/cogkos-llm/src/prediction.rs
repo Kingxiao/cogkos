@@ -134,18 +134,21 @@ Rules:
         }
 
         // Simple statistical approach: use highest confidence belief
-        let best_belief = match beliefs
-            .iter()
-            .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal))
-        {
+        let best_belief = match beliefs.iter().max_by(|a, b| {
+            a.confidence
+                .partial_cmp(&b.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) {
             Some(b) => b,
-            None => return Ok(PredictionResult {
-                content: "No beliefs available for prediction".to_string(),
-                confidence: 0.0,
-                method: PredictionMethod::StatisticalTrend,
-                based_on_claims: vec![],
-                sampling_analysis: None,
-            }),
+            None => {
+                return Ok(PredictionResult {
+                    content: "No beliefs available for prediction".to_string(),
+                    confidence: 0.0,
+                    method: PredictionMethod::StatisticalTrend,
+                    based_on_claims: vec![],
+                    sampling_analysis: None,
+                });
+            }
         };
 
         // Generate a simple prediction based on the best belief

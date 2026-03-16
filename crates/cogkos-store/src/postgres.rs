@@ -13,7 +13,9 @@ fn validate_tenant_id(tenant_id: &str) -> Result<()> {
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
     {
-        return Err(CogKosError::InvalidInput("Invalid tenant_id format: must match [a-z0-9_-]+".to_string()));
+        return Err(CogKosError::InvalidInput(
+            "Invalid tenant_id format: must match [a-z0-9_-]+".to_string(),
+        ));
     }
     Ok(())
 }
@@ -30,19 +32,13 @@ impl PostgresStore {
 
     /// Set RLS tenant context on a connection.
     /// Must be called within a transaction for `SET LOCAL` to scope correctly.
-    async fn set_tenant_context(
-        conn: &mut sqlx::PgConnection,
-        tenant_id: &str,
-    ) -> Result<()> {
+    async fn set_tenant_context(conn: &mut sqlx::PgConnection, tenant_id: &str) -> Result<()> {
         validate_tenant_id(tenant_id)?;
         // SET LOCAL does not support $1 parameters, so we validate strictly above.
-        sqlx::query(&format!(
-            "SET LOCAL app.current_tenant = '{}'",
-            tenant_id
-        ))
-        .execute(&mut *conn)
-        .await
-        .map_err(|e| CogKosError::Database(e.to_string()))?;
+        sqlx::query(&format!("SET LOCAL app.current_tenant = '{}'", tenant_id))
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
         Ok(())
     }
 
@@ -53,7 +49,6 @@ impl PostgresStore {
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Ok(Self { pool })
     }
-
 }
 
 #[async_trait]
@@ -70,7 +65,10 @@ impl super::ClaimStore for PostgresStore {
         let metadata_json =
             serde_json::to_value(&claim.metadata).map_err(CogKosError::Serialization)?;
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), &claim.tenant_id).await?;
 
@@ -111,17 +109,22 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        cogkos_core::monitoring::METRICS.record_duration("cogkos_db_insert_duration_seconds", db_start.elapsed());
+        cogkos_core::monitoring::METRICS
+            .record_duration("cogkos_db_insert_duration_seconds", db_start.elapsed());
 
         Ok(claim.id)
     }
 
     #[tracing::instrument(skip(self), fields(%id, %tenant_id))]
     async fn get_claim(&self, id: Id, tenant_id: &str) -> Result<EpistemicClaim> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -141,7 +144,8 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         match row {
@@ -161,7 +165,10 @@ impl super::ClaimStore for PostgresStore {
         let metadata_json =
             serde_json::to_value(&claim.metadata).map_err(CogKosError::Serialization)?;
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), &claim.tenant_id).await?;
 
@@ -202,7 +209,8 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(())
@@ -210,7 +218,10 @@ impl super::ClaimStore for PostgresStore {
 
     #[tracing::instrument(skip(self), fields(%id, %tenant_id))]
     async fn delete_claim(&self, id: Id, tenant_id: &str) -> Result<()> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -221,7 +232,8 @@ impl super::ClaimStore for PostgresStore {
             .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(())
@@ -263,7 +275,10 @@ impl super::ClaimStore for PostgresStore {
 
         query.push_str(" ORDER BY confidence DESC LIMIT 100");
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -273,7 +288,8 @@ impl super::ClaimStore for PostgresStore {
             .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter().map(row_to_claim).collect()
@@ -322,7 +338,10 @@ impl super::ClaimStore for PostgresStore {
     ) -> Result<Vec<EpistemicClaim>> {
         let stage_str = stage.to_string();
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -345,7 +364,8 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter().map(row_to_claim).collect()
@@ -359,7 +379,10 @@ impl super::ClaimStore for PostgresStore {
         limit: usize,
     ) -> Result<Vec<EpistemicClaim>> {
         let db_start = std::time::Instant::now();
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -382,10 +405,12 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        cogkos_core::monitoring::METRICS.record_duration("cogkos_db_search_duration_seconds", db_start.elapsed());
+        cogkos_core::monitoring::METRICS
+            .record_duration("cogkos_db_search_duration_seconds", db_start.elapsed());
 
         rows.iter().map(row_to_claim).collect()
     }
@@ -408,7 +433,10 @@ impl super::ClaimStore for PostgresStore {
         threshold: f64,
         limit: usize,
     ) -> Result<Vec<EpistemicClaim>> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -431,7 +459,8 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter().map(row_to_claim).collect()
@@ -442,7 +471,10 @@ impl super::ClaimStore for PostgresStore {
         tenant_id: &str,
         limit: usize,
     ) -> Result<Vec<EpistemicClaim>> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -464,24 +496,27 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter().map(row_to_claim).collect()
     }
 
     async fn list_tenants(&self) -> Result<Vec<String>> {
-        let rows = sqlx::query_scalar::<_, String>(
-            "SELECT DISTINCT tenant_id FROM epistemic_claims"
-        )
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        let rows =
+            sqlx::query_scalar::<_, String>("SELECT DISTINCT tenant_id FROM epistemic_claims")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| CogKosError::Database(e.to_string()))?;
         Ok(rows)
     }
 
     async fn insert_conflict(&self, conflict: &ConflictRecord) -> Result<()> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), &conflict.tenant_id).await?;
 
@@ -507,7 +542,8 @@ impl super::ClaimStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Ok(())
     }
@@ -519,13 +555,15 @@ impl super::ClaimStore for PostgresStore {
         status: cogkos_core::models::ResolutionStatus,
         note: Option<String>,
     ) -> Result<()> {
-        sqlx::query(r#"
+        sqlx::query(
+            r#"
             UPDATE conflict_records
             SET resolution_status = $1,
                 resolution_note = $2,
                 resolved_at = NOW()
             WHERE id = $3
-        "#)
+        "#,
+        )
         .bind(format!("{:?}", status))
         .bind(&note)
         .bind(conflict_id)
@@ -596,7 +634,8 @@ fn row_to_claim(row: &PgRow) -> Result<EpistemicClaim> {
         last_prediction_error: row.try_get("last_prediction_error").ok(),
         derived_from: row.try_get("derived_from").unwrap_or_default(),
         superseded_by: row.try_get("superseded_by").ok(),
-        entity_refs: row.try_get::<sqlx::types::Json<Vec<cogkos_core::models::EntityRef>>, _>("entity_refs")
+        entity_refs: row
+            .try_get::<sqlx::types::Json<Vec<cogkos_core::models::EntityRef>>, _>("entity_refs")
             .map(|v| v.0)
             .unwrap_or_default(),
         needs_revalidation: row.try_get("needs_revalidation").unwrap_or(false),
@@ -711,7 +750,10 @@ impl GapStore for PostgresStore {
     async fn record_gap(&self, gap: &KnowledgeGapRecord) -> Result<uuid::Uuid> {
         let gap_id = gap.gap_id;
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), &gap.tenant_id).await?;
 
@@ -736,7 +778,8 @@ impl GapStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(gap_id)
@@ -748,7 +791,10 @@ impl GapStore for PostgresStore {
         domain: &str,
         description: &str,
     ) -> Result<Option<KnowledgeGapRecord>> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -766,7 +812,8 @@ impl GapStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(result.map(|row| KnowledgeGapRecord {
@@ -782,7 +829,10 @@ impl GapStore for PostgresStore {
     }
 
     async fn get_gaps(&self, tenant_id: &str) -> Result<Vec<KnowledgeGapRecord>> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -799,7 +849,8 @@ impl GapStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(results
@@ -822,7 +873,10 @@ impl GapStore for PostgresStore {
         tenant_id: &str,
         domain: &str,
     ) -> Result<Vec<KnowledgeGapRecord>> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
@@ -840,7 +894,8 @@ impl GapStore for PostgresStore {
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(results

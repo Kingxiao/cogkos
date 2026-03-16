@@ -25,7 +25,7 @@ CogKOS (Cognitive Knowledge Operating System) 是一个专为 AI Agent 设计的
 
 ### 环境要求
 
-- **Rust**: 1.85+ (项目使用 edition 2024, rust-version = "1.91")
+- **Rust**: 1.94+ (项目使用 edition 2024)
 - **PostgreSQL**: 16+ (with pgvector extension)
 - **FalkorDB**: (Redis 协议兼容)
 - **Docker & Docker Compose**: (推荐用于本地开发)
@@ -50,9 +50,7 @@ docker-compose ps
 这将启动：
 - PostgreSQL with pgvector (端口 5432) - 主数据库 + 向量检索
 - FalkorDB (端口 6379) - 图数据库
-- SeaweedFS S3 (端口 8333/9333) - 分布式对象存储
-- NATS JetStream (端口 4222, 可选)
-- Redis (端口 6380)
+- SeaweedFS (端口 9333 Master / 8080 Volume / 8333 S3 / 8888 Filer) - 分布式对象存储
 
 ### 3. 数据库迁移
 
@@ -313,12 +311,10 @@ curl -X POST http://localhost:3000/mcp/query \
 | 层级 | 组件 | 技术 |
 |------|------|------|
 | MCP Server | MCP 协议层 | Rust + rmcp SDK (stdio / Streamable HTTP) |
-| 关系数据库 | 元数据、审计日志 | PostgreSQL 16 |
+| 关系数据库 | 元数据、审计日志 | PostgreSQL 17 |
 | 向量检索 | 语义检索 | PostgreSQL pgvector |
 | 图数据库 | 知识图谱、关系存储 | FalkorDB |
 | 对象存储 | 原始文档存储 | S3 / SeaweedFS |
-| 消息队列 | 异步任务队列 | NATS JetStream |
-| 缓存 | 查询缓存 | Redis |
 
 ## 🤝 贡献
 

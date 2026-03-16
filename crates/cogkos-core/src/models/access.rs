@@ -47,7 +47,7 @@ impl ApiKey {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccessEnvelope {
     pub visibility: Visibility,
-    
+
     #[serde(default)]
     pub allowed_roles: Vec<String>,
     #[serde(default)]
@@ -59,7 +59,7 @@ impl AccessEnvelope {
     pub fn new(_tenant_id: impl Into<String>) -> Self {
         Self {
             visibility: Visibility::Tenant,
-            
+
             allowed_roles: Vec::new(),
             gdpr_applicable: false,
         }
@@ -84,7 +84,7 @@ impl AccessEnvelope {
 
         Self {
             visibility,
-            
+
             allowed_roles: Vec::new(),
             gdpr_applicable: matches!(claimant, Claimant::ExternalPublic { .. }),
         }

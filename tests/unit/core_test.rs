@@ -10,9 +10,16 @@ mod models_tests {
             "Test claim content",
             "tenant_1",
             NodeType::Entity,
-            Claimant::Human { user_id: "user_1".into(), role: "researcher".into() },
+            Claimant::Human {
+                user_id: "user_1".into(),
+                role: "researcher".into(),
+            },
             AccessEnvelope::new("tenant_1"),
-            ProvenanceRecord::new("direct_observation".into(), "observation".into(), "manual".into()),
+            ProvenanceRecord::new(
+                "direct_observation".into(),
+                "observation".into(),
+                "manual".into(),
+            ),
         );
 
         assert_eq!(claim.tenant_id, "tenant_1");
@@ -27,7 +34,10 @@ mod models_tests {
             "Test",
             "tenant_1",
             NodeType::Entity,
-            Claimant::Human { user_id: "u1".into(), role: "r".into() },
+            Claimant::Human {
+                user_id: "u1".into(),
+                role: "r".into(),
+            },
             AccessEnvelope::new("tenant_1"),
             ProvenanceRecord::new("test".into(), "test".into(), "test".into()),
         );
@@ -69,9 +79,12 @@ mod models_tests {
     #[test]
     fn test_activation_capped_at_one() {
         let mut claim = EpistemicClaim::new(
-            "Test", "t1", NodeType::Entity,
+            "Test",
+            "t1",
+            NodeType::Entity,
             Claimant::System,
-            AccessEnvelope::new("t1"), ProvenanceRecord::new("test".into(), "test".into(), "test".into()),
+            AccessEnvelope::new("t1"),
+            ProvenanceRecord::new("test".into(), "test".into(), "test".into()),
         );
         for _ in 0..100 {
             claim.record_access(0.5);
@@ -82,9 +95,15 @@ mod models_tests {
     #[test]
     fn test_serialization_roundtrip() {
         let claim = EpistemicClaim::new(
-            "The sky is blue", "tenant-1", NodeType::Insight,
-            Claimant::Human { user_id: "u1".into(), role: "observer".into() },
-            AccessEnvelope::new("tenant-1"), ProvenanceRecord::new("observation".into(), "observation".into(), "manual".into()),
+            "The sky is blue",
+            "tenant-1",
+            NodeType::Insight,
+            Claimant::Human {
+                user_id: "u1".into(),
+                role: "observer".into(),
+            },
+            AccessEnvelope::new("tenant-1"),
+            ProvenanceRecord::new("observation".into(), "observation".into(), "manual".into()),
         );
         let json = serde_json::to_string(&claim).unwrap();
         let de: EpistemicClaim = serde_json::from_str(&json).unwrap();
@@ -94,7 +113,13 @@ mod models_tests {
 
     #[test]
     fn test_node_type_serde() {
-        for t in [NodeType::Entity, NodeType::Relation, NodeType::Event, NodeType::Attribute, NodeType::Prediction] {
+        for t in [
+            NodeType::Entity,
+            NodeType::Relation,
+            NodeType::Event,
+            NodeType::Attribute,
+            NodeType::Prediction,
+        ] {
             let json = serde_json::to_string(&t).unwrap();
             let _: NodeType = serde_json::from_str(&json).unwrap();
         }
@@ -110,7 +135,13 @@ mod models_tests {
 
     #[test]
     fn test_consolidation_stage_serde() {
-        for s in [ConsolidationStage::FastTrack, ConsolidationStage::PendingAggregation, ConsolidationStage::Consolidated, ConsolidationStage::Insight, ConsolidationStage::Archived] {
+        for s in [
+            ConsolidationStage::FastTrack,
+            ConsolidationStage::PendingAggregation,
+            ConsolidationStage::Consolidated,
+            ConsolidationStage::Insight,
+            ConsolidationStage::Archived,
+        ] {
             let json = serde_json::to_string(&s).unwrap();
             let _: ConsolidationStage = serde_json::from_str(&json).unwrap();
         }
@@ -132,8 +163,14 @@ mod error_tests {
     fn test_error_codes() {
         assert_eq!(CogKosError::NotFound("x".into()).error_code(), "NOT_FOUND");
         assert_eq!(CogKosError::Forbidden("x".into()).error_code(), "FORBIDDEN");
-        assert_eq!(CogKosError::InvalidInput("x".into()).error_code(), "INVALID_INPUT");
-        assert_eq!(CogKosError::Database("x".into()).error_code(), "DATABASE_ERROR");
+        assert_eq!(
+            CogKosError::InvalidInput("x".into()).error_code(),
+            "INVALID_INPUT"
+        );
+        assert_eq!(
+            CogKosError::Database("x".into()).error_code(),
+            "DATABASE_ERROR"
+        );
     }
 
     #[test]

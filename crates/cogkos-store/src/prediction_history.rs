@@ -135,8 +135,11 @@ impl PredictionHistoryStore for InMemoryPredictionStore {
 
     async fn get_statistics(&self, tenant_id: &str) -> Result<PredictionStats> {
         let records = self.records.read().await;
-        let tenant_records: Vec<_> = records.iter().filter(|r| r.tenant_id == tenant_id).collect();
-        
+        let tenant_records: Vec<_> = records
+            .iter()
+            .filter(|r| r.tenant_id == tenant_id)
+            .collect();
+
         if tenant_records.is_empty() {
             return Ok(PredictionStats {
                 total_predictions: 0,
@@ -148,16 +151,31 @@ impl PredictionHistoryStore for InMemoryPredictionStore {
         }
 
         let total = tenant_records.len() as f64;
-        let avg_error: f64 = tenant_records.iter().map(|r| r.prediction_error).sum::<f64>() / total;
-        let avg_squared_error: f64 = tenant_records.iter().map(|r| r.squared_error).sum::<f64>() / total;
-        let accuracy: f64 = tenant_records.iter().filter(|r| {
-            let predicted = if r.predicted_probability > 0.5 { 1.0 } else { 0.0 };
-            predicted == r.actual_result
-        }).count() as f64 / total;
-        
-        let variance: f64 = tenant_records.iter()
+        let avg_error: f64 = tenant_records
+            .iter()
+            .map(|r| r.prediction_error)
+            .sum::<f64>()
+            / total;
+        let avg_squared_error: f64 =
+            tenant_records.iter().map(|r| r.squared_error).sum::<f64>() / total;
+        let accuracy: f64 = tenant_records
+            .iter()
+            .filter(|r| {
+                let predicted = if r.predicted_probability > 0.5 {
+                    1.0
+                } else {
+                    0.0
+                };
+                predicted == r.actual_result
+            })
+            .count() as f64
+            / total;
+
+        let variance: f64 = tenant_records
+            .iter()
             .map(|r| (r.prediction_error - avg_error).powi(2))
-            .sum::<f64>() / total;
+            .sum::<f64>()
+            / total;
         let error_std = variance.sqrt();
 
         Ok(PredictionStats {
@@ -176,33 +194,53 @@ impl PredictionHistoryStore for InMemoryPredictionStore {
         limit: usize,
     ) -> Result<Vec<WindowedStats>> {
         let records = self.records.read().await;
-        let tenant_records: Vec<_> = records.iter().filter(|r| r.tenant_id == tenant_id).collect();
-        
+        let tenant_records: Vec<_> = records
+            .iter()
+            .filter(|r| r.tenant_id == tenant_id)
+            .collect();
+
         if tenant_records.is_empty() {
             return Ok(Vec::new());
         }
 
-        let max_time = tenant_records.iter().map(|r| r.predicted_at).max().unwrap_or(0);
+        let max_time = tenant_records
+            .iter()
+            .map(|r| r.predicted_at)
+            .max()
+            .unwrap_or(0);
         let mut windows = Vec::new();
-        
+
         for i in 0..limit {
             let window_end = max_time - (i as i64 * window_seconds);
             let window_start = window_end - window_seconds;
-            
-            let window_records: Vec<_> = tenant_records.iter()
+
+            let window_records: Vec<_> = tenant_records
+                .iter()
                 .filter(|r| r.predicted_at >= window_start && r.predicted_at < window_end)
                 .collect();
-            
+
             if window_records.is_empty() {
                 continue;
             }
-            
+
             let count = window_records.len() as f64;
-            let avg_error: f64 = window_records.iter().map(|r| r.prediction_error).sum::<f64>() / count;
-            let accuracy: f64 = window_records.iter().filter(|r| {
-                let predicted = if r.predicted_probability > 0.5 { 1.0 } else { 0.0 };
-                predicted == r.actual_result
-            }).count() as f64 / count;
+            let avg_error: f64 = window_records
+                .iter()
+                .map(|r| r.prediction_error)
+                .sum::<f64>()
+                / count;
+            let accuracy: f64 = window_records
+                .iter()
+                .filter(|r| {
+                    let predicted = if r.predicted_probability > 0.5 {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    predicted == r.actual_result
+                })
+                .count() as f64
+                / count;
 
             windows.push(WindowedStats {
                 window_start,
@@ -216,16 +254,21 @@ impl PredictionHistoryStore for InMemoryPredictionStore {
         Ok(windows)
     }
 
-    async fn get_recent_errors(&self, tenant_id: &str, limit: usize) -> Result<Vec<PredictionErrorRecord>> {
+    async fn get_recent_errors(
+        &self,
+        tenant_id: &str,
+        limit: usize,
+    ) -> Result<Vec<PredictionErrorRecord>> {
         let records = self.records.read().await;
-        let mut tenant_records: Vec<_> = records.iter()
+        let mut tenant_records: Vec<_> = records
+            .iter()
             .filter(|r| r.tenant_id == tenant_id)
             .cloned()
             .collect();
-        
+
         tenant_records.sort_by(|a, b| b.predicted_at.cmp(&a.predicted_at));
         tenant_records.truncate(limit);
-        
+
         Ok(tenant_records)
     }
 
@@ -235,24 +278,27 @@ impl PredictionHistoryStore for InMemoryPredictionStore {
         error_threshold: f64,
     ) -> Result<Vec<PredictionErrorRecord>> {
         let records = self.records.read().await;
-        let tenant_records: Vec<_> = records.iter()
+        let tenant_records: Vec<_> = records
+            .iter()
             .filter(|r| r.tenant_id == tenant_id && r.prediction_error > error_threshold)
             .cloned()
             .collect();
-        
+
         Ok(tenant_records)
     }
 
     async fn get_error_trend(&self, tenant_id: &str, points: usize) -> Result<Vec<(i64, f64)>> {
         let records = self.records.read().await;
-        let mut tenant_records: Vec<_> = records.iter()
+        let mut tenant_records: Vec<_> = records
+            .iter()
             .filter(|r| r.tenant_id == tenant_id)
             .cloned()
             .collect();
 
         tenant_records.sort_by(|a, b| a.predicted_at.cmp(&b.predicted_at));
 
-        let result: Vec<(i64, f64)> = tenant_records.iter()
+        let result: Vec<(i64, f64)> = tenant_records
+            .iter()
             .take(points)
             .map(|r| (r.predicted_at, r.prediction_error))
             .collect();
@@ -450,10 +496,7 @@ mod tests {
         ];
         store.batch_record(&records).await.unwrap();
 
-        let windows = store
-            .get_windowed_stats("tenant-1", 1000, 3)
-            .await
-            .unwrap();
+        let windows = store.get_windowed_stats("tenant-1", 1000, 3).await.unwrap();
         // At least one window should have data
         assert!(!windows.is_empty());
         for w in &windows {

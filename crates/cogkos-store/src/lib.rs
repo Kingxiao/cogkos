@@ -417,7 +417,8 @@ impl ClaimStore for InMemoryClaimStore {
 
     async fn list_tenants(&self) -> Result<Vec<String>> {
         let claims = self.claims.read().await;
-        let tenants: std::collections::HashSet<_> = claims.values().map(|c| c.tenant_id.clone()).collect();
+        let tenants: std::collections::HashSet<_> =
+            claims.values().map(|c| c.tenant_id.clone()).collect();
         Ok(tenants.into_iter().collect())
     }
 
@@ -771,13 +772,16 @@ impl Default for InMemorySubscriptionStore {
 impl SubscriptionStore for InMemorySubscriptionStore {
     async fn create_subscription(&self, s: &SubscriptionSource) -> Result<uuid::Uuid> {
         let id = s.id;
-        self.data.write()
+        self.data
+            .write()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?
             .insert(id, s.clone());
         Ok(id)
     }
     async fn get_subscription(&self, _: &str, id: uuid::Uuid) -> Result<SubscriptionSource> {
-        let guard = self.data.read()
+        let guard = self
+            .data
+            .read()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?;
         match guard.get(&id) {
             Some(s) => Ok(s.clone()),
@@ -787,24 +791,30 @@ impl SubscriptionStore for InMemorySubscriptionStore {
         }
     }
     async fn update_subscription(&self, s: &SubscriptionSource) -> Result<()> {
-        self.data.write()
+        self.data
+            .write()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?
             .insert(s.id, s.clone());
         Ok(())
     }
     async fn delete_subscription(&self, _: &str, id: uuid::Uuid) -> Result<()> {
-        self.data.write()
+        self.data
+            .write()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?
             .remove(&id);
         Ok(())
     }
     async fn list_subscriptions(&self, _: &str) -> Result<Vec<SubscriptionSource>> {
-        let guard = self.data.read()
+        let guard = self
+            .data
+            .read()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?;
         Ok(guard.values().cloned().collect())
     }
     async fn list_enabled_subscriptions(&self, _: &str) -> Result<Vec<SubscriptionSource>> {
-        let guard = self.data.read()
+        let guard = self
+            .data
+            .read()
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?;
         Ok(guard.values().filter(|s| s.enabled).cloned().collect())
     }

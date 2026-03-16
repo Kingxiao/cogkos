@@ -87,7 +87,9 @@ async fn cleanup(pool: &PgPool, tenant_id: &str) {
 #[tokio::test]
 #[ignore]
 async fn test_insert_and_get_claim() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-insert";
     cleanup(&pool, tenant).await;
 
@@ -107,7 +109,9 @@ async fn test_insert_and_get_claim() {
 #[tokio::test]
 #[ignore]
 async fn test_update_claim() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-update";
     cleanup(&pool, tenant).await;
 
@@ -128,7 +132,9 @@ async fn test_update_claim() {
 #[tokio::test]
 #[ignore]
 async fn test_delete_claim() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-delete";
     cleanup(&pool, tenant).await;
 
@@ -145,7 +151,9 @@ async fn test_delete_claim() {
 #[tokio::test]
 #[ignore]
 async fn test_query_claims() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-query";
     cleanup(&pool, tenant).await;
 
@@ -163,14 +171,22 @@ async fn test_query_claims() {
 #[tokio::test]
 #[ignore]
 async fn test_tenant_isolation() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant_a = "test-iso-a";
     let tenant_b = "test-iso-b";
     cleanup(&pool, tenant_a).await;
     cleanup(&pool, tenant_b).await;
 
-    store.insert_claim(&make_claim(tenant_a, "Tenant A data")).await.unwrap();
-    store.insert_claim(&make_claim(tenant_b, "Tenant B data")).await.unwrap();
+    store
+        .insert_claim(&make_claim(tenant_a, "Tenant A data"))
+        .await
+        .unwrap();
+    store
+        .insert_claim(&make_claim(tenant_b, "Tenant B data"))
+        .await
+        .unwrap();
 
     let a_claims = store.query_claims(tenant_a, &[]).await.unwrap();
     let b_claims = store.query_claims(tenant_b, &[]).await.unwrap();
@@ -191,7 +207,9 @@ async fn test_tenant_isolation() {
 #[tokio::test]
 #[ignore]
 async fn test_insert_conflict() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-conflict";
     cleanup(&pool, tenant).await;
 
@@ -228,7 +246,9 @@ async fn test_insert_conflict() {
 #[tokio::test]
 #[ignore]
 async fn test_record_gap() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-gap";
     cleanup(&pool, tenant).await;
 
@@ -252,7 +272,9 @@ async fn test_record_gap() {
 #[tokio::test]
 #[ignore]
 async fn test_update_activation() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-activation";
     cleanup(&pool, tenant).await;
 
@@ -262,7 +284,11 @@ async fn test_update_activation() {
     store.update_activation(claim.id, 0.3).await.unwrap();
 
     let fetched = store.get_claim(claim.id, tenant).await.unwrap();
-    assert!(fetched.activation_weight > 0.79, "Expected ~0.8 (0.5+0.3), got {}", fetched.activation_weight);
+    assert!(
+        fetched.activation_weight > 0.79,
+        "Expected ~0.8 (0.5+0.3), got {}",
+        fetched.activation_weight
+    );
 
     cleanup(&pool, tenant).await;
 }
@@ -270,7 +296,9 @@ async fn test_update_activation() {
 #[tokio::test]
 #[ignore]
 async fn test_resolve_conflict() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-resolve";
     cleanup(&pool, tenant).await;
 
@@ -299,7 +327,11 @@ async fn test_resolve_conflict() {
 
     // Resolve it
     store
-        .resolve_conflict(conflict_id, ResolutionStatus::Accepted, Some("Context dependent".into()))
+        .resolve_conflict(
+            conflict_id,
+            ResolutionStatus::Accepted,
+            Some("Context dependent".into()),
+        )
         .await
         .unwrap();
 
@@ -315,14 +347,22 @@ async fn test_resolve_conflict() {
 #[tokio::test]
 #[ignore]
 async fn test_list_tenants() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant_x = "test-tenant-x";
     let tenant_y = "test-tenant-y";
     cleanup(&pool, tenant_x).await;
     cleanup(&pool, tenant_y).await;
 
-    store.insert_claim(&make_claim(tenant_x, "Claim X")).await.unwrap();
-    store.insert_claim(&make_claim(tenant_y, "Claim Y")).await.unwrap();
+    store
+        .insert_claim(&make_claim(tenant_x, "Claim X"))
+        .await
+        .unwrap();
+    store
+        .insert_claim(&make_claim(tenant_y, "Claim Y"))
+        .await
+        .unwrap();
 
     let tenants = store.list_tenants().await.unwrap();
     assert!(tenants.contains(&tenant_x.to_string()));
@@ -335,7 +375,9 @@ async fn test_list_tenants() {
 #[tokio::test]
 #[ignore]
 async fn test_e2e_ingest_conflict_resolve() {
-    let Some((store, pool)) = setup().await else { return };
+    let Some((store, pool)) = setup().await else {
+        return;
+    };
     let tenant = "test-e2e";
     cleanup(&pool, tenant).await;
 
@@ -375,7 +417,11 @@ async fn test_e2e_ingest_conflict_resolve() {
 
     // Step 4: Resolve conflict
     store
-        .resolve_conflict(conflict.id, ResolutionStatus::Dismissed, Some("c2 source unreliable".into()))
+        .resolve_conflict(
+            conflict.id,
+            ResolutionStatus::Dismissed,
+            Some("c2 source unreliable".into()),
+        )
         .await
         .unwrap();
 

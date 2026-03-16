@@ -9,7 +9,10 @@ use tracing::{debug, error, info, warn};
 use uuid;
 
 /// Run consolidation task
-pub(crate) async fn run_consolidation(stores: &Arc<Stores>, config: &ConsolidationConfig) -> Result<usize> {
+pub(crate) async fn run_consolidation(
+    stores: &Arc<Stores>,
+    config: &ConsolidationConfig,
+) -> Result<usize> {
     info!("Running scheduled consolidation");
 
     // Get all active tenants from database

@@ -2,14 +2,14 @@
 
 use anyhow::Result;
 use cogkos_llm::{LlmClientBuilder, ProviderType};
-use cogkos_mcp::{start_mcp_server, McpConfig};
-use cogkos_store::{postgres::PostgresStore, postgres_audit::PostgresAuditStore, Stores};
+use cogkos_mcp::{McpConfig, start_mcp_server};
+use cogkos_store::{Stores, postgres::PostgresStore, postgres_audit::PostgresAuditStore};
 use config::{Config, File, FileFormat};
 use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt};
 
 /// Application configuration
 #[derive(Clone, Debug, Deserialize)]
@@ -44,14 +44,27 @@ pub struct ServerConfig {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { host: default_host(), port: default_port(), max_connections: default_max_connections(), request_timeout_secs: default_request_timeout() }
+        Self {
+            host: default_host(),
+            port: default_port(),
+            max_connections: default_max_connections(),
+            request_timeout_secs: default_request_timeout(),
+        }
     }
 }
 
-fn default_host() -> String { "0.0.0.0".to_string() }
-fn default_port() -> u16 { 3000 }
-fn default_max_connections() -> usize { 10000 }
-fn default_request_timeout() -> u64 { 30 }
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+fn default_port() -> u16 {
+    3000
+}
+fn default_max_connections() -> usize {
+    10000
+}
+fn default_request_timeout() -> u64 {
+    30
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct CacheConfig {
@@ -65,13 +78,23 @@ pub struct CacheConfig {
 
 impl Default for CacheConfig {
     fn default() -> Self {
-        Self { enabled: default_true(), ttl_seconds: default_ttl(), max_entries: default_max_entries() }
+        Self {
+            enabled: default_true(),
+            ttl_seconds: default_ttl(),
+            max_entries: default_max_entries(),
+        }
     }
 }
 
-fn default_true() -> bool { true }
-fn default_ttl() -> i64 { 3600 }
-fn default_max_entries() -> usize { 10000 }
+fn default_true() -> bool {
+    true
+}
+fn default_ttl() -> i64 {
+    3600
+}
+fn default_max_entries() -> usize {
+    10000
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseConfig {
@@ -99,11 +122,21 @@ impl Default for DatabaseConfig {
     }
 }
 
-fn default_database_url() -> String { "postgres://localhost:5432/cogkos".to_string() }
-fn default_pg_max_connections() -> u32 { 20 }
-fn default_pg_min_connections() -> u32 { 2 }
-fn default_pg_idle_timeout() -> u64 { 600 }
-fn default_pg_acquire_timeout() -> u64 { 5 }
+fn default_database_url() -> String {
+    "postgres://localhost:5432/cogkos".to_string()
+}
+fn default_pg_max_connections() -> u32 {
+    20
+}
+fn default_pg_min_connections() -> u32 {
+    2
+}
+fn default_pg_idle_timeout() -> u64 {
+    600
+}
+fn default_pg_acquire_timeout() -> u64 {
+    5
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct FalkorDbConfig {
@@ -114,11 +147,20 @@ pub struct FalkorDbConfig {
 }
 
 impl Default for FalkorDbConfig {
-    fn default() -> Self { Self { url: default_falkordb_url(), graph_name: default_falkordb_graph() } }
+    fn default() -> Self {
+        Self {
+            url: default_falkordb_url(),
+            graph_name: default_falkordb_graph(),
+        }
+    }
 }
 
-fn default_falkordb_url() -> String { "redis://localhost:6379".to_string() }
-fn default_falkordb_graph() -> String { "cogkos".to_string() }
+fn default_falkordb_url() -> String {
+    "redis://localhost:6379".to_string()
+}
+fn default_falkordb_graph() -> String {
+    "cogkos".to_string()
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct S3Config {
@@ -136,14 +178,28 @@ pub struct S3Config {
 
 impl Default for S3Config {
     fn default() -> Self {
-        Self { endpoint: None, region: default_s3_region(), bucket: default_s3_bucket(), access_key: default_s3_access_key(), secret_key: default_s3_secret_key() }
+        Self {
+            endpoint: None,
+            region: default_s3_region(),
+            bucket: default_s3_bucket(),
+            access_key: default_s3_access_key(),
+            secret_key: default_s3_secret_key(),
+        }
     }
 }
 
-fn default_s3_region() -> String { "us-east-1".to_string() }
-fn default_s3_bucket() -> String { "cogkos-docs".to_string() }
-fn default_s3_access_key() -> String { String::new() }
-fn default_s3_secret_key() -> String { String::new() }
+fn default_s3_region() -> String {
+    "us-east-1".to_string()
+}
+fn default_s3_bucket() -> String {
+    "cogkos-docs".to_string()
+}
+fn default_s3_access_key() -> String {
+    String::new()
+}
+fn default_s3_secret_key() -> String {
+    String::new()
+}
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct SecurityConfig {
@@ -153,7 +209,9 @@ pub struct SecurityConfig {
     pub rate_limit_requests_per_minute: usize,
 }
 
-fn default_rate_limit() -> usize { 1000 }
+fn default_rate_limit() -> usize {
+    1000
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TelemetryConfig {
@@ -167,7 +225,11 @@ pub struct TelemetryConfig {
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
-        Self { metrics_enabled: default_true(), tracing_enabled: default_true(), jaeger_endpoint: None }
+        Self {
+            metrics_enabled: default_true(),
+            tracing_enabled: default_true(),
+            jaeger_endpoint: None,
+        }
     }
 }
 
@@ -217,8 +279,7 @@ fn load_config() -> Result<AppConfig> {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging + optional OpenTelemetry tracing
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let json_logging = std::env::var("LOG_FORMAT").as_deref() == Ok("json");
 
     // Check if OTLP endpoint is configured (via env or config)
@@ -247,7 +308,10 @@ async fn main() -> Result<()> {
                 Some(tracer)
             }
             Err(e) => {
-                eprintln!("Failed to create OTLP exporter: {}, continuing without OTel", e);
+                eprintln!(
+                    "Failed to create OTLP exporter: {}, continuing without OTel",
+                    e
+                );
                 None
             }
         }
@@ -283,13 +347,32 @@ async fn main() -> Result<()> {
     let config = load_config().unwrap_or_else(|e| {
         info!("Failed to load config file, using defaults: {}", e);
         AppConfig {
-            server: ServerConfig { host: "0.0.0.0".to_string(), port: 3000, max_connections: 10000, request_timeout_secs: 30 },
-            cache: CacheConfig { enabled: true, ttl_seconds: 3600, max_entries: 10000 },
+            server: ServerConfig {
+                host: "0.0.0.0".to_string(),
+                port: 3000,
+                max_connections: 10000,
+                request_timeout_secs: 30,
+            },
+            cache: CacheConfig {
+                enabled: true,
+                ttl_seconds: 3600,
+                max_entries: 10000,
+            },
             database: DatabaseConfig::default(),
-            falkordb: FalkorDbConfig { url: default_falkordb_url(), graph_name: default_falkordb_graph() },
+            falkordb: FalkorDbConfig {
+                url: default_falkordb_url(),
+                graph_name: default_falkordb_graph(),
+            },
             s3: S3Config::default(),
-            security: SecurityConfig { cors_allow_origins: vec!["*".to_string()], rate_limit_requests_per_minute: 1000 },
-            telemetry: TelemetryConfig { metrics_enabled: true, tracing_enabled: true, jaeger_endpoint: None },
+            security: SecurityConfig {
+                cors_allow_origins: vec!["*".to_string()],
+                rate_limit_requests_per_minute: 1000,
+            },
+            telemetry: TelemetryConfig {
+                metrics_enabled: true,
+                tracing_enabled: true,
+                jaeger_endpoint: None,
+            },
         }
     });
 
@@ -315,15 +398,23 @@ async fn main() -> Result<()> {
             match PgPoolOptions::new()
                 .max_connections(config.database.max_connections)
                 .min_connections(config.database.min_connections)
-                .acquire_timeout(std::time::Duration::from_secs(config.database.acquire_timeout_secs))
-                .idle_timeout(std::time::Duration::from_secs(config.database.idle_timeout_secs))
+                .acquire_timeout(std::time::Duration::from_secs(
+                    config.database.acquire_timeout_secs,
+                ))
+                .idle_timeout(std::time::Duration::from_secs(
+                    config.database.idle_timeout_secs,
+                ))
                 .connect(&database_url)
                 .await
             {
                 Ok(pool) => break pool,
                 Err(e) if retries > 0 => {
                     retries -= 1;
-                    tracing::warn!(retries_left = retries, "PostgreSQL connection failed: {}", e);
+                    tracing::warn!(
+                        retries_left = retries,
+                        "PostgreSQL connection failed: {}",
+                        e
+                    );
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                 }
                 Err(e) => return Err(e.into()),
@@ -362,7 +453,7 @@ async fn main() -> Result<()> {
     let vector_store = Arc::new(
         cogkos_store::PgVectorStore::new(pg_pool.clone(), 512)
             .await
-            .map_err(|e| anyhow::anyhow!("PgVectorStore init failed: {}", e))?
+            .map_err(|e| anyhow::anyhow!("PgVectorStore init failed: {}", e))?,
     );
 
     // Create object store (S3)
@@ -374,8 +465,9 @@ async fn main() -> Result<()> {
             &s3_bucket,
             &s3_access_key,
             &s3_secret_key,
-        ).await
-        .map_err(|e| anyhow::anyhow!("S3 connection failed: {}", e))?
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("S3 connection failed: {}", e))?,
     );
 
     // Create audit store (schema already created by migrations)
@@ -399,10 +491,8 @@ async fn main() -> Result<()> {
 
     // Start sleep-time scheduler
     info!("Starting sleep-time scheduler...");
-    let scheduler = cogkos_sleep::Scheduler::new(
-        stores_arc,
-        cogkos_sleep::SchedulerConfig::default(),
-    );
+    let scheduler =
+        cogkos_sleep::Scheduler::new(stores_arc, cogkos_sleep::SchedulerConfig::default());
     let scheduler_handle = scheduler.cancellation_token();
     tokio::spawn(async move {
         scheduler.start().await;
@@ -429,8 +519,8 @@ async fn main() -> Result<()> {
         None
     };
 
-    let embedding_client = if let Ok(api_key) = std::env::var("EMBEDDING_API_KEY")
-        .or_else(|_| std::env::var("OPENAI_API_KEY"))
+    let embedding_client = if let Ok(api_key) =
+        std::env::var("EMBEDDING_API_KEY").or_else(|_| std::env::var("OPENAI_API_KEY"))
     {
         let provider = match std::env::var("EMBEDDING_PROVIDER").as_deref() {
             Ok("anthropic") => ProviderType::Anthropic,
@@ -452,7 +542,10 @@ async fn main() -> Result<()> {
     info!("Starting MCP server...");
     let mcp_config = McpConfig {
         host: std::env::var("MCP_HOST").unwrap_or(config.server.host),
-        port: std::env::var("MCP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(config.server.port),
+        port: std::env::var("MCP_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(config.server.port),
         max_connections: config.server.max_connections,
         cache_ttl_seconds: config.cache.ttl_seconds,
         cache_max_entries: config.cache.max_entries,
@@ -461,7 +554,9 @@ async fn main() -> Result<()> {
 
     // Validate S3 credentials at startup
     if s3_access_key.is_empty() || s3_secret_key.is_empty() {
-        tracing::warn!("S3_ACCESS_KEY or S3_SECRET_KEY is empty — object storage operations will fail");
+        tracing::warn!(
+            "S3_ACCESS_KEY or S3_SECRET_KEY is empty — object storage operations will fail"
+        );
     }
 
     // Start health/readiness HTTP endpoint for k8s probes
@@ -476,7 +571,11 @@ async fn main() -> Result<()> {
         let listener = match tokio::net::TcpListener::bind(("0.0.0.0", health_port)).await {
             Ok(l) => l,
             Err(e) => {
-                tracing::error!(port = health_port, "Failed to bind health check port: {}", e);
+                tracing::error!(
+                    port = health_port,
+                    "Failed to bind health check port: {}",
+                    e
+                );
                 return;
             }
         };
@@ -492,10 +591,7 @@ async fn main() -> Result<()> {
 
                     if req.contains("/readyz") {
                         // Readiness: check DB + FalkorDB connectivity
-                        let pg_ok = sqlx::query("SELECT 1")
-                            .fetch_one(&pool)
-                            .await
-                            .is_ok();
+                        let pg_ok = sqlx::query("SELECT 1").fetch_one(&pool).await.is_ok();
                         let redis_ok = match redis.get().await {
                             Ok(mut conn) => {
                                 use deadpool_redis::redis::AsyncCommands;
@@ -504,14 +600,15 @@ async fn main() -> Result<()> {
                             Err(_) => false,
                         };
                         if pg_ok && redis_ok {
-                            let _ = stream.write_all(
-                                b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nready"
-                            ).await;
+                            let _ = stream
+                                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nready")
+                                .await;
                         } else {
                             let body = format!("pg={} redis={}", pg_ok, redis_ok);
                             let resp = format!(
                                 "HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\n\r\n{}",
-                                body.len(), body
+                                body.len(),
+                                body
                             );
                             let _ = stream.write_all(resp.as_bytes()).await;
                         }
@@ -541,9 +638,9 @@ async fn main() -> Result<()> {
                         let _ = stream.write_all(body.as_bytes()).await;
                     } else {
                         // Liveness: always 200
-                        let _ = stream.write_all(
-                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
-                        ).await;
+                        let _ = stream
+                            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+                            .await;
                     }
                 });
             }
@@ -555,8 +652,9 @@ async fn main() -> Result<()> {
         let ctrl_c = tokio::signal::ctrl_c();
         #[cfg(unix)]
         {
-            let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("failed to install SIGTERM handler");
+            let mut sigterm =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .expect("failed to install SIGTERM handler");
             tokio::select! {
                 _ = ctrl_c => info!("Received SIGINT, draining connections..."),
                 _ = sigterm.recv() => info!("Received SIGTERM, draining connections..."),

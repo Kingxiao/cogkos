@@ -409,7 +409,11 @@ pub async fn handle_get_meta_directory(
         })
         .collect();
 
-    entries.sort_by(|a, b| b.expertise_score.partial_cmp(&a.expertise_score).unwrap_or(std::cmp::Ordering::Equal));
+    entries.sort_by(|a, b| {
+        b.expertise_score
+            .partial_cmp(&a.expertise_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     if let Some(min_score) = req.min_expertise_score {
         entries.retain(|e| e.expertise_score >= min_score);

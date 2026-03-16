@@ -2,13 +2,11 @@
 
 use crate::merger::{MergeConfig, merge_results};
 use crate::server::JsonRpcError;
-use cogkos_core::models::*;
 use cogkos_core::Result;
+use cogkos_core::models::*;
 use cogkos_ingest::EmbeddingService;
 use cogkos_llm::{LlmClient, LlmRequest, Message, Role};
-use cogkos_store::{
-    CacheStore, ClaimStore, GapStore, GraphStore, KnowledgeGapRecord, VectorStore,
-};
+use cogkos_store::{CacheStore, ClaimStore, GapStore, GraphStore, KnowledgeGapRecord, VectorStore};
 use std::sync::Arc;
 
 use super::helpers::{calculate_query_hash, generate_query_vector};
@@ -221,42 +219,41 @@ pub async fn handle_query_knowledge(
         }
 
         // Delegate to sampling for conflict analysis if requested
-        if req.delegate_to_sampling && !sampling_conflicts.is_empty()
+        if req.delegate_to_sampling
+            && !sampling_conflicts.is_empty()
             && let Some(ref client) = llm_client
         {
-                let knowledge_items: Vec<crate::server::KnowledgeItem> = claims
-                    .iter()
-                    .map(|c| crate::server::KnowledgeItem {
-                        id: c.id.to_string(),
-                        content: c.content.clone(),
-                        confidence: c.confidence as f32,
-                        source: None,
-                    })
-                    .collect();
+            let knowledge_items: Vec<crate::server::KnowledgeItem> = claims
+                .iter()
+                .map(|c| crate::server::KnowledgeItem {
+                    id: c.id.to_string(),
+                    content: c.content.clone(),
+                    confidence: c.confidence as f32,
+                    source: None,
+                })
+                .collect();
 
-                let context = crate::server::SamplingContext {
-                    knowledge_items,
-                    conflicts: sampling_conflicts,
-                    query_context: Some(req.query.clone()),
-                    extra: std::collections::HashMap::new(),
-                };
+            let context = crate::server::SamplingContext {
+                knowledge_items,
+                conflicts: sampling_conflicts,
+                query_context: Some(req.query.clone()),
+                extra: std::collections::HashMap::new(),
+            };
 
-                let sampling_req = crate::server::SamplingRequest {
-                    sampling_type: crate::server::SamplingType::ConflictAnalysis,
-                    context,
-                    prompt:
-                        "Analyze the conflicts detected in the knowledge base and provide insights"
-                            .to_string(),
-                    max_tokens: 1024,
-                };
+            let sampling_req = crate::server::SamplingRequest {
+                sampling_type: crate::server::SamplingType::ConflictAnalysis,
+                context,
+                prompt: "Analyze the conflicts detected in the knowledge base and provide insights"
+                    .to_string(),
+                max_tokens: 1024,
+            };
 
-                let client_ref: &dyn LlmClient = client.as_ref();
-                if let Ok(sampling_result) = call_sampling_protocol(client_ref, sampling_req).await
-                {
-                    for conflict in &mut conflicts {
-                        conflict.sampling_analysis = Some(sampling_result.content.clone());
-                    }
+            let client_ref: &dyn LlmClient = client.as_ref();
+            if let Ok(sampling_result) = call_sampling_protocol(client_ref, sampling_req).await {
+                for conflict in &mut conflicts {
+                    conflict.sampling_analysis = Some(sampling_result.content.clone());
                 }
+            }
         }
     }
 
@@ -268,7 +265,9 @@ pub async fn handle_query_knowledge(
     };
 
     // Delegate to sampling for prediction generation if requested
-    if req.delegate_to_sampling && prediction.is_some() && !claims.is_empty()
+    if req.delegate_to_sampling
+        && prediction.is_some()
+        && !claims.is_empty()
         && let Some(ref client) = llm_client
     {
         let knowledge_items: Vec<crate::server::KnowledgeItem> = claims
@@ -291,8 +290,7 @@ pub async fn handle_query_knowledge(
         let sampling_req = crate::server::SamplingRequest {
             sampling_type: crate::server::SamplingType::PredictionGeneration,
             context,
-            prompt: "Generate a more detailed prediction based on the knowledge base"
-                .to_string(),
+            prompt: "Generate a more detailed prediction based on the knowledge base".to_string(),
             max_tokens: 1024,
         };
 

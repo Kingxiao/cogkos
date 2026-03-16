@@ -10,10 +10,7 @@ pub mod wikipedia;
 pub use arxiv::ArxivConnector;
 pub use error::{ExternalError, Result};
 pub use polling::RssSubscriptionManager;
-pub use rss::{
-    RssConnector, RssFeedConfig, RssFeedItem,
-    RssFeedManager,
-};
+pub use rss::{RssConnector, RssFeedConfig, RssFeedItem, RssFeedManager};
 pub use search::{AggregatedSearchEngine, DuckDuckGoConnector, SearchEngine, SerpApiConnector};
 pub use types::{ConnectorConfig, ExternalDocument, SearchQuery, SearchResult, SourceType};
 pub use webhook::{
@@ -121,8 +118,9 @@ impl ExternalKnowledgeManager {
         use futures::future::join_all;
 
         #[allow(clippy::type_complexity)]
-        let mut futures: Vec<Pin<Box<dyn Future<Output = (String, Result<SearchResult>)> + Send>>> =
-            Vec::new();
+        let mut futures: Vec<
+            Pin<Box<dyn Future<Output = (String, Result<SearchResult>)> + Send>>,
+        > = Vec::new();
 
         // Wikipedia
         if let Some(wiki) = &self.wikipedia {
@@ -185,7 +183,11 @@ impl ExternalKnowledgeManager {
         }
 
         // Sort by confidence
-        merged_docs.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        merged_docs.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Apply limit
         merged_docs.truncate(query.limit);

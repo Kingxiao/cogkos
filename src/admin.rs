@@ -1,8 +1,8 @@
 //! CogKOS Admin CLI - API key management
 
 use anyhow::Result;
-use cogkos_store::postgres::PostgresStore;
 use cogkos_store::AuthStore;
+use cogkos_store::postgres::PostgresStore;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 
@@ -35,9 +35,9 @@ async fn main() -> Result<()> {
             println!("Store this key securely - it cannot be retrieved later.");
         }
         "revoke-key" => {
-            let key_hash = args.get(2).ok_or_else(|| {
-                anyhow::anyhow!("Usage: cogkos-admin revoke-key <key_hash>")
-            })?;
+            let key_hash = args
+                .get(2)
+                .ok_or_else(|| anyhow::anyhow!("Usage: cogkos-admin revoke-key <key_hash>"))?;
 
             let store = connect_db().await?;
             store.revoke_api_key(key_hash).await?;
@@ -54,18 +54,26 @@ async fn main() -> Result<()> {
             if rows.is_empty() {
                 println!("No API keys found.");
             } else {
-                println!("{:<36} {:<16} {:<24} {:<8} CREATED", "HASH", "TENANT", "PERMISSIONS", "ENABLED");
+                println!(
+                    "{:<36} {:<16} {:<24} {:<8} CREATED",
+                    "HASH", "TENANT", "PERMISSIONS", "ENABLED"
+                );
                 println!("{}", "-".repeat(100));
                 for (hash, tenant, perms, enabled, created) in &rows {
-                    println!("{:<36} {:<16} {:<24} {:<8} {}", hash, tenant, format!("{:?}", perms), enabled, created.format("%Y-%m-%d %H:%M"));
+                    println!(
+                        "{:<36} {:<16} {:<24} {:<8} {}",
+                        hash,
+                        tenant,
+                        format!("{:?}", perms),
+                        enabled,
+                        created.format("%Y-%m-%d %H:%M")
+                    );
                 }
             }
         }
         "check-db" => {
             let pool = connect_pool().await?;
-            let row: (i64,) = sqlx::query_as("SELECT 1")
-                .fetch_one(&pool)
-                .await?;
+            let row: (i64,) = sqlx::query_as("SELECT 1").fetch_one(&pool).await?;
             println!("Database connection OK (result: {})", row.0);
         }
         _ => {

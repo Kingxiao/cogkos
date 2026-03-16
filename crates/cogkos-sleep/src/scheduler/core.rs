@@ -12,10 +12,10 @@ use tokio::sync::RwLock;
 use tokio::time::interval;
 use tracing::{error, info, warn};
 
-use super::{SchedulerConfig, SchedulerState, TaskType};
 use super::tasks::{
-    run_consolidation, run_pending_aggregation, run_decay, run_health_check, run_confidence_boost,
+    run_confidence_boost, run_consolidation, run_decay, run_health_check, run_pending_aggregation,
 };
+use super::{SchedulerConfig, SchedulerState, TaskType};
 
 /// Main scheduler
 pub struct Scheduler {

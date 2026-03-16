@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::Arc;
 use cogkos_store::Stores;
+use std::sync::Arc;
 
 #[test]
 fn task_type_names() {
@@ -79,11 +79,7 @@ async fn scheduler_check_budget_allows_within_limit() {
     let scheduler = Scheduler::new(stores, cfg);
 
     // Consolidation gets 15% of 10000 = 1500
-    assert!(
-        scheduler
-            .check_budget(TaskType::Consolidation, 100)
-            .await
-    );
+    assert!(scheduler.check_budget(TaskType::Consolidation, 100).await);
 }
 
 #[tokio::test]
@@ -94,11 +90,7 @@ async fn scheduler_check_budget_rejects_over_task_limit() {
     // HealthCheck gets 5% = 50
     let scheduler = Scheduler::new(stores, cfg);
 
-    assert!(
-        !scheduler
-            .check_budget(TaskType::HealthCheck, 51)
-            .await
-    );
+    assert!(!scheduler.check_budget(TaskType::HealthCheck, 51).await);
 }
 
 #[tokio::test]

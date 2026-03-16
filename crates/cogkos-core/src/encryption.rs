@@ -11,8 +11,8 @@ use aes_gcm::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use parking_lot::RwLock;
-use rand::rngs::OsRng;
 use rand::TryRngCore as _;
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

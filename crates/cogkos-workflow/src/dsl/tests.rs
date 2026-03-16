@@ -210,14 +210,13 @@ workflow "multi" {
 
 #[test]
 fn validate_duplicate_node_ids() {
-    let wf = minimal_workflow(
-        vec![task_node("dup"), task_node("dup")],
-        vec![],
-    );
+    let wf = minimal_workflow(vec![task_node("dup"), task_node("dup")], vec![]);
     let parser = WorkflowParser::new();
     let err = parser.validate(&wf).unwrap_err();
     match err {
-        crate::WorkflowError::InvalidDefinition(msg) => assert!(msg.contains("Duplicate node ID: dup")),
+        crate::WorkflowError::InvalidDefinition(msg) => {
+            assert!(msg.contains("Duplicate node ID: dup"))
+        }
         other => panic!("expected InvalidDefinition, got {:?}", other),
     }
 }
@@ -226,10 +225,7 @@ fn validate_duplicate_node_ids() {
 
 #[test]
 fn validate_edge_from_nonexistent_node() {
-    let wf = minimal_workflow(
-        vec![task_node("a")],
-        vec![seq_edge("ghost", "a")],
-    );
+    let wf = minimal_workflow(vec![task_node("a")], vec![seq_edge("ghost", "a")]);
     let parser = WorkflowParser::new();
     let err = parser.validate(&wf).unwrap_err();
     match err {
@@ -242,10 +238,7 @@ fn validate_edge_from_nonexistent_node() {
 
 #[test]
 fn validate_edge_to_nonexistent_node() {
-    let wf = minimal_workflow(
-        vec![task_node("a")],
-        vec![seq_edge("a", "ghost")],
-    );
+    let wf = minimal_workflow(vec![task_node("a")], vec![seq_edge("a", "ghost")]);
     let parser = WorkflowParser::new();
     let err = parser.validate(&wf).unwrap_err();
     match err {
@@ -288,10 +281,7 @@ fn validate_cycle_three_nodes() {
 
 #[test]
 fn validate_self_loop() {
-    let wf = minimal_workflow(
-        vec![task_node("a")],
-        vec![seq_edge("a", "a")],
-    );
+    let wf = minimal_workflow(vec![task_node("a")], vec![seq_edge("a", "a")]);
     let parser = WorkflowParser::new();
     let err = parser.validate(&wf).unwrap_err();
     match err {
@@ -329,7 +319,12 @@ fn validate_linear_chain_ok() {
 #[test]
 fn validate_diamond_dag_ok() {
     let wf = minimal_workflow(
-        vec![task_node("a"), task_node("b"), task_node("c"), task_node("d")],
+        vec![
+            task_node("a"),
+            task_node("b"),
+            task_node("c"),
+            task_node("d"),
+        ],
         vec![
             seq_edge("a", "b"),
             seq_edge("a", "c"),

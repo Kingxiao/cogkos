@@ -734,7 +734,10 @@ async fn test_submit_experience_with_knowledge_type() {
         structured_content: None,
         entity_refs: vec![],
         confidence: Some(0.95),
-        source: SourceInfo::Agent { agent_id: "test".to_string(), model: "test".to_string() },
+        source: SourceInfo::Agent {
+            agent_id: "test".to_string(),
+            model: "test".to_string(),
+        },
         valid_from: None,
         valid_to: None,
         tags: vec!["product".to_string(), "price".to_string()],
@@ -755,9 +758,9 @@ async fn test_submit_experience_with_knowledge_type() {
     // Verify claim was stored
     let stored_claims = stores.claims.lock().unwrap();
     assert_eq!(stored_claims.len(), 1, "Should have 1 claim stored");
-    
+
     // Verify knowledge_type is set (default should be Experiential)
     assert_eq!(stored_claims[0].knowledge_type, KnowledgeType::Experiential);
-    
+
     println!("✅ Knowledge type test passed!");
 }

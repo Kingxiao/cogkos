@@ -52,10 +52,7 @@ impl DocumentParser for PptxParser {
             let mut xml_content = String::new();
             if let Ok(mut file) = archive.by_name(slide_name) {
                 file.read_to_string(&mut xml_content).map_err(|e| {
-                    cogkos_core::CogKosError::Parse(format!(
-                        "Failed to read {}: {}",
-                        slide_name, e
-                    ))
+                    cogkos_core::CogKosError::Parse(format!("Failed to read {}: {}", slide_name, e))
                 })?;
             } else {
                 continue;
@@ -104,13 +101,12 @@ fn extract_text_from_slide_xml(xml: &str) -> String {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                if in_text_element
-                    && let Ok(text) = e.unescape() {
-                        let t = text.trim().to_string();
-                        if !t.is_empty() {
-                            current_paragraph.push(t);
-                        }
+                if in_text_element && let Ok(text) = e.unescape() {
+                    let t = text.trim().to_string();
+                    if !t.is_empty() {
+                        current_paragraph.push(t);
                     }
+                }
             }
             Ok(Event::End(ref e)) => {
                 let local = e.local_name();

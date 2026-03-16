@@ -1,7 +1,7 @@
 //! Subscription management handlers (Issue #132)
 
-use cogkos_core::models::*;
 use cogkos_core::Result;
+use cogkos_core::models::*;
 use cogkos_store::SubscriptionStore;
 
 use super::types::*;

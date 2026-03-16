@@ -66,7 +66,12 @@ fn test_provenance_record() {
 
 #[test]
 fn test_resolution_status_serde() {
-    for s in [ResolutionStatus::Open, ResolutionStatus::Elevated, ResolutionStatus::Dismissed, ResolutionStatus::Accepted] {
+    for s in [
+        ResolutionStatus::Open,
+        ResolutionStatus::Elevated,
+        ResolutionStatus::Dismissed,
+        ResolutionStatus::Accepted,
+    ] {
         let json = serde_json::to_string(&s).unwrap();
         let _: ResolutionStatus = serde_json::from_str(&json).unwrap();
     }

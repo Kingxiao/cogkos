@@ -29,7 +29,10 @@ fn test_calculate_decay_high_activation_protects() {
 fn test_calculate_decay_with_revalidation_boost() {
     let decayed = calculate_decay(0.8, 0.01, 100.0, 0.5);
     let boosted = calculate_decay_with_revalidation(0.8, 0.01, 100.0, 0.5, 0.5);
-    assert!(boosted > decayed, "Revalidation boost should increase confidence");
+    assert!(
+        boosted > decayed,
+        "Revalidation boost should increase confidence"
+    );
 }
 
 #[test]

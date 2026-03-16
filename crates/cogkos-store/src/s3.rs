@@ -401,39 +401,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_local_store_rejects_dotdot() {
-        let store = LocalStore::new("cogkos-test-store")
-            .await
-            .unwrap();
-        let result = store.upload("../../etc/passwd", b"evil", "text/plain").await;
+        let store = LocalStore::new("cogkos-test-store").await.unwrap();
+        let result = store
+            .upload("../../etc/passwd", b"evil", "text/plain")
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("path traversal"));
     }
 
     #[tokio::test]
     async fn test_local_store_rejects_absolute_path() {
-        let store = LocalStore::new("cogkos-test-store")
-            .await
-            .unwrap();
+        let store = LocalStore::new("cogkos-test-store").await.unwrap();
         let result = store.upload("/etc/passwd", b"evil", "text/plain").await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_local_store_rejects_null_bytes() {
-        let store = LocalStore::new("cogkos-test-store")
-            .await
-            .unwrap();
-        let result = store
-            .upload("file\0.txt", b"evil", "text/plain")
-            .await;
+        let store = LocalStore::new("cogkos-test-store").await.unwrap();
+        let result = store.upload("file\0.txt", b"evil", "text/plain").await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_local_store_accepts_valid_key() {
-        let store = LocalStore::new("cogkos-test-store")
-            .await
-            .unwrap();
+        let store = LocalStore::new("cogkos-test-store").await.unwrap();
         let result = store
             .upload("tenant-1/docs/file.pdf", b"data", "application/pdf")
             .await;
@@ -444,9 +436,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_local_store_download_missing_key() {
-        let store = LocalStore::new("cogkos-test-store")
-            .await
-            .unwrap();
+        let store = LocalStore::new("cogkos-test-store").await.unwrap();
         let result = store.download("nonexistent-key").await;
         assert!(result.is_err());
     }
@@ -467,10 +457,7 @@ mod tests {
     #[tokio::test]
     async fn test_inmemory_store_delete() {
         let store = InMemoryObjectStore::new();
-        store
-            .upload("key1", b"data", "text/plain")
-            .await
-            .unwrap();
+        store.upload("key1", b"data", "text/plain").await.unwrap();
         store.delete("key1").await.unwrap();
         assert!(store.download("key1").await.is_err());
     }

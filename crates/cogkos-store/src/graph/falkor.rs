@@ -15,7 +15,8 @@ pub(crate) fn validate_uuid(id: &impl std::fmt::Display) -> Result<String> {
         Ok(s)
     } else {
         Err(CogKosError::InvalidInput(format!(
-            "Invalid UUID for graph query: {}", s
+            "Invalid UUID for graph query: {}",
+            s
         )))
     }
 }
@@ -28,15 +29,12 @@ pub(crate) fn cypher_escape(s: &str) -> String {
 
 /// Validate a relation name (only alphanumeric + underscore allowed).
 pub(crate) fn validate_relation(rel: &str) -> Result<&str> {
-    if !rel.is_empty()
-        && rel
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_')
-    {
+    if !rel.is_empty() && rel.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
         Ok(rel)
     } else {
         Err(CogKosError::InvalidInput(format!(
-            "Invalid relation name: {}", rel
+            "Invalid relation name: {}",
+            rel
         )))
     }
 }

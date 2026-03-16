@@ -1,6 +1,4 @@
-use super::{
-    EdgeDefinition, EdgeType, NodeDefinition, NodeType, RetryPolicy, WorkflowDefinition,
-};
+use super::{EdgeDefinition, EdgeType, NodeDefinition, NodeType, RetryPolicy, WorkflowDefinition};
 use std::collections::HashMap;
 use uuid::Uuid;
 

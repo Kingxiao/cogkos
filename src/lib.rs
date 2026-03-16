@@ -3,8 +3,8 @@
 //! Library exports for testing and integration
 
 pub use cogkos_core;
-pub use cogkos_store;
 pub use cogkos_mcp;
+pub use cogkos_store;
 
 #[cfg(test)]
 mod tests {

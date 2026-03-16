@@ -11,7 +11,10 @@ mod tests {
             content,
             "test",
             NodeType::Entity,
-            Claimant::Human { user_id: "user1".into(), role: "tester".into() },
+            Claimant::Human {
+                user_id: "user1".into(),
+                role: "tester".into(),
+            },
             AccessEnvelope::new("test"),
             ProvenanceRecord::new("test_source".into(), "test".into(), "test".into()),
         );
@@ -70,7 +73,10 @@ mod tests {
     fn test_conflict_detection_same_id() {
         let claim = make_claim("content", 0.9);
         let result = detect_conflict(&claim, &claim);
-        assert!(result.is_none(), "Same claim should not conflict with itself");
+        assert!(
+            result.is_none(),
+            "Same claim should not conflict with itself"
+        );
     }
 
     #[test]

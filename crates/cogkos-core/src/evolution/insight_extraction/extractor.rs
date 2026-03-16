@@ -73,7 +73,10 @@ impl InsightExtractor {
         let mut groups: Vec<(ConflictType, Vec<&'a ConflictRecord>)> = Vec::new();
 
         for conflict in conflicts {
-            if let Some(group) = groups.iter_mut().find(|(t, _)| *t == conflict.conflict_type) {
+            if let Some(group) = groups
+                .iter_mut()
+                .find(|(t, _)| *t == conflict.conflict_type)
+            {
                 group.1.push(conflict);
             } else {
                 groups.push((conflict.conflict_type, vec![conflict]));
@@ -91,9 +94,7 @@ impl InsightExtractor {
         claims: &HashMap<uuid::Uuid, EpistemicClaim>,
     ) -> Option<ExtractedInsight> {
         match conflict_type {
-            ConflictType::SourceDisagreement => {
-                self.analyze_source_disagreement(conflicts, claims)
-            }
+            ConflictType::SourceDisagreement => self.analyze_source_disagreement(conflicts, claims),
             ConflictType::TemporalShift | ConflictType::TemporalInconsistency => {
                 self.analyze_temporal_shift(conflicts, claims)
             }
@@ -451,9 +452,15 @@ impl InsightExtractor {
         for word in content.split_whitespace() {
             let clean = word.trim_matches(|c: char| !c.is_alphanumeric());
             if clean.len() > 2
-                && clean.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
-                && !["The", "This", "That", "These", "Those", "With", "From", "Into"]
-                    .contains(&clean)
+                && clean
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false)
+                && ![
+                    "The", "This", "That", "These", "Those", "With", "From", "Into",
+                ]
+                .contains(&clean)
             {
                 entities.push(clean.to_lowercase());
             }
@@ -555,11 +562,7 @@ mod tests {
             NodeType::Entity,
             Claimant::System,
             AccessEnvelope::new("test-tenant"),
-            ProvenanceRecord::new(
-                source.to_string(),
-                "test".to_string(),
-                "test".to_string(),
-            ),
+            ProvenanceRecord::new(source.to_string(), "test".to_string(), "test".to_string()),
         );
         claim.id = id;
         claim.confidence = 0.8;

@@ -1,8 +1,8 @@
 //! CRUD integration tests for claim lifecycle
 
 use cogkos_core::audit::InMemoryAuditStore;
-use cogkos_store::*;
 use cogkos_core::models::*;
+use cogkos_store::*;
 use std::sync::Arc;
 
 /// Minimal in-memory object store for testing
@@ -10,7 +10,12 @@ struct MockObjectStore;
 
 #[async_trait::async_trait]
 impl ObjectStore for MockObjectStore {
-    async fn upload(&self, _key: &str, _data: &[u8], _content_type: &str) -> cogkos_core::Result<String> {
+    async fn upload(
+        &self,
+        _key: &str,
+        _data: &[u8],
+        _content_type: &str,
+    ) -> cogkos_core::Result<String> {
         Ok("mock://uploaded".into())
     }
     async fn download(&self, _key: &str) -> cogkos_core::Result<Vec<u8>> {
@@ -35,14 +40,31 @@ async fn create_stores() -> Stores {
     let gaps: Arc<dyn GapStore> = Arc::new(InMemoryGapStore::new());
     let audit: Arc<dyn AuditStore> = Arc::new(InMemoryAuditStore::new(1000));
     let subscription: Arc<dyn SubscriptionStore> = Arc::new(InMemorySubscriptionStore::new());
-    Stores::new(claims, vectors, graph, cache, feedback, objects, auth, gaps, audit, subscription)
+    Stores::new(
+        claims,
+        vectors,
+        graph,
+        cache,
+        feedback,
+        objects,
+        auth,
+        gaps,
+        audit,
+        subscription,
+    )
 }
 
 fn make_claim(content: &str, tenant: &str) -> EpistemicClaim {
     EpistemicClaim::new(
-        content, tenant, NodeType::Entity,
-        Claimant::Human { user_id: "u1".into(), role: "tester".into() },
-        AccessEnvelope::new("t1"), ProvenanceRecord::new("test".into(), "test".into(), "test".into()),
+        content,
+        tenant,
+        NodeType::Entity,
+        Claimant::Human {
+            user_id: "u1".into(),
+            role: "tester".into(),
+        },
+        AccessEnvelope::new("t1"),
+        ProvenanceRecord::new("test".into(), "test".into(), "test".into()),
     )
 }
 
@@ -98,12 +120,22 @@ async fn test_graph_activation_diffusion() {
     stores.graph.add_node(&c1).await.unwrap();
     stores.graph.add_node(&c2).await.unwrap();
     stores.graph.add_node(&c3).await.unwrap();
-    stores.graph.add_edge(c1.id, c2.id, "CAUSES", 0.8).await.unwrap();
-    stores.graph.add_edge(c2.id, c3.id, "SIMILAR_TO", 0.6).await.unwrap();
+    stores
+        .graph
+        .add_edge(c1.id, c2.id, "CAUSES", 0.8)
+        .await
+        .unwrap();
+    stores
+        .graph
+        .add_edge(c2.id, c3.id, "SIMILAR_TO", 0.6)
+        .await
+        .unwrap();
 
-    let diffused = stores.graph.activation_diffusion(
-        c1.id, 1.0, 3, 0.8, 0.01,
-    ).await.unwrap();
+    let diffused = stores
+        .graph
+        .activation_diffusion(c1.id, 1.0, 3, 0.8, 0.01)
+        .await
+        .unwrap();
 
     // Should find at least c2 via activation diffusion
     assert!(!diffused.is_empty());
@@ -118,7 +150,11 @@ fn make_cache_response(hash: u64) -> McpQueryResponse {
         conflicts: vec![],
         prediction: None,
         knowledge_gaps: vec![],
-        freshness: FreshnessInfo { newest_source: None, oldest_source: None, staleness_warning: false },
+        freshness: FreshnessInfo {
+            newest_source: None,
+            oldest_source: None,
+            staleness_warning: false,
+        },
         cache_status: CacheStatus::Miss,
         metadata: QueryMetadata::default(),
     }

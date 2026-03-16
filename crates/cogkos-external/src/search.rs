@@ -61,14 +61,13 @@ impl DuckDuckGoConnector {
 
     fn parse_results(&self, html: &str) -> Result<Vec<DuckDuckGoResult>> {
         let document = scraper::Html::parse_document(html);
-        let selector = scraper::Selector::parse(".result")
-            .expect("valid CSS selector: .result");
+        let selector = scraper::Selector::parse(".result").expect("valid CSS selector: .result");
         let title_selector = scraper::Selector::parse(".result__title a")
             .expect("valid CSS selector: .result__title a");
         let snippet_selector = scraper::Selector::parse(".result__snippet")
             .expect("valid CSS selector: .result__snippet");
-        let url_selector = scraper::Selector::parse(".result__url")
-            .expect("valid CSS selector: .result__url");
+        let url_selector =
+            scraper::Selector::parse(".result__url").expect("valid CSS selector: .result__url");
 
         let mut results = Vec::new();
 
@@ -357,7 +356,11 @@ impl AggregatedSearchEngine {
         }
 
         // Sort by confidence
-        merged_docs.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        merged_docs.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Apply limit
         merged_docs.truncate(query.limit);

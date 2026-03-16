@@ -22,9 +22,7 @@ enum RateLimiterBackend {
         buckets: Arc<Mutex<HashMap<String, (u32, std::time::Instant)>>>,
     },
     #[cfg(feature = "redis-ratelimit")]
-    Redis {
-        pool: deadpool_redis::Pool,
-    },
+    Redis { pool: deadpool_redis::Pool },
 }
 
 impl RateLimiter {
@@ -74,9 +72,7 @@ impl RateLimiter {
             buckets.retain(|_, (_, last)| now.duration_since(*last) < stale_threshold);
         }
 
-        let (tokens, last_refill) = buckets
-            .entry(tenant_id.to_string())
-            .or_insert((max, now));
+        let (tokens, last_refill) = buckets.entry(tenant_id.to_string()).or_insert((max, now));
 
         // Refill tokens based on elapsed time
         let elapsed = now.duration_since(*last_refill);

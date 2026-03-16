@@ -1,7 +1,7 @@
 mod analyzer;
-mod training;
 #[cfg(test)]
 mod tests;
+mod training;
 
 pub use analyzer::*;
 pub use training::*;

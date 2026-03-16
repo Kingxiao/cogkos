@@ -1,7 +1,7 @@
 //! Feedback and gap reporting handlers, cross-instance query
 
-use cogkos_core::models::*;
 use cogkos_core::Result;
+use cogkos_core::models::*;
 use cogkos_store::{CacheStore, FeedbackStore, GapStore, KnowledgeGapRecord};
 
 use super::helpers::{calculate_anomaly_score, generate_gap_suggestions, rand_simple};

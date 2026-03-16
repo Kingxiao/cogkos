@@ -10,7 +10,9 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 /// Standard Prometheus histogram bucket boundaries
-pub const HISTOGRAM_BUCKETS: &[f64] = &[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0];
+pub const HISTOGRAM_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+];
 
 /// Initialize structured logging with default settings
 pub fn init_logging() {
@@ -72,14 +74,20 @@ impl MetricsCollector {
         if let Ok(counters) = self.counters.read() {
             for (name, value) in counters.iter() {
                 let safe_name = name.replace('-', "_");
-                output.push_str(&format!("# TYPE {} counter\n{} {}\n", safe_name, safe_name, value));
+                output.push_str(&format!(
+                    "# TYPE {} counter\n{} {}\n",
+                    safe_name, safe_name, value
+                ));
             }
         }
 
         if let Ok(gauges) = self.gauges.read() {
             for (name, value) in gauges.iter() {
                 let safe_name = name.replace('-', "_");
-                output.push_str(&format!("# TYPE {} gauge\n{} {}\n", safe_name, safe_name, value));
+                output.push_str(&format!(
+                    "# TYPE {} gauge\n{} {}\n",
+                    safe_name, safe_name, value
+                ));
             }
         }
 
@@ -99,10 +107,7 @@ impl MetricsCollector {
                     ));
                 }
                 // +Inf bucket always equals total count
-                output.push_str(&format!(
-                    "{}_bucket{{le=\"+Inf\"}} {}\n",
-                    safe_name, count
-                ));
+                output.push_str(&format!("{}_bucket{{le=\"+Inf\"}} {}\n", safe_name, count));
                 output.push_str(&format!("{}_sum {}\n", safe_name, sum));
                 output.push_str(&format!("{}_count {}\n", safe_name, count));
             }

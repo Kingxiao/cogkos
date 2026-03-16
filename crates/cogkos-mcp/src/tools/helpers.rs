@@ -44,97 +44,245 @@ pub(crate) fn extract_domain(content: &str) -> String {
         (
             "cs",
             vec![
-                "algorithm", "software", "programming", "computer", "machine learning",
-                "neural", "deep learning", "ai", "artificial intelligence", "nlp",
-                "natural language", "computer vision", "robotics", "database", "network",
-                "operating system", "compiler", "distributed", "cloud", "security",
-                "软件", "编程", "算法", "计算机", "机器学习", "人工智能", "神经网络",
+                "algorithm",
+                "software",
+                "programming",
+                "computer",
+                "machine learning",
+                "neural",
+                "deep learning",
+                "ai",
+                "artificial intelligence",
+                "nlp",
+                "natural language",
+                "computer vision",
+                "robotics",
+                "database",
+                "network",
+                "operating system",
+                "compiler",
+                "distributed",
+                "cloud",
+                "security",
+                "软件",
+                "编程",
+                "算法",
+                "计算机",
+                "机器学习",
+                "人工智能",
+                "神经网络",
             ],
         ),
         (
             "math",
             vec![
-                "mathematics", "theorem", "proof", "algebra", "geometry", "calculus",
-                "topology", "analysis", "combinatorics", "number theory", "probability",
-                "数学", "定理", "证明", "代数", "几何", "微积分", "拓扑",
+                "mathematics",
+                "theorem",
+                "proof",
+                "algebra",
+                "geometry",
+                "calculus",
+                "topology",
+                "analysis",
+                "combinatorics",
+                "number theory",
+                "probability",
+                "数学",
+                "定理",
+                "证明",
+                "代数",
+                "几何",
+                "微积分",
+                "拓扑",
             ],
         ),
         (
             "physics",
             vec![
-                "physics", "quantum", "particle", "thermodynamics", "relativity",
-                "electromagnetism", "mechanics", "cosmology", "astrophysics",
-                "物理", "量子", "粒子", "热力学", "相对论", "力学",
+                "physics",
+                "quantum",
+                "particle",
+                "thermodynamics",
+                "relativity",
+                "electromagnetism",
+                "mechanics",
+                "cosmology",
+                "astrophysics",
+                "物理",
+                "量子",
+                "粒子",
+                "热力学",
+                "相对论",
+                "力学",
             ],
         ),
         (
             "bio",
             vec![
-                "biology", "biochemistry", "genetics", "molecular", "cell", "protein",
-                "dna", "rna", "organism", "ecology", "evolution", "neuroscience",
-                "生物", "生化", "基因", "分子", "细胞", "生态", "进化",
+                "biology",
+                "biochemistry",
+                "genetics",
+                "molecular",
+                "cell",
+                "protein",
+                "dna",
+                "rna",
+                "organism",
+                "ecology",
+                "evolution",
+                "neuroscience",
+                "生物",
+                "生化",
+                "基因",
+                "分子",
+                "细胞",
+                "生态",
+                "进化",
             ],
         ),
         (
             "medicine",
             vec![
-                "medicine", "clinical", "drug", "therapy", "diagnosis", "patient",
-                "disease", "treatment", "pharmaceutical", "vaccine",
-                "医学", "医疗", "临床", "药物", "治疗", "诊断",
+                "medicine",
+                "clinical",
+                "drug",
+                "therapy",
+                "diagnosis",
+                "patient",
+                "disease",
+                "treatment",
+                "pharmaceutical",
+                "vaccine",
+                "医学",
+                "医疗",
+                "临床",
+                "药物",
+                "治疗",
+                "诊断",
             ],
         ),
         (
             "finance",
             vec![
-                "finance", "investment", "stock", "market", "trading", "portfolio",
-                "risk", "asset", "pricing", "derivative", "banking", "economy",
-                "金融", "投资", "股票", "市场", "银行", "经济", "风险",
+                "finance",
+                "investment",
+                "stock",
+                "market",
+                "trading",
+                "portfolio",
+                "risk",
+                "asset",
+                "pricing",
+                "derivative",
+                "banking",
+                "economy",
+                "金融",
+                "投资",
+                "股票",
+                "市场",
+                "银行",
+                "经济",
+                "风险",
             ],
         ),
         (
             "law",
             vec![
-                "law", "legal", "court", "regulation", "contract", "compliance",
-                "legislation", "patent", "copyright", "jurisdiction",
-                "法律", "法规", "合规", "合同",
+                "law",
+                "legal",
+                "court",
+                "regulation",
+                "contract",
+                "compliance",
+                "legislation",
+                "patent",
+                "copyright",
+                "jurisdiction",
+                "法律",
+                "法规",
+                "合规",
+                "合同",
             ],
         ),
         (
             "psychology",
             vec![
-                "psychology", "cognitive", "behavior", "mental", "emotion",
-                "neuroscience", "therapy", "counseling", "psychiatric",
-                "心理", "认知", "行为", "精神",
+                "psychology",
+                "cognitive",
+                "behavior",
+                "mental",
+                "emotion",
+                "neuroscience",
+                "therapy",
+                "counseling",
+                "psychiatric",
+                "心理",
+                "认知",
+                "行为",
+                "精神",
             ],
         ),
         (
             "education",
             vec![
-                "education", "teaching", "learning", "curriculum", "student",
-                "pedagogy", "classroom", "instruction",
-                "教育", "教学", "学习", "学校", "学生",
+                "education",
+                "teaching",
+                "learning",
+                "curriculum",
+                "student",
+                "pedagogy",
+                "classroom",
+                "instruction",
+                "教育",
+                "教学",
+                "学习",
+                "学校",
+                "学生",
             ],
         ),
         (
             "marketing",
             vec![
-                "marketing", "brand", "advertising", "customer", "social media",
-                "content", "seo", "campaign", "engagement",
-                "营销", "品牌", "广告", "市场", "客户",
+                "marketing",
+                "brand",
+                "advertising",
+                "customer",
+                "social media",
+                "content",
+                "seo",
+                "campaign",
+                "engagement",
+                "营销",
+                "品牌",
+                "广告",
+                "市场",
+                "客户",
             ],
         ),
         (
             "manufacturing",
             vec![
-                "manufacturing", "factory", "production", "industrial",
-                "制造", "工厂", "生产", "工业", "制造业",
+                "manufacturing",
+                "factory",
+                "production",
+                "industrial",
+                "制造",
+                "工厂",
+                "生产",
+                "工业",
+                "制造业",
             ],
         ),
         (
             "retail",
             vec![
-                "retail", "shop", "store", "e-commerce",
-                "零售", "商店", "电商",
+                "retail",
+                "shop",
+                "store",
+                "e-commerce",
+                "零售",
+                "商店",
+                "电商",
             ],
         ),
     ];
@@ -204,7 +352,11 @@ pub(crate) fn rand_simple(s: &str) -> usize {
 
 /// Comprehensive claim access check
 #[allow(dead_code)]
-pub(crate) fn check_claim_access(claim: &EpistemicClaim, _tenant_id: &str, roles: &[String]) -> bool {
+pub(crate) fn check_claim_access(
+    claim: &EpistemicClaim,
+    _tenant_id: &str,
+    roles: &[String],
+) -> bool {
     let envelope = &claim.access_envelope;
 
     match envelope.visibility {
@@ -327,7 +479,10 @@ mod unit_tests {
 
     #[test]
     fn test_extract_domain_keyword_cs() {
-        assert_eq!(extract_domain("A deep learning algorithm for image classification"), "cs");
+        assert_eq!(
+            extract_domain("A deep learning algorithm for image classification"),
+            "cs"
+        );
     }
 
     #[test]
@@ -342,17 +497,26 @@ mod unit_tests {
 
     #[test]
     fn test_extract_domain_unknown() {
-        assert_eq!(extract_domain("Some random text about cooking"), "unclassified");
+        assert_eq!(
+            extract_domain("Some random text about cooking"),
+            "unclassified"
+        );
     }
 
     #[test]
     fn test_content_hash_deterministic() {
-        assert_eq!(calculate_content_hash(b"hello"), calculate_content_hash(b"hello"));
+        assert_eq!(
+            calculate_content_hash(b"hello"),
+            calculate_content_hash(b"hello")
+        );
     }
 
     #[test]
     fn test_content_hash_different_content() {
-        assert_ne!(calculate_content_hash(b"hello"), calculate_content_hash(b"world"));
+        assert_ne!(
+            calculate_content_hash(b"hello"),
+            calculate_content_hash(b"world")
+        );
     }
 
     #[test]
@@ -409,22 +573,34 @@ mod unit_tests {
 
     #[test]
     fn test_query_hash_deterministic() {
-        assert_eq!(calculate_query_hash("test", &None), calculate_query_hash("test", &None));
+        assert_eq!(
+            calculate_query_hash("test", &None),
+            calculate_query_hash("test", &None)
+        );
     }
 
     #[test]
     fn test_query_hash_domain_matters() {
-        assert_ne!(calculate_query_hash("test", &None), calculate_query_hash("test", &Some("cs".to_string())));
+        assert_ne!(
+            calculate_query_hash("test", &None),
+            calculate_query_hash("test", &Some("cs".to_string()))
+        );
     }
 
     #[test]
     fn test_claim_access_public() {
         let mut claim = EpistemicClaim::new(
-            "test content".to_string(), "tenant-1".to_string(), NodeType::Entity,
-            Claimant::System, AccessEnvelope::new("tenant-1"),
+            "test content".to_string(),
+            "tenant-1".to_string(),
+            NodeType::Entity,
+            Claimant::System,
+            AccessEnvelope::new("tenant-1"),
             ProvenanceRecord {
-                source_id: "test".to_string(), source_type: "test".to_string(),
-                ingestion_method: "test".to_string(), original_url: None, audit_hash: "test".to_string(),
+                source_id: "test".to_string(),
+                source_type: "test".to_string(),
+                ingestion_method: "test".to_string(),
+                original_url: None,
+                audit_hash: "test".to_string(),
             },
         );
         claim.access_envelope.visibility = Visibility::Public;
@@ -434,17 +610,31 @@ mod unit_tests {
     #[test]
     fn test_claim_access_private_with_role() {
         let mut claim = EpistemicClaim::new(
-            "test content".to_string(), "tenant-1".to_string(), NodeType::Entity,
-            Claimant::System, AccessEnvelope::new("tenant-1"),
+            "test content".to_string(),
+            "tenant-1".to_string(),
+            NodeType::Entity,
+            Claimant::System,
+            AccessEnvelope::new("tenant-1"),
             ProvenanceRecord {
-                source_id: "test".to_string(), source_type: "test".to_string(),
-                ingestion_method: "test".to_string(), original_url: None, audit_hash: "test".to_string(),
+                source_id: "test".to_string(),
+                source_type: "test".to_string(),
+                ingestion_method: "test".to_string(),
+                original_url: None,
+                audit_hash: "test".to_string(),
             },
         );
         claim.access_envelope.visibility = Visibility::Private;
         claim.access_envelope.allowed_roles = vec!["admin".to_string()];
-        assert!(check_claim_access(&claim, "tenant-1", &["admin".to_string()]));
-        assert!(!check_claim_access(&claim, "tenant-1", &["reader".to_string()]));
+        assert!(check_claim_access(
+            &claim,
+            "tenant-1",
+            &["admin".to_string()]
+        ));
+        assert!(!check_claim_access(
+            &claim,
+            "tenant-1",
+            &["reader".to_string()]
+        ));
         assert!(!check_claim_access(&claim, "tenant-1", &[]));
     }
 }

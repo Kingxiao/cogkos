@@ -3,11 +3,11 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::models::{EpistemicClaim, EvolutionEngineState, ShiftRecord, ShiftResult};
 use super::{
-    AnomalyDetectionResult, AnomalyDetector, AnomalyRecommendation,
-    Framework, LlmSandbox, SandboxReport, ParadigmShiftError, Result,
+    AnomalyDetectionResult, AnomalyDetector, AnomalyRecommendation, Framework, LlmSandbox,
+    ParadigmShiftError, Result, SandboxReport,
 };
+use crate::models::{EpistemicClaim, EvolutionEngineState, ShiftRecord, ShiftResult};
 
 /// Switch/rollback manager
 pub struct FrameworkSwitchManager {
@@ -378,13 +378,21 @@ impl ABTestFramework {
         let sample_b = self.results_b.len();
 
         let accuracy_a = if sample_a > 0 {
-            self.results_a.iter().filter(|r| r.prediction_correct).count() as f64 / sample_a as f64
+            self.results_a
+                .iter()
+                .filter(|r| r.prediction_correct)
+                .count() as f64
+                / sample_a as f64
         } else {
             0.0
         };
 
         let accuracy_b = if sample_b > 0 {
-            self.results_b.iter().filter(|r| r.prediction_correct).count() as f64 / sample_b as f64
+            self.results_b
+                .iter()
+                .filter(|r| r.prediction_correct)
+                .count() as f64
+                / sample_b as f64
         } else {
             0.0
         };
@@ -446,19 +454,30 @@ impl ABTestFramework {
     fn calculate_pooled_variance(&self) -> f64 {
         let n1 = self.results_a.len() as f64;
         let n2 = self.results_b.len() as f64;
-        if n1 + n2 < 2.0 { return 1.0; }
+        if n1 + n2 < 2.0 {
+            return 1.0;
+        }
         let var1 = self.variance(&self.results_a);
         let var2 = self.variance(&self.results_b);
         ((n1 - 1.0) * var1 + (n2 - 1.0) * var2) / (n1 + n2 - 2.0)
     }
 
     fn variance(&self, outcomes: &[TestOutcome]) -> f64 {
-        if outcomes.len() < 2 { return 0.0; }
-        let mean = outcomes.iter().map(|o| if o.prediction_correct { 1.0 } else { 0.0 }).sum::<f64>() / outcomes.len() as f64;
-        let sum_sq_diff: f64 = outcomes.iter().map(|o| {
-            let val = if o.prediction_correct { 1.0 } else { 0.0 };
-            (val - mean).powi(2)
-        }).sum();
+        if outcomes.len() < 2 {
+            return 0.0;
+        }
+        let mean = outcomes
+            .iter()
+            .map(|o| if o.prediction_correct { 1.0 } else { 0.0 })
+            .sum::<f64>()
+            / outcomes.len() as f64;
+        let sum_sq_diff: f64 = outcomes
+            .iter()
+            .map(|o| {
+                let val = if o.prediction_correct { 1.0 } else { 0.0 };
+                (val - mean).powi(2)
+            })
+            .sum();
         sum_sq_diff / (outcomes.len() - 1) as f64
     }
 
@@ -580,7 +599,11 @@ mod tests {
         for i in 0..100 {
             ab.record_outcome(TestOutcome {
                 timestamp: Utc::now(),
-                framework_id: if i < 50 { ab.framework_a.id } else { ab.framework_b.id },
+                framework_id: if i < 50 {
+                    ab.framework_a.id
+                } else {
+                    ab.framework_b.id
+                },
                 query: format!("query_{}", i),
                 prediction_correct: i % 4 != 0,
                 confidence: 0.8,

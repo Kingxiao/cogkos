@@ -198,19 +198,21 @@ impl VideoParser {
             .args([
                 "-i",
                 input_path.to_str().unwrap_or("input"),
-                "-vn",           // no video
+                "-vn", // no video
                 "-acodec",
-                "pcm_s16le",     // 16-bit PCM
+                "pcm_s16le", // 16-bit PCM
                 "-ar",
-                "16000",         // 16kHz sample rate
+                "16000", // 16kHz sample rate
                 "-ac",
-                "1",             // mono
-                "-y",            // overwrite
+                "1",  // mono
+                "-y", // overwrite
                 output_path.to_str().unwrap_or("output"),
             ])
             .output()
             .await
-            .map_err(|e| VideoParserError::FfmpegError(format!("ffmpeg execution failed: {}", e)))?;
+            .map_err(|e| {
+                VideoParserError::FfmpegError(format!("ffmpeg execution failed: {}", e))
+            })?;
 
         // Clean up input immediately
         let _ = tokio::fs::remove_file(&input_path).await;
@@ -226,9 +228,9 @@ impl VideoParser {
         }
 
         // Read extracted WAV
-        let wav_data = tokio::fs::read(&output_path)
-            .await
-            .map_err(|e| VideoParserError::IoError(format!("Failed to read extracted audio: {}", e)))?;
+        let wav_data = tokio::fs::read(&output_path).await.map_err(|e| {
+            VideoParserError::IoError(format!("Failed to read extracted audio: {}", e))
+        })?;
 
         let _ = tokio::fs::remove_file(&output_path).await;
 
@@ -280,23 +282,24 @@ impl DocumentParser for VideoParser {
         let mut chunks = Vec::new();
 
         if let Some(ref transcription) = result.audio_transcription
-            && !transcription.text.is_empty() {
-                let mut metadata = std::collections::HashMap::new();
-                metadata.insert("source".to_string(), filename.to_string());
-                metadata.insert("type".to_string(), "video_transcription".to_string());
-                metadata.insert(
-                    "duration_secs".to_string(),
-                    format!("{:.1}", result.duration_secs),
-                );
-                metadata.insert("width".to_string(), result.width.to_string());
-                metadata.insert("height".to_string(), result.height.to_string());
+            && !transcription.text.is_empty()
+        {
+            let mut metadata = std::collections::HashMap::new();
+            metadata.insert("source".to_string(), filename.to_string());
+            metadata.insert("type".to_string(), "video_transcription".to_string());
+            metadata.insert(
+                "duration_secs".to_string(),
+                format!("{:.1}", result.duration_secs),
+            );
+            metadata.insert("width".to_string(), result.width.to_string());
+            metadata.insert("height".to_string(), result.height.to_string());
 
-                chunks.push(TextChunk {
-                    content: transcription.text.clone(),
-                    chunk_index: 0,
-                    metadata,
-                });
-            }
+            chunks.push(TextChunk {
+                content: transcription.text.clone(),
+                chunk_index: 0,
+                metadata,
+            });
+        }
 
         if chunks.is_empty() {
             tracing::warn!("No text content extracted from video: {}", filename);

@@ -26,7 +26,6 @@ impl PostgresAuditStore {
             pool: (*pool).clone(),
         }
     }
-
 }
 
 #[async_trait]

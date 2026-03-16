@@ -7,9 +7,7 @@
 //! - Deduplication (Response body hash/ID)
 //! - Configurable JSON path extraction
 
-use crate::{
-    ExternalDocument, Result, RssFeedManager, error::ExternalError, types::*,
-};
+use crate::{ExternalDocument, Result, RssFeedManager, error::ExternalError, types::*};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

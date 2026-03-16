@@ -1,8 +1,8 @@
 mod bias;
 mod monitor;
-mod tracker;
 #[cfg(test)]
 mod tests;
+mod tracker;
 
 pub use bias::*;
 pub use monitor::*;

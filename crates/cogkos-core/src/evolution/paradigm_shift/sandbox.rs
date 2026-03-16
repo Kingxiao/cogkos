@@ -6,10 +6,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::models::EpistemicClaim;
 use super::{
-    AnomalyDetectionResult, LlmClient, LlmMessage, LlmRole, LlmRequest, ParadigmShiftError,
+    AnomalyDetectionResult, LlmClient, LlmMessage, LlmRequest, LlmRole, ParadigmShiftError,
 };
+use crate::models::EpistemicClaim;
 
 /// Framework definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

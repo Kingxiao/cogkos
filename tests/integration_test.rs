@@ -17,8 +17,8 @@ async fn test_llm_client_builder() {
 
 #[tokio::test]
 async fn test_anthropic_client_builder() {
-    let mut builder = LlmClientBuilder::new("test-key", ProviderType::Anthropic)
-        .with_model("claude-sonnet-4-6");
+    let mut builder =
+        LlmClientBuilder::new("test-key", ProviderType::Anthropic).with_model("claude-sonnet-4-6");
     let client = builder.build().unwrap();
     assert!(std::sync::Arc::strong_count(&client) == 1);
 }
