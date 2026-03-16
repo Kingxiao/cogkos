@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use cogkos_llm::{LlmClientBuilder, ProviderType};
-use cogkos_mcp::{McpConfig, start_mcp_server};
+use cogkos_mcp::{McpConfig, McpTransport, start_mcp_server};
 use cogkos_store::{Stores, postgres::PostgresStore, postgres_audit::PostgresAuditStore};
 use config::{Config, File, FileFormat};
 use serde::Deserialize;
@@ -538,8 +538,12 @@ async fn main() -> Result<()> {
         None
     };
 
-    // Start MCP server (stdio transport)
-    info!("Starting MCP server...");
+    // Start MCP server
+    let transport = match std::env::var("MCP_TRANSPORT").as_deref() {
+        Ok("http") | Ok("streamable-http") => McpTransport::StreamableHttp,
+        _ => McpTransport::Stdio,
+    };
+    info!(transport = ?transport, "Starting MCP server...");
     let mcp_config = McpConfig {
         host: std::env::var("MCP_HOST").unwrap_or(config.server.host),
         port: std::env::var("MCP_PORT")
@@ -550,6 +554,7 @@ async fn main() -> Result<()> {
         cache_ttl_seconds: config.cache.ttl_seconds,
         cache_max_entries: config.cache.max_entries,
         rate_limit_per_minute: Some(config.security.rate_limit_requests_per_minute as u32),
+        transport,
     };
 
     // Validate S3 credentials at startup

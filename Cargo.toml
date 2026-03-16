@@ -100,7 +100,7 @@ pgvector = { version = "0.4", features = ["sqlx"] }
 tokio-test = "0.4"
 mockall = "0.12"
 unicode-segmentation = "1"
-rmcp = { version = "1.2", features = ["server", "transport-io"] }
+rmcp = { version = "1.2", features = ["server", "transport-io", "transport-streamable-http-server"] }
 config = "0.13"
 
 hex = "0.4"
