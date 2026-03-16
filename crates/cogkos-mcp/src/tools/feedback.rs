@@ -2,7 +2,7 @@
 
 use cogkos_core::Result;
 use cogkos_core::models::*;
-use cogkos_store::{CacheStore, FeedbackStore, GapStore, KnowledgeGapRecord};
+use cogkos_store::{CacheStore, ClaimStore, FeedbackStore, GapStore, KnowledgeGapRecord};
 
 use super::helpers::{calculate_anomaly_score, generate_gap_suggestions, rand_simple};
 use super::types::*;
@@ -94,12 +94,16 @@ pub async fn handle_cross_instance_query(
 }
 
 /// Submit feedback handler
+///
+/// Closes the feedback loop: adjusts both cache confidence AND underlying
+/// claim confidence based on agent feedback (S5 evolution principle).
 pub async fn handle_submit_feedback(
     req: SubmitFeedbackRequest,
     tenant_id: &str,
     agent_id: &str,
     feedback_store: &dyn FeedbackStore,
     cache_store: &dyn CacheStore,
+    claim_store: &dyn ClaimStore,
 ) -> Result<serde_json::Value> {
     let note = req.note.clone().unwrap_or_default();
     let feedback = AgentFeedback::new(req.query_hash, agent_id, req.success).with_note(&note);
@@ -107,6 +111,7 @@ pub async fn handle_submit_feedback(
     feedback_store.insert_feedback(&feedback).await?;
 
     let mut cache_adjusted = false;
+    let mut claims_updated: usize = 0;
     let mut new_confidence: Option<f64> = None;
 
     if let Some(cached) = cache_store.get_cached(tenant_id, req.query_hash).await? {
@@ -130,6 +135,7 @@ pub async fn handle_submit_feedback(
 
         new_confidence = Some((cached.confidence + adjustment).clamp(0.0, 1.0));
 
+        // Update cache
         if req.success {
             cache_store
                 .record_success(tenant_id, req.query_hash)
@@ -139,13 +145,30 @@ pub async fn handle_submit_feedback(
                 .refresh_ttl(tenant_id, req.query_hash)
                 .await
                 .ok();
-        } else {
-            if success_rate < 0.3 {
-                cache_store.invalidate(tenant_id, req.query_hash).await.ok();
-            }
+        } else if success_rate < 0.3 {
+            cache_store.invalidate(tenant_id, req.query_hash).await.ok();
         }
 
         cache_adjusted = true;
+
+        // Propagate confidence adjustment to underlying claims
+        let claim_ids = collect_claim_ids(&cached.response);
+        if !claim_ids.is_empty() && new_confidence.is_some() {
+            let conf = new_confidence.unwrap();
+            for claim_id in &claim_ids {
+                if let Ok(claim) = claim_store.get_claim(*claim_id, tenant_id).await {
+                    // Blend: 70% original claim confidence + 30% feedback-derived confidence
+                    let blended = claim.confidence * 0.7 + conf * 0.3;
+                    let clamped = blended.clamp(0.0, 1.0);
+                    if let Ok(()) = claim_store
+                        .update_confidence(*claim_id, tenant_id, clamped)
+                        .await
+                    {
+                        claims_updated += 1;
+                    }
+                }
+            }
+        }
     }
 
     let history = feedback_store
@@ -156,11 +179,26 @@ pub async fn handle_submit_feedback(
     Ok(serde_json::json!({
         "status": "recorded",
         "cache_adjusted": cache_adjusted,
+        "claims_updated": claims_updated,
         "adjusted_confidence": new_confidence,
         "anomaly_score": anomaly_score,
         "improvement_suggestion": req.improvement_suggestion,
         "feedback_note": note
     }))
+}
+
+/// Extract all claim IDs referenced in a query response
+fn collect_claim_ids(response: &McpQueryResponse) -> Vec<uuid::Uuid> {
+    let mut ids = Vec::new();
+    if let Some(ref belief) = response.best_belief {
+        if let Some(id) = belief.claim_id {
+            ids.push(id);
+        }
+        ids.extend(belief.claim_ids.iter().copied());
+    }
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 /// Report gap handler
@@ -229,7 +267,7 @@ mod feedback_cache_tests {
     use super::*;
     use cogkos_core::Result;
     use cogkos_store::async_trait;
-    use cogkos_store::{CacheStore, FeedbackStore};
+    use cogkos_store::{CacheStore, FeedbackStore, InMemoryClaimStore};
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
@@ -360,6 +398,7 @@ mod feedback_cache_tests {
 
         let feedback_store = Arc::new(MockFeedbackStore::new());
         let cache_store = Arc::new(MockCacheStore::new());
+        let claim_store = Arc::new(InMemoryClaimStore::new());
 
         let cache_entry = create_test_cache_entry(query_hash);
         cache_store
@@ -381,6 +420,7 @@ mod feedback_cache_tests {
             agent_id,
             feedback_store.as_ref(),
             cache_store.as_ref(),
+            claim_store.as_ref(),
         )
         .await
         .unwrap();
@@ -411,6 +451,7 @@ mod feedback_cache_tests {
 
         let feedback_store = Arc::new(MockFeedbackStore::new());
         let cache_store = Arc::new(MockCacheStore::new());
+        let claim_store = Arc::new(InMemoryClaimStore::new());
 
         let cache_entry = create_test_cache_entry(query_hash);
         cache_store
@@ -432,6 +473,7 @@ mod feedback_cache_tests {
             agent_id,
             feedback_store.as_ref(),
             cache_store.as_ref(),
+            claim_store.as_ref(),
         )
         .await
         .unwrap();
@@ -450,6 +492,7 @@ mod feedback_cache_tests {
 
         let feedback_store = Arc::new(MockFeedbackStore::new());
         let cache_store = Arc::new(MockCacheStore::new());
+        let claim_store = Arc::new(InMemoryClaimStore::new());
 
         let req = SubmitFeedbackRequest {
             query_hash,
@@ -465,6 +508,7 @@ mod feedback_cache_tests {
             agent_id,
             feedback_store.as_ref(),
             cache_store.as_ref(),
+            claim_store.as_ref(),
         )
         .await
         .unwrap();
@@ -480,12 +524,102 @@ mod feedback_cache_tests {
     }
 
     #[tokio::test]
+    async fn test_feedback_updates_claim_confidence() {
+        let query_hash = 12349u64;
+        let agent_id = "test_agent";
+        let tenant_id = "test-tenant";
+        let claim_id = uuid::Uuid::new_v4();
+
+        let feedback_store = Arc::new(MockFeedbackStore::new());
+        let cache_store = Arc::new(MockCacheStore::new());
+        let claim_store = Arc::new(InMemoryClaimStore::new());
+
+        // Insert a claim that the cache entry references
+        let claimant = Claimant::Human {
+            user_id: "test-user".to_string(),
+            role: "developer".to_string(),
+        };
+        let mut claim = EpistemicClaim::new(
+            "Test claim content",
+            tenant_id,
+            NodeType::Entity,
+            claimant.clone(),
+            AccessEnvelope::from_claimant(tenant_id, &claimant),
+            ProvenanceRecord::new("test".to_string(), "test".to_string(), "test".to_string()),
+        );
+        claim.id = claim_id;
+        claim.confidence = 0.8;
+        claim_store.insert_claim(&claim).await.unwrap();
+
+        // Create cache entry referencing this claim
+        let response = McpQueryResponse {
+            query_hash,
+            query_context: "test query".to_string(),
+            best_belief: Some(BeliefSummary {
+                claim_id: Some(claim_id),
+                content: "Test belief".to_string(),
+                confidence: 0.8,
+                based_on: 1,
+                consolidation_stage: ConsolidationStage::Consolidated,
+                claim_ids: vec![],
+            }),
+            related_by_graph: vec![],
+            conflicts: vec![],
+            prediction: None,
+            knowledge_gaps: vec![],
+            freshness: FreshnessInfo {
+                newest_source: Some(chrono::Utc::now()),
+                oldest_source: Some(chrono::Utc::now()),
+                staleness_warning: false,
+            },
+            cache_status: CacheStatus::Miss,
+            metadata: QueryMetadata::default(),
+        };
+        let cache_entry = QueryCacheEntry::new(query_hash, response);
+        cache_store
+            .set_cached(tenant_id, &cache_entry)
+            .await
+            .unwrap();
+
+        // Submit negative feedback
+        let req = SubmitFeedbackRequest {
+            query_hash,
+            success: false,
+            note: Some("Wrong answer".to_string()),
+            improvement_suggestion: None,
+        };
+
+        let result = handle_submit_feedback(
+            req,
+            tenant_id,
+            agent_id,
+            feedback_store.as_ref(),
+            cache_store.as_ref(),
+            claim_store.as_ref(),
+        )
+        .await
+        .unwrap();
+
+        // Verify claim confidence was updated (should decrease)
+        let updated_claim = claim_store.get_claim(claim_id, tenant_id).await.unwrap();
+        assert!(
+            updated_claim.confidence < 0.8,
+            "Claim confidence should decrease after negative feedback, got {}",
+            updated_claim.confidence
+        );
+
+        let claims_updated = result.get("claims_updated").unwrap().as_u64().unwrap();
+        assert_eq!(claims_updated, 1);
+    }
+
+    #[tokio::test]
     async fn test_end_to_end_feedback_cache_flow() {
         let query_hash = 12350u64;
         let agent_id = "test_agent";
 
         let feedback_store = Arc::new(MockFeedbackStore::new());
         let cache_store = Arc::new(MockCacheStore::new());
+        let claim_store = Arc::new(InMemoryClaimStore::new());
 
         let cache_entry = create_test_cache_entry(query_hash);
         cache_store
@@ -498,7 +632,6 @@ mod feedback_cache_tests {
             .await
             .unwrap();
         assert!(cached.is_some());
-        let initial_confidence = cached.unwrap().confidence;
 
         cache_store
             .record_hit("test-tenant", query_hash)
@@ -519,6 +652,7 @@ mod feedback_cache_tests {
             agent_id,
             feedback_store.as_ref(),
             cache_store.as_ref(),
+            claim_store.as_ref(),
         )
         .await
         .unwrap();
@@ -536,10 +670,5 @@ mod feedback_cache_tests {
         let status = result.get("status").unwrap().as_str().unwrap();
         assert_eq!(status, "recorded");
         assert!(result.get("cache_adjusted").unwrap().as_bool().unwrap());
-
-        println!("End-to-end feedback cache flow test passed");
-        println!("   - Initial confidence: {}", initial_confidence);
-        println!("   - Success count: {}", entry_after.success_count);
-        println!("   - Hit count: {}", entry_after.hit_count);
     }
 }

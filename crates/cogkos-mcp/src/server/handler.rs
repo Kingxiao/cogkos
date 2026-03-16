@@ -447,6 +447,7 @@ impl ServerHandler for CogkosMcpHandler {
                         &auth_context.api_key_hash,
                         self.state.stores.feedback.as_ref(),
                         self.state.stores.cache.as_ref(),
+                        self.state.stores.claims.as_ref(),
                     )
                     .await
                     .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;

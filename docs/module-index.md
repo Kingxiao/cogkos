@@ -1,5 +1,5 @@
 # CogKOS 模块开发索引
-生成时间：2026-03-10 14:56
+更新时间：2026-03-17
 
 ## 代码结构
 
@@ -8,21 +8,25 @@ cogkos/
 ├── crates/
 │   ├── cogkos-core/       # 核心数据模型（EpistemicClaim, EvolutionEngine）
 │   ├── cogkos-store/      # 存储层（PostgreSQL/pgvector, FalkorDB, S3）
-│   ├── cogkos-mcp/        # MCP Server（L6 查询/接口层）
-│   │   └── src/tools/    # MCP 工具实现
-│   │       ├── query.rs   # query_knowledge
-│   │       ├── submit.rs  # submit_experience
-│   │       ├── feedback.rs # submit_feedback
-│   │       ├── upload.rs  # upload_document
-│   │       ├── gap.rs     # report_gap
-│   │       └── meta.rs    # get_meta_directory
+│   ├── cogkos-mcp/        # MCP Server（L6，stdio + Streamable HTTP）
+│   │   └── src/
+│   │       ├── server/    # handler.rs + startup.rs + rate_limiter.rs
+│   │       └── tools/     # MCP 工具实现
+│   │           ├── query.rs        # query_knowledge
+│   │           ├── ingest.rs       # submit_experience
+│   │           ├── feedback.rs     # submit_feedback（含 claim 置信度回写）
+│   │           ├── subscriptions.rs # RSS/Webhook/API 订阅
+│   │           ├── helpers.rs      # 共用辅助函数
+│   │           └── types.rs        # 请求/响应类型定义
 │   ├── cogkos-ingest/     # 摄入管道（L7）
 │   │   └── src/
-│   │       ├── parser/    # PDF/Word/Markdown 解析器
+│   │       ├── parser/    # PDF/Word/Markdown/PPTX 解析器
 │   │       ├── pipeline.rs
 │   │       └── classifier.rs
-│   └── cogkos-sleep/      # Sleep-time 调度（L3/L2）
-│       └── src/scheduler.rs
+│   ├── cogkos-sleep/      # Sleep-time 调度（L3/L2）
+│   │   └── src/scheduler/ # core.rs + tasks.rs + tests.rs
+│   ├── cogkos-federation/ # 联邦层（L8，🟡）
+│   └── cogkos-external/   # 外部知识源（L2，🟡）
 ├── docs/                   # 架构文档
 ├── docker-compose.yml       # 开发环境
 └── .github/workflows/      # CI/CD
@@ -84,10 +88,9 @@ git push origin main
 
 | 服务 | 端口 | 用途 |
 |------|------|------|
-| PostgreSQL (含 pgvector) | 5432 | 元数据存储 + 向量检索 |
+| PostgreSQL 17 (含 pgvector) | 5432 | 元数据存储 + 向量检索 |
 | FalkorDB | 6379 | 图数据库 |
-| MinIO | 9000/9001 | S3 兼容存储 |
-| NATS | 4222 | 消息队列（V2） |
+| SeaweedFS | 8333/9333 | S3 兼容对象存储 |
 
 启动开发环境:
 ```bash
