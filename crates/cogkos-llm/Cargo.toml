@@ -1,0 +1,28 @@
+[package]
+name = "cogkos-llm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+tokio-stream = { workspace = true }
+pin-project = { workspace = true }
+regex = { workspace = true }
+cogkos-core = { version = "0.1.0", path = "../cogkos-core" }
+zeroize = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"

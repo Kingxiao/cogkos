@@ -1,0 +1,88 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+max_connections = 10000
+request_timeout_secs = 30
+
+[database]
+url = "postgres://localhost:5432/cogkos"
+max_connections = 20
+min_connections = 2
+idle_timeout_secs = 600
+acquire_timeout_secs = 5
+
+[cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 10000
+
+[evolution]
+conflict_detection_enabled = true
+decay_interval_hours = 24
+consolidation_interval_hours = 6
+
+[activation]
+sample_rate = 1.0
+batch_flush_interval_ms = 5000
+batch_max_size = 1000
+
+[ingest]
+max_file_size_mb = 500
+supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx", "jpg", "jpeg", "png", "gif", "webp", "bmp"]
+
+[telemetry]
+metrics_enabled = true
+tracing_enabled = true
+jaeger_endpoint = "http://jaeger:4317"
+
+[security]
+# 生产环境应限制具体域名，通过环境变量 CORS_ORIGINS 设置（逗号分隔）
+# 开发环境可设为 "http://localhost:5173,http://localhost:3000"
+cors_allow_origins = ["${CORS_ORIGINS}"]
+rate_limit_requests_per_minute = 1000
+
+# ============================================
+# 多类型 LLM 配置
+# 配置优先级：配置文件 > 环境变量 > 默认值
+# 环境变量映射：
+#   - KIMI_API_KEY → text
+#   - AI302_API_KEY → embedding
+#   - DOUBAO_API_KEY → image
+#   - OPENAI_API_KEY → audio
+#   - OPENROUTER_API_KEY → other
+# ============================================
+
+# 文本生成 LLM
+[llm.text]
+provider = "kimi"
+model = "moonshot-v1-8k"
+api_key = ""
+base_url = "https://api.moonshot.cn/v1"
+
+# Embedding LLM
+[llm.embedding]
+provider = "minimax"
+model = "embo-01"
+api_key = ""
+base_url = "https://api.minimax.chat/v1"
+
+# 图像理解 LLM
+[llm.image]
+provider = "doubao"
+model = "doubao-vision-lite"
+api_key = ""
+base_url = "https://ark.cn-beijing.volces.com/api/v3"
+
+# 语音识别 LLM (Whisper)
+[llm.audio]
+provider = "openai"
+model = "whisper-1"
+api_key = ""
+base_url = "https://api.openai.com/v1"
+
+# 其他类型 LLM (备用)
+[llm.other]
+provider = "openrouter"
+model = "anthropic/claude-3.5-sonnet"
+api_key = ""
+base_url = "https://openrouter.ai/api/v1"

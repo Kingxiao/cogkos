@@ -1,0 +1,41 @@
+[package]
+name = "cogkos-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core data models and domain logic for CogKOS"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+toml = "0.8"
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+lazy_static = "1.4"
+tokio.workspace = true
+parking_lot.workspace = true
+notify = "6.1"
+async-trait = "=0.1.89"
+
+# Encryption
+aes-gcm = "0.10"
+base64 = "0.22"
+
+# Math
+statrs.workspace = true
+rand.workspace = true
+
+# HTTP client for LLM calls
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+tokio-test.workspace = true
+mockall.workspace = true
+humantime = "2"
+serde-humantime = "0.1"
+tempfile = "3"

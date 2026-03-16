@@ -1,0 +1,36 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+# Environment
+.env
+.env.local
+# Data directories
+data/
+*.db
+# Test artifacts
+test_output/
+# OS
+.DS_Store
+Thumbs.db
+# Logs
+*.log
+logs/
+# Build artifacts
+dist/
+build/
+test_embedding.rs
+
+# 测试文件
+bin/test_*.rs
+examples/test_*.rs
+config/local.toml
+
+# Audit docs (local only)
+docs/audit/
+docs/archive/audit/
