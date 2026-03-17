@@ -714,18 +714,22 @@ impl CogkosMcpHandler {
         &self,
         arguments: &JsonObject,
     ) -> Result<AuthContext, rmcp::ErrorData> {
-        let api_key = arguments
-            .get("api_key")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                rmcp::ErrorData::new(
-                    ErrorCode::INVALID_PARAMS,
-                    "Missing required field: api_key",
-                    None,
-                )
-            })?;
+        // Try api_key from arguments first, then fallback to DEFAULT_MCP_API_KEY env var.
+        // This enables Claude Code MCP clients (which can't inject api_key into tool args)
+        // to authenticate via a pre-configured default key.
+        let api_key = if let Some(key) = arguments.get("api_key").and_then(|v| v.as_str()) {
+            key.to_string()
+        } else if let Ok(default_key) = std::env::var("DEFAULT_MCP_API_KEY") {
+            default_key
+        } else {
+            return Err(rmcp::ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                "Missing api_key in arguments and DEFAULT_MCP_API_KEY not set",
+                None,
+            ));
+        };
 
-        self.state.auth.authenticate(api_key).await.map_err(|e| {
+        self.state.auth.authenticate(&api_key).await.map_err(|e| {
             rmcp::ErrorData::new(
                 ErrorCode::INVALID_PARAMS,
                 format!("Authentication failed: {}", e),
