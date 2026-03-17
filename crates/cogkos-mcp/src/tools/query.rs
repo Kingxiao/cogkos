@@ -317,10 +317,10 @@ pub async fn handle_query_knowledge(
         };
 
         let client_ref: &dyn LlmClient = client.as_ref();
-        if let Ok(sampling_result) = call_sampling_protocol(client_ref, sampling_req).await {
-            if let Some(ref mut pred) = prediction {
-                pred.sampling_analysis = Some(sampling_result.content);
-            }
+        if let Ok(sampling_result) = call_sampling_protocol(client_ref, sampling_req).await
+            && let Some(ref mut pred) = prediction
+        {
+            pred.sampling_analysis = Some(sampling_result.content);
         }
     }
 

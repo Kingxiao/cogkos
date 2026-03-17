@@ -153,8 +153,9 @@ pub async fn handle_submit_feedback(
 
         // Propagate confidence adjustment to underlying claims
         let claim_ids = collect_claim_ids(&cached.response);
-        if !claim_ids.is_empty() && new_confidence.is_some() {
-            let conf = new_confidence.unwrap();
+        if let Some(conf) = new_confidence
+            && !claim_ids.is_empty()
+        {
             for claim_id in &claim_ids {
                 if let Ok(claim) = claim_store.get_claim(*claim_id, tenant_id).await {
                     // Blend: 70% original claim confidence + 30% feedback-derived confidence
@@ -574,6 +575,7 @@ mod feedback_cache_tests {
                 staleness_warning: false,
             },
             cache_status: CacheStatus::Miss,
+            cognitive_path: None,
             metadata: QueryMetadata::default(),
         };
         let cache_entry = QueryCacheEntry::new(query_hash, response);
