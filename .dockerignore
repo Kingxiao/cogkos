@@ -1,0 +1,7 @@
+target/
+data/
+backups/
+.env
+.git/
+*.log
+docs/archive/
