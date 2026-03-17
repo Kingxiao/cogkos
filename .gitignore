@@ -1,36 +1,36 @@
-# Rust
-target/
-Cargo.lock
-**/*.rs.bk
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-# Environment
-.env
-.env.local
-# Data directories
-data/
-*.db
-# Test artifacts
-test_output/
-# OS
-.DS_Store
-Thumbs.db
-# Logs
-*.log
-logs/
-# Build artifacts
-dist/
-build/
-test_embedding.rs
-
-# 测试文件
-bin/test_*.rs
-examples/test_*.rs
-config/local.toml
 
 # Audit docs (local only)
-docs/audit/
+backups/
+bin/test_*.rs
+build/
+# Build artifacts
+Cargo.lock
+config/local.toml
+data/
+# Data directories
+*.db
+dist/
 docs/archive/audit/
+docs/audit/
+.DS_Store
+.env
+# Environment
+.env.local
+examples/test_*.rs
+# IDE
+.idea/
+*.log
+logs/
+# Logs
+# OS
+**/*.rs.bk
+# Rust
+*.swo
+*.swp
+target/
+# Test artifacts
+test_embedding.rs
+test_output/
+Thumbs.db
+.vscode/
+# 测试文件
