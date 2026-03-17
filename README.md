@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org)
 
-CogKOS (Cognitive Knowledge Operating System) 是一个专为 AI Agent 设计的认知知识操作系统，提供长期记忆、知识进化和预测能力。
+CogKOS (Cognitive Knowledge Operating System) 是一个专为 AI Agent 设计的认知操作系统，提供长期记忆、知识进化和预测能力。
 
 > 🧠 **核心设计理念**: 让 AI Agent 拥有真正的长期记忆和知识进化能力，通过 Sleep-time 计算实现知识的自主整合与优化。
 
