@@ -61,10 +61,10 @@ base_url = "https://api.moonshot.cn/v1"
 
 # Embedding LLM
 [llm.embedding]
-provider = "minimax"
-model = "embo-01"
+provider = "openai"
+model = "text-embedding-3-large"
 api_key = ""
-base_url = "https://api.minimax.chat/v1"
+base_url = "https://api.302.ai/v1"
 
 # 图像理解 LLM
 [llm.image]
