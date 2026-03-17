@@ -1,5 +1,5 @@
 # CogKOS 模块开发索引
-更新时间：2026-03-17
+更新时间：2026-03-18
 
 ## 代码结构
 
@@ -26,7 +26,7 @@ cogkos/
 │   ├── cogkos-sleep/      # Sleep-time 调度（L3/L2）
 │   │   └── src/scheduler/ # core.rs + tasks.rs + tests.rs
 │   ├── cogkos-federation/ # 联邦层（L8，🟡）
-│   └── cogkos-external/   # 外部知识源（L2，🟡）
+│   └── cogkos-external/   # 外部知识源（L2，✅）
 ├── docs/                   # 架构文档
 ├── docker-compose.yml       # 开发环境
 └── .github/workflows/      # CI/CD

@@ -119,6 +119,7 @@ mod tests {
             knowledge_gaps: vec![],
             freshness: FreshnessInfo::default(),
             cache_status: CacheStatus::Miss,
+            cognitive_path: None,
             metadata: QueryMetadata::default(),
         }
     }

@@ -1,5 +1,7 @@
 //! CogKOS - Cognitive Knowledge Operating System
 
+mod polling;
+
 use anyhow::Result;
 use cogkos_llm::{LlmClientBuilder, ProviderType};
 use cogkos_mcp::{McpConfig, McpTransport, start_mcp_server};
@@ -448,10 +450,10 @@ async fn main() -> Result<()> {
     let redis_pool_health = redis_pool.clone();
     let graph_store = Arc::new(cogkos_store::FalkorStore::new(redis_pool, &falkordb_graph));
 
-    // Create vector store (PgVectorStore with 512-dim for bge-small-zh-v1.5)
+    // Create vector store (dimension auto-detected from embedding model)
     info!("Connecting to PgVectorStore...");
     let vector_store = Arc::new(
-        cogkos_store::PgVectorStore::new(pg_pool.clone(), 512)
+        cogkos_store::PgVectorStore::new(pg_pool.clone())
             .await
             .map_err(|e| anyhow::anyhow!("PgVectorStore init failed: {}", e))?,
     );
@@ -492,10 +494,18 @@ async fn main() -> Result<()> {
     // Start sleep-time scheduler
     info!("Starting sleep-time scheduler...");
     let scheduler =
-        cogkos_sleep::Scheduler::new(stores_arc, cogkos_sleep::SchedulerConfig::default());
+        cogkos_sleep::Scheduler::new(stores_arc.clone(), cogkos_sleep::SchedulerConfig::default());
     let scheduler_handle = scheduler.cancellation_token();
     tokio::spawn(async move {
         scheduler.start().await;
+    });
+
+    // Start external knowledge polling (RSS/API)
+    let polling_config = polling::PollingConfig::from_env();
+    let polling_cancel = scheduler_handle.clone();
+    let polling_stores = stores_arc;
+    tokio::spawn(async move {
+        polling::start_polling(polling_stores, polling_config, polling_cancel).await;
     });
 
     // Initialize LLM clients (optional, based on environment variables)
@@ -519,20 +529,21 @@ async fn main() -> Result<()> {
         None
     };
 
-    let embedding_client = if let Ok(api_key) =
-        std::env::var("EMBEDDING_API_KEY").or_else(|_| std::env::var("OPENAI_API_KEY"))
+    let embedding_client = if let Ok(api_key) = std::env::var("EMBEDDING_API_KEY")
+        .or_else(|_| std::env::var("API_302_KEY"))
+        .or_else(|_| std::env::var("OPENAI_API_KEY"))
     {
         let provider = match std::env::var("EMBEDDING_PROVIDER").as_deref() {
             Ok("anthropic") => ProviderType::Anthropic,
             _ => ProviderType::OpenAi,
         };
         let mut builder = LlmClientBuilder::new(api_key, provider);
-        if let Ok(base_url) = std::env::var("EMBEDDING_BASE_URL") {
-            builder = builder.with_base_url(base_url);
-        }
-        if let Ok(model) = std::env::var("EMBEDDING_MODEL") {
-            builder = builder.with_model(model);
-        }
+        let base_url = std::env::var("EMBEDDING_BASE_URL")
+            .unwrap_or_else(|_| "https://api.302.ai/v1".to_string());
+        builder = builder.with_base_url(base_url);
+        let model = std::env::var("EMBEDDING_MODEL")
+            .unwrap_or_else(|_| "text-embedding-3-large".to_string());
+        builder = builder.with_model(model);
         Some(builder.build()?)
     } else {
         None

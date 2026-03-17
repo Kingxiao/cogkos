@@ -385,6 +385,7 @@ mod feedback_cache_tests {
                 staleness_warning: false,
             },
             cache_status: CacheStatus::Miss,
+            cognitive_path: None,
             metadata: QueryMetadata::default(),
         };
 

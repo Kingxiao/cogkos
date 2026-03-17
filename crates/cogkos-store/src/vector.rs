@@ -7,24 +7,81 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 /// PostgreSQL pgvector-based vector store
+///
+/// Vector dimension is not hardcoded — it is detected from the first
+/// embedding upsert or explicitly via `ensure_index()`.
 pub struct PgVectorStore {
     pool: PgPool,
-    _embedding_dimension: i32,
+    /// Detected embedding dimension (set on first upsert or explicit init)
+    detected_dim: std::sync::atomic::AtomicI32,
 }
 
 impl PgVectorStore {
-    /// Create new pgvector store
-    pub async fn new(pool: PgPool, embedding_dimension: i32) -> Result<Self> {
+    /// Create new pgvector store (dimension-agnostic)
+    pub async fn new(pool: PgPool) -> Result<Self> {
         // Ensure pgvector extension is enabled
         sqlx::query("CREATE EXTENSION IF NOT EXISTS vector")
             .execute(&pool)
             .await
             .map_err(|e| CogKosError::Vector(e.to_string()))?;
 
-        Ok(Self {
+        let store = Self {
             pool,
-            _embedding_dimension: embedding_dimension,
-        })
+            detected_dim: std::sync::atomic::AtomicI32::new(0),
+        };
+
+        // Try to detect dimension from existing data
+        if let Ok(Some(dim)) = store.detect_dimension_from_db().await {
+            store
+                .detected_dim
+                .store(dim, std::sync::atomic::Ordering::Relaxed);
+            tracing::info!(dim, "Detected embedding dimension from existing data");
+        }
+
+        Ok(store)
+    }
+
+    /// Backwards-compatible constructor (ignores the dimension parameter)
+    pub async fn with_dimension(pool: PgPool, _embedding_dimension: i32) -> Result<Self> {
+        Self::new(pool).await
+    }
+
+    /// Get the detected embedding dimension (0 if not yet detected)
+    pub fn embedding_dimension(&self) -> i32 {
+        self.detected_dim.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Detect dimension from existing vectors in the database
+    async fn detect_dimension_from_db(&self) -> Result<Option<i32>> {
+        let row: Option<(i32,)> = sqlx::query_as(
+            "SELECT vector_dims(embedding)::int FROM epistemic_claims WHERE embedding IS NOT NULL LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| CogKosError::Vector(e.to_string()))?;
+
+        Ok(row.map(|r| r.0))
+    }
+
+    /// Ensure HNSW index exists for the given dimension.
+    /// Called automatically on first upsert, or explicitly at startup after probing the embedding model.
+    pub async fn ensure_index(&self, dim: i32) -> Result<()> {
+        self.detected_dim
+            .store(dim, std::sync::atomic::Ordering::Relaxed);
+
+        // Create HNSW index if not exists (idempotent via IF NOT EXISTS)
+        let sql = format!(
+            "CREATE INDEX IF NOT EXISTS idx_claims_embedding_hnsw \
+             ON epistemic_claims USING hnsw ((embedding::vector({})) vector_cosine_ops)",
+            dim
+        );
+        sqlx::query(&sql)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| CogKosError::Vector(format!("HNSW index creation failed: {}", e)))?;
+
+        tracing::info!(dim, "HNSW index ensured for embedding dimension");
+        Ok(())
     }
 }
 
@@ -42,9 +99,7 @@ impl super::VectorStore for PgVectorStore {
         );
 
         sqlx::query(
-            "INSERT INTO epistemic_claims (id, embedding, metadata) 
-             VALUES ($1, $2::vector, $3)
-             ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata"
+            "UPDATE epistemic_claims SET embedding = $2::vector, metadata = $3 WHERE id = $1",
         )
         .bind(id)
         .bind(vector_str)

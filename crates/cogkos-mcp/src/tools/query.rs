@@ -9,7 +9,7 @@ use cogkos_llm::{LlmClient, LlmRequest, Message, Role};
 use cogkos_store::{CacheStore, ClaimStore, GapStore, GraphStore, KnowledgeGapRecord, VectorStore};
 use std::sync::Arc;
 
-use super::helpers::{calculate_query_hash, generate_query_vector};
+use super::helpers::{self, calculate_query_hash, generate_query_vector};
 use super::types::*;
 
 /// Query knowledge handler
@@ -44,6 +44,7 @@ pub async fn handle_query_knowledge(
                 staleness_warning: false,
             },
             cache_status: CacheStatus::Miss,
+            cognitive_path: None,
             metadata: QueryMetadata {
                 execution_time_ms: 0,
                 cache_hit_rate: 0.0,
@@ -57,45 +58,64 @@ pub async fn handle_query_knowledge(
     // Calculate query hash for cache lookup
     let query_hash = calculate_query_hash(&req.query, &req.context.domain);
 
-    // 1. Check cache (skip if high urgency)
+    // 1. Check cache — S6 dual-path decision (skip if high urgency)
+    let dual_path = DualPathThresholds::from_env();
     if !matches!(req.context.urgency, Urgency::High)
         && let Some(cached) = cache_store.get_cached(tenant_id, query_hash).await?
     {
-        // Use configurable TTL from environment or default to 3600 seconds
         let ttl_seconds = std::env::var("CACHE_TTL_SECONDS")
             .ok()
             .and_then(|s| s.parse::<i64>().ok())
             .unwrap_or(3600);
 
-        // Check if cache is still valid using the comprehensive validation logic
         if cached.is_valid(ttl_seconds) {
-            // Update hit stats
-            cache_store.record_hit(tenant_id, query_hash).await?;
+            // S6: Determine cognitive path
+            if cached.qualifies_for_system1(&dual_path) {
+                // === System 1: Fast path — high confidence, return immediately ===
+                cache_store.record_hit(tenant_id, query_hash).await?;
 
-            let hit_rate = cached.success_rate();
-            let mut response = cached.response.clone();
-            response.cache_status = CacheStatus::Hit;
-            response.metadata.execution_time_ms = start_time.elapsed().as_millis() as u64;
-            response.metadata.cache_hit_rate = hit_rate;
+                // S3 读即写: update activation for cached claims
+                if let Some(ref belief) = cached.response.best_belief {
+                    for claim_id in &belief.claim_ids {
+                        claim_store
+                            .update_activation(*claim_id, tenant_id, 0.05)
+                            .await
+                            .ok();
+                    }
+                }
 
-            // Log cache hit for monitoring
-            tracing::debug!(
-                query_hash = query_hash,
-                hit_count = cached.hit_count,
-                success_rate = hit_rate,
-                "Cache hit for query"
-            );
+                let hit_rate = cached.success_rate();
+                let mut response = cached.response.clone();
+                response.cache_status = CacheStatus::Hit;
+                response.cognitive_path = Some(CognitivePath::System1);
+                response.metadata.execution_time_ms = start_time.elapsed().as_millis() as u64;
+                response.metadata.cache_hit_rate = hit_rate;
 
-            return Ok(response);
+                tracing::debug!(
+                    query_hash = query_hash,
+                    confidence = cached.confidence,
+                    hit_count = cached.hit_count,
+                    success_rate = hit_rate,
+                    "System 1 fast path: cache hit with high confidence"
+                );
+
+                return Ok(response);
+            } else {
+                // Cache exists but low confidence → degrade to System 2
+                tracing::info!(
+                    query_hash = query_hash,
+                    confidence = cached.confidence,
+                    success_rate = cached.success_rate(),
+                    "System 2 triggered: cache confidence below threshold, running full reasoning"
+                );
+                // Fall through to System 2 full path
+            }
         } else {
-            // Cache entry exists but is invalid - log for monitoring
             tracing::debug!(
                 query_hash = query_hash,
                 confidence = cached.confidence,
-                hit_count = cached.hit_count,
-                success_rate = cached.success_rate(),
                 invalidated = cached.invalidated_by.is_some(),
-                "Cache entry expired or invalid"
+                "Cache entry expired or invalid, using System 2"
             );
         }
     }
@@ -107,12 +127,12 @@ pub async fn handle_query_knowledge(
             Ok(vec) => vec,
             Err(e) => {
                 tracing::warn!("Embedding failed, using fallback: {}", e);
-                generate_query_vector(&req.query)
+                generate_query_vector(&req.query, helpers::DEFAULT_FALLBACK_DIM)
             }
         }
     } else {
         tracing::warn!("No embedding client configured, using fallback");
-        generate_query_vector(&req.query)
+        generate_query_vector(&req.query, helpers::DEFAULT_FALLBACK_DIM)
     };
     let vector_matches = vector_store
         .search(query_vector, tenant_id, req.context.max_results)
@@ -347,6 +367,7 @@ pub async fn handle_query_knowledge(
             staleness_warning,
         },
         cache_status: CacheStatus::Miss,
+        cognitive_path: Some(CognitivePath::System2),
         metadata: QueryMetadata {
             execution_time_ms,
             cache_hit_rate: 0.0,

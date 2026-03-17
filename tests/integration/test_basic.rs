@@ -155,6 +155,7 @@ async fn test_cache_set_and_get() {
             staleness_warning: false,
         },
         cache_status: CacheStatus::Miss,
+        cognitive_path: None,
         metadata: QueryMetadata::default(),
     };
     let entry = QueryCacheEntry::new(12345, response);
@@ -330,6 +331,7 @@ async fn test_ingest_store_query_flow() {
             staleness_warning: false,
         },
         cache_status: CacheStatus::Miss,
+        cognitive_path: None,
         metadata: QueryMetadata::default(),
     };
     let entry = QueryCacheEntry::new(99999, response);

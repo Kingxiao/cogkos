@@ -164,6 +164,7 @@ fn make_cache_response(hash: u64) -> McpQueryResponse {
             staleness_warning: false,
         },
         cache_status: CacheStatus::Miss,
+        cognitive_path: None,
         metadata: QueryMetadata::default(),
     }
 }

@@ -8,7 +8,7 @@ use cogkos_store::{ClaimStore, GraphStore, ObjectStore, VectorStore};
 use std::sync::Arc;
 
 use super::helpers::{
-    calculate_content_hash, calculate_hash, extract_domain, generate_query_vector,
+    self, calculate_content_hash, calculate_hash, extract_domain, generate_query_vector,
 };
 use super::types::*;
 
@@ -80,12 +80,12 @@ pub async fn handle_submit_experience(
             }
             Err(e) => {
                 tracing::warn!("Embedding failed, using fallback: {}", e);
-                generate_query_vector(&claim.content)
+                generate_query_vector(&claim.content, helpers::DEFAULT_FALLBACK_DIM)
             }
         }
     } else {
         tracing::warn!("No embedding client configured, using fallback");
-        generate_query_vector(&claim.content)
+        generate_query_vector(&claim.content, helpers::DEFAULT_FALLBACK_DIM)
     };
 
     let payload = serde_json::json!({

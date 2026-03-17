@@ -40,14 +40,14 @@ Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
 
 | 交付物 | 内容 | 对应 | 状态 |
 |--------|------|------|------|
-| L2 进化引擎（渐进模式） | 冲突检测 + 贝叶斯聚合 + 衰减 | S5 | 🟡 框架搭建 |
+| L2 进化引擎（渐进模式） | 冲突检测 + 贝叶斯聚合 + 衰减 | S5 | ✅ |
 | 语义距离计算 | 新数据 vs 已有数据的向量距离 | L9 | ✅ pgvector |
-| L6 查询缓存 | System 1/2 双路径 + 缓存置信度 | S6 | 🟡 |
+| L6 查询缓存 | System 1/2 双路径 + 缓存置信度 | S6 | ✅ 2026-03-17 |
 | L6 Streamable HTTP | 多 Agent 并发接入（rmcp SDK） | E8 | ✅ 2026-03-17 |
-| LLM 轻量预测 | 查询时基于 Belief 上下文预测 | S1 | 🟡 |
+| LLM 轻量预测 | 查询时基于 Belief 上下文预测 | S1 | ✅ |
 | 读即写 | 查询命中时更新 activation_weight | S3 | ✅ |
 | Agent 反馈回路 | feedback → cache + claim 置信度回写 | G2 | ✅ 2026-03-17 |
-| **L7 订阅管理（基础版）** | RSS Feed + API 轮询 + 调度 + 去重 | L7 | 🟡 基础框架 |
+| **L7 订阅管理（基础版）** | RSS Feed + API 轮询 + 调度 + 去重 | L7 | ✅ 2026-03-17 |
 | GDPR 删除 | 五种删除语义 | E4 | 📋 |
 | 计算预算管理 | Sleep-time 任务预算分配 | E9 | ✅ |
 | **Dogfooding 接入** | CogKOS 记录自身开发知识 | — | ⚠️ 待配置 Embedding |
@@ -55,7 +55,7 @@ Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
 **Phase 2 交付标准**：
 - 冲突自动检测 ✅
 - 知识随时间衰减 ✅
-- 查询有缓存 + MCP 响应包含预测/冲突/空洞 🟡（缓存框架就绪，双路径待实现）
+- 查询有缓存 + MCP 响应包含预测/冲突/空洞 ✅（System 1 快路径 / System 2 完整推理）
 - Agent 反馈能修正缓存置信度 ✅（且同步回写 claim 置信度）
 - 多 Agent 并发接入 ✅（Streamable HTTP on :3000/mcp）
 

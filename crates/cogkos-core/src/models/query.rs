@@ -106,6 +106,9 @@ pub struct McpQueryResponse {
     pub knowledge_gaps: Vec<String>,
     pub freshness: FreshnessInfo,
     pub cache_status: CacheStatus,
+    /// Which cognitive path was used (S6: System 1 fast / System 2 full reasoning)
+    #[serde(default)]
+    pub cognitive_path: Option<CognitivePath>,
     #[serde(default)]
     pub metadata: QueryMetadata,
 }
@@ -209,6 +212,75 @@ pub enum CacheStatus {
     Hit,
     Miss,
     Stale,
+}
+
+/// Cognitive path used for query processing (S6: 双路径认知)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CognitivePath {
+    /// System 1: Fast path — high-confidence cache hit, no full reasoning
+    System1,
+    /// System 2: Slow path — full vector search + graph diffusion + LLM reasoning
+    System2,
+}
+
+/// Thresholds for System 1/2 path decision
+pub struct DualPathThresholds {
+    /// Minimum cache confidence for System 1 fast path
+    pub system1_confidence: f64,
+    /// Minimum success rate for System 1 (only applied when hit_count >= min_hits)
+    pub system1_success_rate: f64,
+    /// Minimum hits before success rate is considered
+    pub min_hits_for_rate: u64,
+}
+
+impl Default for DualPathThresholds {
+    fn default() -> Self {
+        Self {
+            system1_confidence: 0.7,
+            system1_success_rate: 0.5,
+            min_hits_for_rate: 5,
+        }
+    }
+}
+
+impl DualPathThresholds {
+    /// Load from environment or use defaults
+    pub fn from_env() -> Self {
+        Self {
+            system1_confidence: std::env::var("SYSTEM1_CONFIDENCE_THRESHOLD")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.7),
+            system1_success_rate: std::env::var("SYSTEM1_SUCCESS_RATE_THRESHOLD")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.5),
+            min_hits_for_rate: std::env::var("SYSTEM1_MIN_HITS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(5),
+        }
+    }
+}
+
+impl QueryCacheEntry {
+    /// Determine if this cache entry qualifies for System 1 fast path
+    pub fn qualifies_for_system1(&self, thresholds: &DualPathThresholds) -> bool {
+        // Must have sufficient confidence
+        if self.confidence < thresholds.system1_confidence {
+            return false;
+        }
+
+        // If enough hits, check success rate
+        if self.hit_count >= thresholds.min_hits_for_rate
+            && self.success_rate() < thresholds.system1_success_rate
+        {
+            return false;
+        }
+
+        true
+    }
 }
 
 /// Query cache entry

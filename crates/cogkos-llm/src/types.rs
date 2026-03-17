@@ -51,8 +51,11 @@ pub struct Choice {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
+    #[serde(default)]
     pub prompt_tokens: u32,
+    #[serde(default)]
     pub completion_tokens: u32,
+    #[serde(default)]
     pub total_tokens: u32,
 }
 
@@ -84,8 +87,9 @@ pub struct DeltaMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingRequest {
     pub model: String,
+    /// Input text(s) — can be a string or array of strings depending on provider
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<Vec<String>>,
+    pub input: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub texts: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -108,8 +112,10 @@ pub struct EmbeddingResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingData {
-    pub object: String,
+    #[serde(default)]
+    pub object: Option<String>,
     pub embedding: Vec<f32>,
+    #[serde(default)]
     pub index: u32,
 }
 

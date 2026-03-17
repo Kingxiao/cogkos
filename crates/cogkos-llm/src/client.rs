@@ -110,6 +110,40 @@ impl OpenAiClient {
         );
         Ok(headers)
     }
+
+    /// Send a single embedding request and parse the response
+    async fn send_embedding_request(
+        &self,
+        url: &str,
+        body: &EmbeddingRequest,
+    ) -> Result<Vec<Vec<f32>>> {
+        debug!("Sending embedding request to {}", url);
+
+        let response = self
+            .client
+            .post(url)
+            .headers(self.build_headers()?)
+            .json(body)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(LlmError::ApiError(error_text));
+        }
+
+        let embedding_response: EmbeddingResponse = response.json().await?;
+
+        if let Some(data) = embedding_response.data {
+            Ok(data.into_iter().map(|d| d.embedding).collect())
+        } else if let Some(vectors) = embedding_response.vectors {
+            Ok(vectors)
+        } else {
+            Err(LlmError::InvalidResponse(
+                "No embedding data in response".to_string(),
+            ))
+        }
+    }
 }
 
 #[async_trait]
@@ -253,67 +287,43 @@ impl LlmClient for OpenAiClient {
 
     async fn embed(&self, texts: Vec<String>, model: Option<String>) -> Result<Vec<Vec<f32>>> {
         let is_minimax = self.base_url.contains("minimax");
-        let is_302ai = self.base_url.contains("302");
+        let url = format!("{}/embeddings", self.base_url);
+        let model_name = model.unwrap_or_else(|| self.default_model.clone());
 
-        let body = if is_minimax {
+        if is_minimax {
             // MiniMax format - requires texts + type: query
-            EmbeddingRequest {
-                model: model.unwrap_or_else(|| "embo-01".to_string()),
+            let body = EmbeddingRequest {
+                model: model_name,
                 input: None,
                 texts: Some(texts),
                 r#type: Some("query".to_string()),
-            }
-        } else if is_302ai {
-            // 302.ai - OpenAI compatible format
-            EmbeddingRequest {
-                model: model.unwrap_or_else(|| "text-embedding-3-small".to_string()),
-                input: Some(texts),
-                texts: None,
-                r#type: None,
-            }
-        } else {
-            // OpenAI format
-            EmbeddingRequest {
-                model: model.unwrap_or_else(|| "text-embedding-3-small".to_string()),
-                input: Some(texts),
-                texts: None,
-                r#type: None,
-            }
-        };
-
-        let url = format!("{}/embeddings", self.base_url);
-
-        debug!("Sending embedding request to {}", url);
-
-        let response = self
-            .client
-            .post(&url)
-            .headers(self.build_headers()?)
-            .json(&body)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(LlmError::ApiError(error_text));
+            };
+            return self.send_embedding_request(&url, &body).await;
         }
 
-        let embedding_response: EmbeddingResponse = response.json().await?;
+        // OpenAI-compatible providers (302.ai, OpenAI, etc.)
+        // Some providers (302.ai) reject array input for certain models.
+        // Send each text individually and collect results.
+        let mut all_embeddings = Vec::with_capacity(texts.len());
+        for text in &texts {
+            let body = EmbeddingRequest {
+                model: model_name.clone(),
+                input: Some(serde_json::Value::String(text.clone())),
+                texts: None,
+                r#type: None,
+            };
 
-        // Handle both OpenAI and MiniMax response formats
-        let embeddings: Vec<Vec<f32>> = if let Some(data) = embedding_response.data {
-            // OpenAI format
-            data.into_iter().map(|d| d.embedding).collect()
-        } else if let Some(vectors) = embedding_response.vectors {
-            // MiniMax format
-            vectors
-        } else {
-            return Err(LlmError::InvalidResponse(
-                "No embedding data in response".to_string(),
-            ));
-        };
+            let mut batch = self.send_embedding_request(&url, &body).await?;
+            if let Some(emb) = batch.pop() {
+                all_embeddings.push(emb);
+            } else {
+                return Err(LlmError::InvalidResponse(
+                    "Empty embedding response for text".to_string(),
+                ));
+            }
+        }
 
-        Ok(embeddings)
+        Ok(all_embeddings)
     }
 
     fn provider(&self) -> &'static str {

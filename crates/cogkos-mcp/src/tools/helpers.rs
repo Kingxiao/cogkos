@@ -3,13 +3,43 @@
 use cogkos_core::models::*;
 use std::hash::{Hash, Hasher};
 
-/// Generate a pseudo-random vector from query string for fallback
-pub(crate) fn generate_query_vector(query: &str) -> Vec<f32> {
+/// Default fallback dimension when no embedding service is configured
+/// and no existing vectors exist in the database.
+pub const DEFAULT_FALLBACK_DIM: usize = 1024;
+
+/// Probe the embedding service to detect vector dimension.
+/// Returns the dimension from the first successful embedding call,
+/// or DEFAULT_FALLBACK_DIM if no embedding service is available.
+pub async fn probe_embedding_dimension(
+    embedding_client: &Option<std::sync::Arc<dyn cogkos_llm::LlmClient>>,
+) -> usize {
+    if let Some(client) = embedding_client {
+        let service = cogkos_ingest::EmbeddingService::new(client.clone());
+        match service.embed("dimension probe").await {
+            Ok(vec) => {
+                let dim = vec.len();
+                tracing::info!(dim, "Probed embedding dimension from model");
+                return dim;
+            }
+            Err(e) => {
+                tracing::warn!("Embedding probe failed, using default dim: {}", e);
+            }
+        }
+    }
+    tracing::info!(
+        dim = DEFAULT_FALLBACK_DIM,
+        "Using default fallback embedding dimension"
+    );
+    DEFAULT_FALLBACK_DIM
+}
+
+/// Generate a pseudo-random vector from query string for fallback.
+/// Dimension is determined by the embedding model, not hardcoded.
+pub(crate) fn generate_query_vector(query: &str, dim: usize) -> Vec<f32> {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     query.hash(&mut hasher);
     let hash = hasher.finish();
-    // MiniMax embo-01 returns 1536 dimensions
-    (0..1536)
+    (0..dim)
         .map(|i| {
             let h = hash.wrapping_add(i as u64);
             ((h % 1000) as f32 / 1000.0 - 0.5) * 0.1
@@ -453,21 +483,24 @@ mod unit_tests {
 
     #[test]
     fn test_query_vector_deterministic() {
-        let v1 = generate_query_vector("test query");
-        let v2 = generate_query_vector("test query");
+        let v1 = generate_query_vector("test query", 1024);
+        let v2 = generate_query_vector("test query", 1024);
         assert_eq!(v1, v2);
     }
 
     #[test]
-    fn test_query_vector_dimensions() {
-        let v = generate_query_vector("hello");
-        assert_eq!(v.len(), 1536);
+    fn test_query_vector_dimensions_match_requested() {
+        let v = generate_query_vector("hello", 768);
+        assert_eq!(v.len(), 768);
+
+        let v2 = generate_query_vector("hello", 1536);
+        assert_eq!(v2.len(), 1536);
     }
 
     #[test]
     fn test_query_vector_different_queries() {
-        let v1 = generate_query_vector("query A");
-        let v2 = generate_query_vector("query B");
+        let v1 = generate_query_vector("query A", 1024);
+        let v2 = generate_query_vector("query B", 1024);
         assert_ne!(v1, v2);
     }
 
