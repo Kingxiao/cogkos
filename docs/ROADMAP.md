@@ -50,7 +50,7 @@ Phase 1 ──→ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
 | **L7 订阅管理（基础版）** | RSS Feed + API 轮询 + 调度 + 去重 | L7 | ✅ 2026-03-17 |
 | GDPR 删除 | 五种删除语义 | E4 | 📋 |
 | 计算预算管理 | Sleep-time 任务预算分配 | E9 | ✅ |
-| **Dogfooding 接入** | CogKOS 记录自身开发知识 | — | ⚠️ 待配置 Embedding |
+| **Dogfooding 接入** | CogKOS 记录自身开发知识 | — | ✅ 2026-03-18 |
 
 **Phase 2 交付标准**：
 - 冲突自动检测 ✅
