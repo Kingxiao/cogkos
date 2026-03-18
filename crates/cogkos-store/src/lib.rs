@@ -111,6 +111,26 @@ pub trait ClaimStore: Send + Sync {
         status: ResolutionStatus,
         note: Option<String>,
     ) -> Result<()>;
+
+    // Working memory support (default impls for backward compatibility)
+    async fn list_claims_by_memory_layer(
+        &self,
+        _tenant_id: &str,
+        _memory_layer: &str,
+        _session_id: Option<&str>,
+        _limit: usize,
+    ) -> Result<Vec<EpistemicClaim>> {
+        Ok(vec![])
+    }
+
+    async fn count_claims_by_memory_layer(
+        &self,
+        _tenant_id: &str,
+        _memory_layer: &str,
+        _session_id: Option<&str>,
+    ) -> Result<usize> {
+        Ok(0)
+    }
 }
 
 /// Vector store trait

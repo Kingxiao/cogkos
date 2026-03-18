@@ -61,6 +61,70 @@ pub enum Claimant {
     ExternalPublic { source_name: String },
 }
 
+/// Memory layer (cognitive architecture: Atkinson-Shiffrin three-store model)
+///
+/// Stored in `metadata.memory_layer` for backward compatibility.
+/// This enum provides type-safe access.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryLayer {
+    /// Active context — λ=0.5, half-life ~1.4h, session-scoped
+    Working,
+    /// Event memories — λ=0.05, half-life ~14h, session summaries
+    Episodic,
+    /// Long-term knowledge — λ=0.01, half-life ~3d (default)
+    Semantic,
+}
+
+impl MemoryLayer {
+    /// Decay rate (lambda) for this memory layer
+    pub fn lambda(&self) -> f64 {
+        match self {
+            MemoryLayer::Working => 0.5,
+            MemoryLayer::Episodic => 0.05,
+            MemoryLayer::Semantic => 0.01,
+        }
+    }
+
+    /// Hard TTL in hours
+    pub fn max_age_hours(&self) -> f64 {
+        match self {
+            MemoryLayer::Working => 8.0,
+            MemoryLayer::Episodic => 168.0, // 7 days
+            MemoryLayer::Semantic => 720.0, // 30 days
+        }
+    }
+
+    /// Parse from claim metadata
+    pub fn from_metadata(metadata: &serde_json::Map<String, serde_json::Value>) -> Self {
+        metadata
+            .get("memory_layer")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "working" => MemoryLayer::Working,
+                "episodic" => MemoryLayer::Episodic,
+                _ => MemoryLayer::Semantic,
+            })
+            .unwrap_or(MemoryLayer::Semantic)
+    }
+}
+
+impl Default for MemoryLayer {
+    fn default() -> Self {
+        MemoryLayer::Semantic
+    }
+}
+
+impl std::fmt::Display for MemoryLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MemoryLayer::Working => write!(f, "working"),
+            MemoryLayer::Episodic => write!(f, "episodic"),
+            MemoryLayer::Semantic => write!(f, "semantic"),
+        }
+    }
+}
+
 /// Stage of knowledge consolidation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -245,6 +309,34 @@ impl EpistemicClaim {
         self.activation_weight = (self.activation_weight + delta).min(1.0);
         self.access_count += 1;
         self.last_accessed = Some(chrono::Utc::now());
+    }
+
+    /// Get the memory layer of this claim
+    pub fn memory_layer(&self) -> MemoryLayer {
+        MemoryLayer::from_metadata(&self.metadata)
+    }
+
+    /// Get session_id from metadata (if working/episodic memory)
+    pub fn session_id(&self) -> Option<&str> {
+        self.metadata.get("session_id").and_then(|v| v.as_str())
+    }
+
+    /// Get rehearsal count from metadata (working memory)
+    pub fn rehearsal_count(&self) -> u64 {
+        self.metadata
+            .get("rehearsal_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+    }
+
+    /// Increment rehearsal count (called on every recall)
+    pub fn record_rehearsal(&mut self) {
+        let count = self.rehearsal_count() + 1;
+        self.metadata.insert(
+            "rehearsal_count".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(count)),
+        );
+        self.record_access(self.memory_layer().lambda() * 0.4); // rehearsal boosts activation
     }
 
     /// Check if claim is currently valid
