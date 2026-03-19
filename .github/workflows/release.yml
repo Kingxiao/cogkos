@@ -14,7 +14,7 @@ env:
   RUST_VERSION: "1.94"
 
 jobs:
-  # ============ 创建发布 ============
+  # ============ Create Release ============
   create-release:
     name: Create Release
     runs-on: ubuntu-24.04
@@ -23,7 +23,7 @@ jobs:
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Create Release
         id: create_release
@@ -34,7 +34,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true
 
-  # ============ 构建多平台二进制 ============
+  # ============ Build Multi-platform Binaries ============
   build-binaries:
     name: Build Binaries
     needs: create-release
@@ -61,7 +61,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -106,14 +106,14 @@ jobs:
           files: |
             cogkos-*
 
-  # ============ 构建并推送Docker镜像 ============
+  # ============ Build & Push Docker Image ============
   docker-release:
     name: Docker Release
     needs: create-release
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -151,14 +151,14 @@ jobs:
           sbom: true
           provenance: true
 
-  # ============ 发布Helm Chart ============
+  # ============ Publish Helm Chart ============
   helm-release:
     name: Helm Release
     needs: create-release
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -194,7 +194,7 @@ jobs:
           publish_dir: .helm-repo
           destination_dir: helm
 
-  # ============ 发布到crates.io ============
+  # ============ Publish to crates.io ============
   crates-release:
     name: Crates.io Release
     needs: create-release
@@ -202,7 +202,7 @@ jobs:
     if: "!contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta')"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -218,14 +218,14 @@ jobs:
         run: |
           cargo workspaces publish --from-git --yes
 
-  # ============ 生成并发布文档 ============
+  # ============ Generate & Publish Docs ============
   docs:
     name: Documentation
     needs: create-release
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

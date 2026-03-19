@@ -170,7 +170,7 @@ cargo audit         # Security audit
 ```bash
 # Docker
 docker build -t cogkos:latest .
-docker run -d -p 3000:3000 --env-file .env cogkos:latest
+docker run -d -p 3000:3000 -p 8081:8081 --env-file .env cogkos:latest
 
 # Kubernetes
 kubectl apply -k k8s/overlays/dev

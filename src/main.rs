@@ -614,6 +614,10 @@ async fn main() -> Result<()> {
         rate_limit_per_minute: Some(config.security.rate_limit_requests_per_minute as u32),
         transport,
         request_timeout_secs: config.server.request_timeout_secs,
+        auth_cache_ttl_seconds: std::env::var("AUTH_CACHE_TTL")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300),
         redis_pool: Some(redis_pool_health.clone()),
     };
 
@@ -631,10 +635,10 @@ async fn main() -> Result<()> {
             Err(e) => {
                 tracing::error!(
                     port = health_port,
-                    "Failed to bind health check port: {}",
+                    "Failed to bind health check port: {}. Terminating — health probes are required for reliable operation.",
                     e
                 );
-                return;
+                std::process::exit(1);
             }
         };
         info!(port = health_port, "Health/metrics endpoint listening");

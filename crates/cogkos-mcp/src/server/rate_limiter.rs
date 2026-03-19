@@ -116,7 +116,9 @@ impl RateLimiter {
 
         // Set TTL on first request in window
         if count == 1 {
-            let _: () = conn.expire(&key, 60).await.unwrap_or(());
+            if let Err(e) = conn.expire::<_, ()>(&key, 60).await {
+                tracing::warn!(key = %key, "Failed to set rate limit TTL, bucket may persist indefinitely: {}", e);
+            }
         }
 
         if count > max {

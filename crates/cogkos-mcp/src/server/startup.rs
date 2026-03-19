@@ -19,7 +19,7 @@ fn build_state(
 ) -> McpServerState {
     let auth = Arc::new(AuthMiddleware::new(
         stores.auth.clone(),
-        300, // 5 minute cache
+        config.auth_cache_ttl_seconds,
     ));
 
     let cache = Arc::new(QueryCache::new(
@@ -139,13 +139,15 @@ async fn start_http_server(
         http_config,
     );
 
-    let app = Router::new().route(
-        "/mcp",
-        axum::routing::any(move |req: axum::extract::Request| {
-            let svc = mcp_service.clone();
-            async move { svc.handle(req).await }
-        }),
-    );
+    let app = Router::new()
+        .route(
+            "/mcp",
+            axum::routing::any(move |req: axum::extract::Request| {
+                let svc = mcp_service.clone();
+                async move { svc.handle(req).await }
+            }),
+        )
+        .layer(tower_http::cors::CorsLayer::permissive());
 
     info!(
         addr = %bind_addr,

@@ -31,6 +31,8 @@ pub struct McpConfig {
     pub rate_limit_per_minute: Option<u32>,
     pub transport: McpTransport,
     pub request_timeout_secs: u64,
+    /// Auth cache TTL in seconds (how long before re-validating API keys against DB)
+    pub auth_cache_ttl_seconds: i64,
     /// Redis pool for rate limiter persistence (None = in-memory fallback)
     pub redis_pool: Option<deadpool_redis::Pool>,
 }
@@ -46,6 +48,7 @@ impl Default for McpConfig {
             rate_limit_per_minute: Some(600),
             transport: McpTransport::default(),
             request_timeout_secs: 30,
+            auth_cache_ttl_seconds: 300,
             redis_pool: None,
         }
     }
