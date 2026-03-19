@@ -12,10 +12,10 @@ RUN apt-get update && apt-get install -y \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# 先复制 Cargo 配置以利用依赖缓存
+# Copy Cargo configs first to leverage dependency caching
 COPY Cargo.toml Cargo.lock ./
 
-# 逐个复制 crate 的 Cargo.toml（保持目录结构）
+# Copy each crate's Cargo.toml (preserve directory structure)
 COPY crates/cogkos-core/Cargo.toml crates/cogkos-core/Cargo.toml
 COPY crates/cogkos-store/Cargo.toml crates/cogkos-store/Cargo.toml
 COPY crates/cogkos-mcp/Cargo.toml crates/cogkos-mcp/Cargo.toml
@@ -26,7 +26,7 @@ COPY crates/cogkos-federation/Cargo.toml crates/cogkos-federation/Cargo.toml
 COPY crates/cogkos-external/Cargo.toml crates/cogkos-external/Cargo.toml
 COPY crates/cogkos-workflow/Cargo.toml crates/cogkos-workflow/Cargo.toml
 
-# 创建虚拟源文件以缓存依赖构建
+# Create dummy source files to cache dependency builds
 RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && \
     for crate in cogkos-core cogkos-store cogkos-mcp cogkos-ingest cogkos-sleep \
                  cogkos-llm cogkos-federation cogkos-external cogkos-workflow; do \
@@ -34,17 +34,17 @@ RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && \
     done && \
     cargo build --release 2>/dev/null || true
 
-# 复制实际源代码和迁移文件
+# Copy actual source code and migration files
 COPY . .
 
-# 触发完整重编译（虚拟源文件的时间戳已过期）
+# Trigger full rebuild (dummy source timestamps are stale)
 RUN touch src/main.rs && \
     for crate in cogkos-core cogkos-store cogkos-mcp cogkos-ingest cogkos-sleep \
                  cogkos-llm cogkos-federation cogkos-external cogkos-workflow; do \
         touch "crates/$crate/src/lib.rs"; \
     done
 
-# 构建发布版本
+# Build release binaries
 RUN cargo build --release --bin cogkos --bin cogkos-admin
 
 # Runtime stage - Distroless
@@ -52,7 +52,7 @@ FROM gcr.io/distroless/cc-debian12:nonroot
 
 WORKDIR /app
 
-# 复制二进制和迁移文件
+# Copy binaries and migration files
 COPY --from=builder /app/target/release/cogkos /app/cogkos
 COPY --from=builder /app/target/release/cogkos-admin /app/cogkos-admin
 COPY --from=builder /app/migrations /app/migrations

@@ -631,7 +631,7 @@ impl AuthStore for InMemoryAuthStore {
     }
 }
 
-/// Knowledge gap record for tracking knowledge空洞
+/// Knowledge gap record for tracking knowledge gaps
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KnowledgeGapRecord {
     pub gap_id: uuid::Uuid,

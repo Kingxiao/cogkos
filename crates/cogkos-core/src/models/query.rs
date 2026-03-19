@@ -214,7 +214,7 @@ pub enum CacheStatus {
     Stale,
 }
 
-/// Cognitive path used for query processing (S6: 双路径认知)
+/// Cognitive path used for query processing (S6: dual-path cognition)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CognitivePath {

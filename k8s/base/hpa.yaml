@@ -1,4 +1,4 @@
-# HPA v2 - 2026年最新自动扩缩容API
+# HPA v2 - autoscaling API
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

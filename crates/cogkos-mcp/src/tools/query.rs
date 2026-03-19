@@ -74,7 +74,7 @@ pub async fn handle_query_knowledge(
                 // === System 1: Fast path — high confidence, return immediately ===
                 cache_store.record_hit(tenant_id, query_hash).await?;
 
-                // S3 读即写: update activation for cached claims
+                // S3 read-is-write: update activation for cached claims
                 if let Some(ref belief) = cached.response.best_belief {
                     for claim_id in &belief.claim_ids {
                         claim_store

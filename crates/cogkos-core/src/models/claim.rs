@@ -50,9 +50,9 @@ impl std::fmt::Display for NodeType {
 /// Type of knowledge
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum KnowledgeType {
-    Business, // 管理员维护，版本替换式更新，全 Agent 共享
+    Business, // Admin-maintained, version-replace updates, shared across all Agents
     #[default]
-    Experiential, // Agent 贡献，渐进聚合，按角色/客户分区
+    Experiential, // Agent-contributed, progressively aggregated, partitioned by role/customer
 }
 
 impl std::fmt::Display for KnowledgeType {

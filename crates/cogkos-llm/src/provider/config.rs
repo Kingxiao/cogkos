@@ -1,22 +1,22 @@
 //! LLM Provider Configuration
 //!
-//! 支持多类型 LLM 配置：text, embedding, image, audio, other
+//! Multi-type LLM configuration: text, embedding, image, audio, other
 
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt;
 
-/// 单个 LLM Provider 配置
+/// Single LLM provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
-    /// Provider 名称: openai, anthropic, kimi, 302ai, doubao, openrouter 等
+    /// Provider name: openai, anthropic, kimi, 302ai, doubao, openrouter, etc.
     pub provider: String,
-    /// 模型名称
+    /// Model name
     pub model: String,
-    /// API Key（可通过环境变量覆盖）
+    /// API key (can be overridden by env var)
     #[serde(default)]
     pub api_key: String,
-    /// 基础 URL（可选）
+    /// Base URL (optional)
     #[serde(default)]
     pub base_url: Option<String>,
 }
@@ -33,7 +33,7 @@ impl Default for LlmProviderConfig {
 }
 
 impl LlmProviderConfig {
-    /// 从配置文件值创建配置，应用环境变量覆盖
+    /// Create from config file values, applying env var overrides
     pub fn from_toml(
         provider: String,
         model: String,
@@ -41,7 +41,7 @@ impl LlmProviderConfig {
         base_url: Option<String>,
         env_key: &str,
     ) -> Self {
-        // 配置优先级：指定环境变量 > 通用 fallback > 配置文件
+        // Priority: specific env var > generic fallback > config file
         let final_api_key = env::var(env_key)
             .ok()
             .or_else(|| env::var("OPENAI_API_KEY").ok())
@@ -58,27 +58,27 @@ impl LlmProviderConfig {
     }
 }
 
-/// 多类型 LLM 配置容器
+/// Multi-type LLM configuration container
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmConfig {
-    /// 文本生成 LLM 配置
+    /// Text generation LLM config
     #[serde(default)]
     pub text: Option<LlmProviderConfig>,
-    /// Embedding LLM 配置
+    /// Embedding LLM config
     #[serde(default)]
     pub embedding: Option<LlmProviderConfig>,
-    /// 图像理解 LLM 配置
+    /// Image understanding LLM config
     #[serde(default)]
     pub image: Option<LlmProviderConfig>,
-    /// 语音识别 LLM 配置
+    /// Speech recognition LLM config
     #[serde(default)]
     pub audio: Option<LlmProviderConfig>,
-    /// 其他类型 LLM 配置
+    /// Other LLM type config
     #[serde(default)]
     pub other: Option<LlmProviderConfig>,
 }
 
-/// 根据 provider 名称获取对应的环境变量名
+/// Get the env var name for a given provider
 fn get_env_var_name(provider: &str) -> String {
     match provider {
         "kimi" => "KIMI_API_KEY".to_string(),
@@ -92,7 +92,7 @@ fn get_env_var_name(provider: &str) -> String {
 }
 
 impl LlmConfig {
-    /// 从 TOML 配置创建，应用环境变量覆盖
+    /// Create from TOML config, applying env var overrides
     pub fn from_toml_config(
         text: Option<(String, String, String, Option<String>)>,
         embedding: Option<(String, String, String, Option<String>)>,
@@ -124,7 +124,7 @@ impl LlmConfig {
         }
     }
 
-    /// 获取指定类型的配置
+    /// Get config for the specified LLM type
     pub fn get(&self, llm_type: &str) -> Option<&LlmProviderConfig> {
         match llm_type {
             "text" => self.text.as_ref(),
@@ -136,7 +136,7 @@ impl LlmConfig {
         }
     }
 
-    /// 检查指定类型是否已配置（有有效 API Key）
+    /// Check if the specified type is configured (has a valid API key)
     pub fn is_configured(&self, llm_type: &str) -> bool {
         self.get(llm_type)
             .map(|c| !c.api_key.is_empty())
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_llm_config_from_toml() {
-        // 设置环境变量，模拟配置文件 + 环境变量覆盖的场景
+        // Set env vars to simulate config file + env var override scenario
         unsafe {
             env::set_var("KIMI_API_KEY", "test-key");
         }

@@ -1,4 +1,4 @@
-{{/* 测试模板文件 */}}
+{{/* Test template */}}
 {{- if .Values.mcp.enabled }}
 apiVersion: v1
 kind: Pod

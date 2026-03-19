@@ -1,6 +1,6 @@
 //! Lightweight prediction based on belief context
 //!
-//! This module implements S1: "记忆的本质是预测" - generating predictions
+//! This module implements S1: "memory is prediction" - generating predictions
 //! based on the current belief context without complex reasoning.
 
 use cogkos_core::models::{BeliefSummary, PredictionMethod, PredictionResult};

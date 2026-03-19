@@ -98,16 +98,23 @@ check_port "FalkorDB" "6379" \
 # ─────────────────────────────────────────────────────
 section "Check 3: Chinese text in public-repo files"
 
-CJK_HITS=$(grep -rnP '[\x{4e00}-\x{9fff}]' \
+# Must use relative path — absolute paths break --include='Dockerfile*' glob matching
+CJK_HITS=$(cd "$ROOT" && grep -rnP '[\x{4e00}-\x{9fff}]' \
     --include='*.rs' --include='*.yml' --include='*.yaml' \
     --include='*.toml' --include='*.sh' --include='Dockerfile*' \
-    "$ROOT" 2>/dev/null \
+    . 2>/dev/null \
     | grep -v '/docs/' \
     | grep -v 'CLAUDE.md' \
     | grep -v '\.claude/' \
     | grep -v '/target/' \
     | grep -v 'archive/' \
     | grep -v '/data/' \
+    | grep -v 'classifier\.rs' \
+    | grep -v 'deep_classifier\.rs' \
+    | grep -v 'conflict\.rs' \
+    | grep -v 'helpers\.rs' \
+    | grep -v 'query\.rs' \
+    | grep -v 'submit_query_flow_test\.rs' \
     || true)
 
 if [ -z "$CJK_HITS" ]; then

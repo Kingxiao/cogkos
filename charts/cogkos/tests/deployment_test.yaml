@@ -1,4 +1,4 @@
-# Helm Chart测试文件
+# Helm chart test file
 suite: test cogkos deployment
 templates:
   - deployment.yaml

@@ -8,7 +8,7 @@ use super::types::*;
 
 /// Handle RSS subscription request
 ///
-/// Implements TC-L7-03: RSS订阅_定时拉取
+/// Implements TC-L7-03: RSS subscription with scheduled polling
 pub async fn handle_subscribe_rss(
     req: SubscribeRssRequest,
     tenant_id: &str,
@@ -58,8 +58,8 @@ pub async fn handle_subscribe_rss(
 
 /// Handle webhook subscription request
 ///
-/// Implements TC-L7-01: Webhook_接收触发
-/// Implements TC-L7-02: Webhook_签名验证
+/// Implements TC-L7-01: Webhook receive trigger
+/// Implements TC-L7-02: Webhook signature verification
 pub async fn handle_subscribe_webhook(
     req: SubscribeWebhookRequest,
     tenant_id: &str,
@@ -109,7 +109,7 @@ pub async fn handle_subscribe_webhook(
 
 /// Handle API polling subscription request
 ///
-/// Implements TC-L7-04: API轮询_间隔控制
+/// Implements TC-L7-04: API polling with interval control
 pub async fn handle_subscribe_api(
     req: SubscribeApiRequest,
     tenant_id: &str,

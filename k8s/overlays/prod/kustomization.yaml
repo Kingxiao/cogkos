@@ -30,8 +30,8 @@ configMapGenerator:
 secretGenerator:
   - name: cogkos-secrets
     behavior: merge
-    # 生产环境使用外部密钥管理，这里仅作占位
-    # 实际部署时使用: kustomize edit set secret cogkos-secrets --from-file=...
+    # Production uses external secret management; this is a placeholder
+    # For real deploys: kustomize edit set secret cogkos-secrets --from-file=...
 
 patches:
   - target:

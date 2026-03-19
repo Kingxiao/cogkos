@@ -1,5 +1,5 @@
 #!/bin/bash
-# 同步代码到开源仓库（排除敏感文件）
+# Sync code to public repo (excluding sensitive files)
 set -e
 
 TMPDIR=$(mktemp -d)
@@ -7,7 +7,7 @@ trap "rm -rf $TMPDIR" EXIT
 
 git clone --depth 1 https://github.com/Kingxiao/cogkos.git "$TMPDIR/cogkos" 2>/dev/null
 
-# 排除敏感文件和目录
+# Exclude sensitive files and directories
 rsync -av --delete \
   --exclude='.git' \
   --exclude='.env' \

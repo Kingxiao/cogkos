@@ -1,8 +1,8 @@
 apiVersion: v2
-# Helm 3.16+ Chart版本
+# Helm 3.16+ chart version
 name: cogkos
 description: CogKOS - Cognitive Knowledge Operating System
-# 2026年Helm Chart标准格式
+# Standard Helm chart format
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
@@ -21,7 +21,7 @@ maintainers:
 annotations:
   category: AI/ML
   licenses: MIT
-  # Artifact Hub注解 (2026年标准)
+  # Artifact Hub annotations
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
     - Initial release

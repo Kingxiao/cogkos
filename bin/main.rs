@@ -13,23 +13,23 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    println!("CogKOS v0.1.0 - 知识操作系统");
+    println!("CogKOS v0.1.0 - Cognitive Knowledge OS");
     println!("============================");
     println!();
-    
-    println!("可用模块:");
-    println!("  - cogkos-core: 核心功能");
-    println!("  - cogkos-ingest: 文件摄取");
-    println!("  - cogkos-llm: LLM 集成");
-    println!("  - cogkos-workflow: 工作流引擎");
-    println!("  - cogkos-store: 存储层");
+
+    println!("Available modules:");
+    println!("  - cogkos-core: Core functionality");
+    println!("  - cogkos-ingest: File ingestion");
+    println!("  - cogkos-llm: LLM integration");
+    println!("  - cogkos-workflow: Workflow engine");
+    println!("  - cogkos-store: Storage layer");
     println!();
-    
-    // 加载 LLM 配置
+
+    // Load LLM config
     let llm_config = load_llm_config();
-    println!("LLM 配置: {}", llm_config);
-    
-    // 创建 LLM 客户端
+    println!("LLM config: {}", llm_config);
+
+    // Create LLM client
     let llm_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if llm_config.is_configured("text") {
         let config = llm_config.get("text").unwrap();
         let mut builder = LlmClientBuilder::new(&config.api_key, ProviderType::OpenAi)
@@ -42,72 +42,72 @@ async fn main() {
                 Some(client)
             }
             Err(e) => {
-                println!("  ⚠ Text LLM 构建失败: {}", e);
+                println!("  ⚠ Text LLM build failed: {}", e);
                 None
             }
         }
     } else {
-        println!("  ⚠ Text LLM 未配置 (需要 KIMI_API_KEY)");
+        println!("  ⚠ Text LLM not configured (needs KIMI_API_KEY)");
         None
     };
-    
-    // 检查其他 LLM 配置
+
+    // Check other LLM configs
     if llm_config.is_configured("embedding") {
         let config = llm_config.get("embedding").unwrap();
         println!("  ✓ Embedding: {} ({})", config.model, config.provider);
     } else {
-        println!("  ⚠ Embedding 未配置 (需要 AI302_API_KEY)");
+        println!("  ⚠ Embedding not configured (needs AI302_API_KEY)");
     }
-    
+
     if llm_config.is_configured("image") {
         let config = llm_config.get("image").unwrap();
         println!("  ✓ Image: {} ({})", config.model, config.provider);
     } else {
-        println!("  ⚠ Image 未配置 (需要 DOUBAO_API_KEY)");
+        println!("  ⚠ Image not configured (needs DOUBAO_API_KEY)");
     }
-    
+
     if llm_config.is_configured("audio") {
         let config = llm_config.get("audio").unwrap();
         println!("  ✓ Audio: {} ({})", config.model, config.provider);
     } else {
-        println!("  ⚠ Audio 未配置 (需要 OPENAI_API_KEY)");
+        println!("  ⚠ Audio not configured (needs OPENAI_API_KEY)");
     }
-    
+
     if llm_config.is_configured("other") {
         let config = llm_config.get("other").unwrap();
         println!("  ✓ Other: {} ({})", config.model, config.provider);
     } else {
-        println!("  ⚠ Other 未配置 (需要 OPENROUTER_API_KEY)");
+        println!("  ⚠ Other not configured (needs OPENROUTER_API_KEY)");
     }
-    
+
     println!();
-    println!("环境配置:");
-    println!("  DATABASE_URL: {}", env::var("DATABASE_URL").unwrap_or_else(|_| "✗ 未配置".to_string()));
-    println!("  QDRANT_URL: {}", env::var("QDRANT_URL").unwrap_or_else(|_| "✗ 未配置".to_string()));
-    println!("  FALKORDB_URL: {}", env::var("FALKORDB_URL").unwrap_or_else(|_| "✗ 未配置".to_string()));
+    println!("Environment config:");
+    println!("  DATABASE_URL: {}", env::var("DATABASE_URL").unwrap_or_else(|_| "✗ not configured".to_string()));
+    println!("  QDRANT_URL: {}", env::var("QDRANT_URL").unwrap_or_else(|_| "✗ not configured".to_string()));
+    println!("  FALKORDB_URL: {}", env::var("FALKORDB_URL").unwrap_or_else(|_| "✗ not configured".to_string()));
     println!();
-    
-    // 创建 Stores - 使用固定测试 key
+
+    // Create Stores - use fixed test key
     let auth_store = InMemoryAuthStoreWithKey::new();
     let test_key = auth_store.create_api_key("test-tenant", vec!["read".to_string(), "write".to_string()]).await.unwrap();
-    println!("  ✓ 测试 API key: {}\n", test_key);
-    
+    println!("  ✓ Test API key: {}\n", test_key);
+
     let object_store: Arc<dyn cogkos_store::ObjectStore> = match LocalStore::new("cogkos").await {
         Ok(store) => Arc::new(store),
         Err(e) => {
-            println!("❌ 对象存储初始化失败: {:?}", e);
+            println!("❌ Object store init failed: {:?}", e);
             return;
         }
     };
-    
+
     // Use PostgreSQL for persistence if DATABASE_URL is set
     let db_url = std::env::var("DATABASE_URL").unwrap_or_default();
     let stores = if !db_url.is_empty() {
-        println!("🔄 正在连接 PostgreSQL...");
+        println!("🔄 Connecting to PostgreSQL...");
         let postgres_store = cogkos_store::PostgresStore::from_url(&db_url)
             .await
             .expect("Failed to connect to PostgreSQL");
-        println!("✅ PostgreSQL 连接成功!");
+        println!("✅ PostgreSQL connected!");
         Stores::new(
             Arc::new(postgres_store),
             Arc::new(cogkos_store::vector::InMemoryVectorStore::new()),
@@ -122,7 +122,7 @@ async fn main() {
             Arc::new(cogkos_store::NoopMemoryLayerStore),
         )
     } else {
-        println!("⚠️ DATABASE_URL 为空，使用 InMemory 存储");
+        println!("⚠️ DATABASE_URL empty, using InMemory storage");
         Stores::new(
             Arc::new(cogkos_store::InMemoryClaimStore::new()),
             Arc::new(cogkos_store::vector::InMemoryVectorStore::new()),
@@ -137,19 +137,19 @@ async fn main() {
             Arc::new(cogkos_store::NoopMemoryLayerStore),
         )
     };
-    
+
     let config = McpConfig { host: "127.0.0.1".to_string(), port: 3002, ..Default::default() };
-    
-    // 调试：打印 embedding 配置
+
+    // Debug: print embedding config
     if let Some(embed_cfg) = llm_config.get("embedding") {
     }
-    
-    // 创建 embedding client
-    // 强制从环境变量创建 embedding client
+
+    // Create embedding client
+    // Force create embedding client from env vars
     let minimax_key = std::env::var("MINIMAX_API_KEY").unwrap_or_default();
     let kimi_key = std::env::var("KIMI_API_KEY").unwrap_or_default();
     let key = if !minimax_key.is_empty() { minimax_key } else { kimi_key };
-    
+
     let embedding_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if !key.is_empty() {
         let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&key, cogkos_llm::ProviderType::OpenAi)
             .with_base_url("https://api.minimax.chat/v1")
@@ -161,30 +161,30 @@ async fn main() {
                 Some(client)
             }
             Err(e) => {
-                println!("  ⚠ Embedding 构建失败: {}", e);
+                println!("  ⚠ Embedding build failed: {}", e);
                 None
             }
         }
     } else {
-        println!("  ⚠ Embedding 未配置 (需要 MINIMAX_API_KEY)");
+        println!("  ⚠ Embedding not configured (needs MINIMAX_API_KEY)");
         None
     };
-    
-    println!("🚀 启动 MCP 服务器...\n");
-    
+
+    println!("🚀 Starting MCP server...\n");
+
     match start_mcp_server(stores, config, llm_client, embedding_client).await {
-        Ok(_) => println!("\n✅ 服务器已停止"),
-        Err(e) => println!("\n❌ 服务器错误: {:?}", e),
+        Ok(_) => println!("\n✅ Server stopped"),
+        Err(e) => println!("\n❌ Server error: {:?}", e),
     }
 }
 
-/// 从配置文件加载 LLM 配置
+/// Load LLM config from config file
 fn load_llm_config() -> LlmConfig {
-    // 调试：打印环境变量
-    
-    // 查找配置文件
+    // Debug: print env vars
+
+    // Find config file
     let config_path = find_config_file();
-    
+
     if let Some(path) = config_path {
         match fs::read_to_string(&path) {
             Ok(content) => {
@@ -193,78 +193,78 @@ fn load_llm_config() -> LlmConfig {
                         return parse_llm_config(&toml);
                     }
                     Err(e) => {
-                        println!("⚠ 配置文件解析失败: {}, 使用默认值", e);
+                        println!("⚠ Config file parse error: {}, using defaults", e);
                     }
                 }
             }
             Err(e) => {
-                println!("⚠ 配置文件读取失败: {}, 使用默认值", e);
+                println!("⚠ Config file read error: {}, using defaults", e);
             }
         }
     } else {
-        println!("⚠ 未找到配置文件, 使用默认值");
+        println!("⚠ Config file not found, using defaults");
     }
-    
+
     LlmConfig::default()
 }
 
-/// 查找配置文件路径
+/// Find config file path
 fn find_config_file() -> Option<PathBuf> {
     let mut search_paths: Vec<PathBuf> = vec![
-        // 当前目录
+        // Current directory
         PathBuf::from("config/default.toml"),
         PathBuf::from("../config/default.toml"),
-        // 项目根目录 (从 bin 目录)
+        // Project root (from bin directory)
         PathBuf::from("cogkos/config/default.toml"),
     ];
-    
-    // 添加当前工作目录及父目录的配置
+
+    // Add cwd and parent directory configs
     if let Ok(cwd) = env::current_dir() {
         search_paths.push(cwd.join("config/default.toml"));
-        // 尝试父目录
+        // Try parent directory
         if let Some(parent) = cwd.parent() {
             search_paths.push(parent.join("config/default.toml"));
-            // 再上一级
+            // One more level up
             if let Some(grandparent) = parent.parent() {
                 search_paths.push(grandparent.join("config/default.toml"));
             }
         }
     }
-    
+
     for path in search_paths {
         if path.exists() {
-            println!("  📄 找到配置文件: {:?}", path);
+            println!("  📄 Found config file: {:?}", path);
             return Some(path);
         }
     }
-    
+
     None
 }
 
-/// 从 toml 值解析 LLM 配置
+/// Parse LLM config from toml value
 fn parse_llm_config(toml: &toml::Value) -> LlmConfig {
-    // [llm.text] 会解析为 toml.get("llm").and_then(|t| t.get("text"))
+    // [llm.text] parses as toml.get("llm").and_then(|t| t.get("text"))
     let llm_table = toml.get("llm");
-    
+
     let text_cfg = llm_table.and_then(|t| t.get("text"));
     let embed_cfg = llm_table.and_then(|t| t.get("embedding"));
     let image_cfg = llm_table.and_then(|t| t.get("image"));
     let audio_cfg = llm_table.and_then(|t| t.get("audio"));
     let other_cfg = llm_table.and_then(|t| t.get("other"));
-    
-    // 解析配置
+
+    // Parse configs
     let text = text_cfg.and_then(|v| parse_provider_config(Some(v)));
     let embedding = embed_cfg.and_then(|v| parse_provider_config(Some(v)));
     let image = image_cfg.and_then(|v| parse_provider_config(Some(v)));
     let audio = audio_cfg.and_then(|v| parse_provider_config(Some(v)));
     let other = other_cfg.and_then(|v| parse_provider_config(Some(v)));
-    
-    // 调试：打印 embedding 配置
+
+    // Debug: print embedding config
     if let Some(ref e) = embedding {
     } else {
     }
-    
-    // 从解析结果中提取 provider 名称
+
+    // Extract provider names from parsed results
     LlmConfig::from_toml_config(
         text.as_ref().map(|(p, m, k, b)| (p.clone(), m.clone(), k.clone(), b.clone())),
         embedding.as_ref().map(|(p, m, k, b)| (p.clone(), m.clone(), k.clone(), b.clone())),
@@ -274,7 +274,7 @@ fn parse_llm_config(toml: &toml::Value) -> LlmConfig {
     )
 }
 
-/// 从环境变量获取 API key
+/// Get API key from env var
 fn get_api_key_from_env(provider: &str) -> Option<String> {
     let env_var = match provider {
         "kimi" => "KIMI_API_KEY",
@@ -288,18 +288,18 @@ fn get_api_key_from_env(provider: &str) -> Option<String> {
     std::env::var(env_var).ok()
 }
 
-/// 解析单个 provider 配置（环境变量优先）
+/// Parse single provider config (env var takes priority)
 fn parse_provider_config(value: Option<&toml::Value>) -> Option<(String, String, String, Option<String>)> {
     let table = value?.as_table()?;
-    
+
     let provider = table.get("provider")?.as_str()?.to_string();
     let model = table.get("model")?.as_str()?.to_string();
     let base_url = table.get("base_url").and_then(|v| v.as_str()).map(|s| s.to_string());
-    
-    // 优先从环境变量获取 API key
+
+    // Prefer API key from env var
     let api_key = get_api_key_from_env(&provider)
         .or_else(|| table.get("api_key").and_then(|v| v.as_str()).map(|s| s.to_string()))
         .unwrap_or_default();
-    
+
     Some((provider, model, api_key, base_url))
 }

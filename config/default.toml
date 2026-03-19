@@ -36,15 +36,15 @@ tracing_enabled = true
 jaeger_endpoint = "http://jaeger:4317"
 
 [security]
-# 生产环境应限制具体域名，通过环境变量 CORS_ORIGINS 设置（逗号分隔）
-# 开发环境可设为 "http://localhost:5173,http://localhost:3000"
+# In production, restrict to specific domains via CORS_ORIGINS env var (comma-separated)
+# For dev, set to "http://localhost:5173,http://localhost:3000"
 cors_allow_origins = ["${CORS_ORIGINS}"]
 rate_limit_requests_per_minute = 1000
 
 # ============================================
-# 多类型 LLM 配置
-# 配置优先级：配置文件 > 环境变量 > 默认值
-# 环境变量映射：
+# Multi-type LLM configuration
+# Priority: config file > env vars > defaults
+# Env var mapping:
 #   - KIMI_API_KEY → text
 #   - AI302_API_KEY → embedding
 #   - DOUBAO_API_KEY → image
@@ -52,7 +52,7 @@ rate_limit_requests_per_minute = 1000
 #   - OPENROUTER_API_KEY → other
 # ============================================
 
-# 文本生成 LLM
+# Text generation LLM
 [llm.text]
 provider = "kimi"
 model = "moonshot-v1-8k"
@@ -66,21 +66,21 @@ model = "text-embedding-3-large"
 api_key = ""
 base_url = "https://api.302.ai/v1"
 
-# 图像理解 LLM
+# Image understanding LLM
 [llm.image]
 provider = "doubao"
 model = "doubao-vision-lite"
 api_key = ""
 base_url = "https://ark.cn-beijing.volces.com/api/v3"
 
-# 语音识别 LLM (Whisper)
+# Speech recognition LLM (Whisper)
 [llm.audio]
 provider = "openai"
 model = "whisper-1"
 api_key = ""
 base_url = "https://api.openai.com/v1"
 
-# 其他类型 LLM (备用)
+# Other LLM type (fallback)
 [llm.other]
 provider = "openrouter"
 model = "anthropic/claude-3.5-sonnet"

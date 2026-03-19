@@ -1,8 +1,8 @@
-# 默认values - 生产环境配置
-# 使用Helm 3.16+特性
+# Default values - production config
+# Requires Helm 3.16+
 
 # =========================
-# 全局配置
+# Global config
 # =========================
 global:
   imageRegistry: ""
@@ -74,7 +74,7 @@ mcp:
       cpu: 500m
       memory: 512Mi
   
-  # HPA v2配置
+  # HPA v2 config
   autoscaling:
     enabled: true
     minReplicas: 3
@@ -108,7 +108,7 @@ mcp:
     enabled: true
     minAvailable: 2
   
-  # 节点亲和性
+  # Node affinity
   nodeSelector: {}
   
   tolerations: []
@@ -132,7 +132,7 @@ mcp:
           app.kubernetes.io/name: cogkos
 
 # =========================
-# Sleep-time任务
+# Sleep-time tasks
 # =========================
 sleep:
   enabled: true
@@ -142,7 +142,7 @@ sleep:
     pullPolicy: IfNotPresent
     tag: "v0.1.0"
   
-  # 定时任务配置
+  # Cron job config
   consolidation:
     enabled: true
     schedule: "0 */6 * * *"
@@ -163,7 +163,7 @@ sleep:
         cpu: 100m
 
 # =========================
-# 应用配置
+# Application config
 # =========================
 config:
   server:
@@ -188,7 +188,7 @@ config:
     batchMaxSize: 1000
 
 # =========================
-# 外部依赖配置
+# External dependencies
 # =========================
 externalDependencies:
   postgres:
@@ -216,7 +216,7 @@ externalDependencies:
     existingSecret: ""
 
 # =========================
-# 可观测性
+# Observability
 # =========================
 observability:
   metrics:
@@ -237,7 +237,7 @@ observability:
     format: json
 
 # =========================
-# 网络安全
+# Network security
 # =========================
 networkPolicy:
   enabled: true

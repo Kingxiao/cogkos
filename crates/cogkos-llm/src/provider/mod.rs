@@ -1,19 +1,19 @@
 //! LLM Provider Configuration Module
 //!
-//! 支持多类型 LLM 配置：text, embedding, image, audio, other
-//! 配置优先级：配置文件 > 环境变量 > 默认值
+//! Multi-type LLM configuration: text, embedding, image, audio, other
+//! Priority: config file > env vars > defaults
 
 pub mod config;
 
 use std::env;
 
-/// LLM 类型别名
+/// LLM type alias
 pub type LlmType = &'static str;
 
-/// LLM 配置类型
+/// LLM config types
 pub const LLM_TYPES: &[&str] = &["text", "embedding", "image", "audio", "other"];
 
-/// 环境变量映射到 LLM 类型
+/// Map env var name to LLM type
 pub fn env_key_for_llm_type(llm_type: &str) -> Option<&'static str> {
     match llm_type {
         "text" => Some("KIMI_API_KEY"),
@@ -25,7 +25,7 @@ pub fn env_key_for_llm_type(llm_type: &str) -> Option<&'static str> {
     }
 }
 
-/// 从环境变量获取 API Key
+/// Get API key from env var
 pub fn get_api_key_from_env(llm_type: &str) -> Option<String> {
     env_key_for_llm_type(llm_type)
         .and_then(|key| env::var(key).ok())

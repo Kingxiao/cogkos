@@ -317,7 +317,7 @@ Respond only with valid JSON."#,
     }
 
     fn extract_industry(&self, content: &str) -> Option<String> {
-        // 中文关键词优先匹配
+        // Chinese keyword matching (priority)
         let chinese_industries = [
             ("制造业", "制造业"),
             ("生产制造", "制造业"),
@@ -338,7 +338,7 @@ Respond only with valid JSON."#,
             }
         }
 
-        // 英文关键词匹配
+        // English keyword matching
         let industries = [
             ("manufacturing", "制造业"),
             ("manufacture", "制造业"),

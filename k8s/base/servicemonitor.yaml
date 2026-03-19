@@ -1,4 +1,4 @@
-# Prometheus ServiceMonitor (使用Prometheus Operator 2026年标准)
+# Prometheus ServiceMonitor (Prometheus Operator CRD)
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

@@ -1,5 +1,5 @@
 #!/bin/bash
-# CogKOS 数据库备份脚本
+# CogKOS database backup script
 # Crontab: 0 3 * * * /home/zichuan/.openclaw/workspace/cogkos-archive/scripts/backup.sh
 
 set -euo pipefail
