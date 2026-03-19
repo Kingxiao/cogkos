@@ -38,37 +38,63 @@ CogKOS (Cognitive Knowledge Operating System) 是一个专为 AI Agent 设计的
 git clone https://github.com/Kingxiao/cogkos.git
 cd cogkos
 
-# 启动 PostgreSQL + FalkorDB
+# 启动 PostgreSQL (pgvector) + FalkorDB
 docker-compose up -d
 ```
 
-### 2. 配置并运行
+### 2. 配置并构建
 
 ```bash
 cp .env.example .env
-# 编辑 .env — 设置 DATABASE_URL、FALKORDB_URL、embedding API key
+# 编辑 .env — 参考注释了解必填/选填项
 
 cargo build --release
-./target/release/cogkos
 ```
 
-MCP 服务在 `http://localhost:3000/mcp` 启动，健康检查在 `:8081/healthz`。
+### 3. 首次启动 — 初始化并创建 API Key
 
-### 3. 连接 Agent
+```bash
+# 启动服务（自动执行数据库迁移）
+./target/release/cogkos &
+
+# 创建首个 API Key（tenant = 你的组织/项目名）
+./target/release/cogkos-admin create-key my-org read,write
+# 输出: API Key: ck_xxxxxxxxxxxx（仅显示一次，请保存）
+
+# 验证
+curl http://localhost:8081/healthz   # → "ok"
+curl http://localhost:8081/readyz    # → "ready"（检查 PG + FalkorDB）
+```
+
+> **快速开发模式**: 在 `.env` 中设置 `DEFAULT_MCP_API_KEY=any-string` 可跳过 admin CLI 创建密钥。
+
+### 4. 连接你的 Agent
+
+CogKOS 采用 **租户/Agent** 模型：
+- **租户 (Tenant)** = 你的组织（数据隔离边界）
+- **Agent** = 同一租户内共享知识池的多个 AI Agent
 
 ```json
-// MCP 客户端配置示例 (Claude Code ~/.claude/mcp_servers.json)
+// Agent A — Claude Code (~/.claude/mcp_servers.json)
 {
   "cogkos": {
     "type": "streamable-http",
     "url": "http://localhost:3000/mcp",
     "headers": {
-      "X-API-Key": "<your-key>",
-      "X-Tenant-ID": "default"
+      "X-API-Key": "ck_xxxxxxxxxxxx",
+      "X-Tenant-ID": "my-org"
     }
   }
 }
+
+// Agent B — 同一租户，不同 Key（或相同 Key）
+// 两个 Agent 读写同一个知识池
 ```
+
+同一租户内的所有 Agent：
+- **共享**同一个知识图谱和语义搜索索引
+- **跨 Agent 冲突检测**（Agent A 说 X，Agent B 说非 X → 自动检测）
+- 通过请求中的 `source.agent_id` 标识身份（用于溯源追踪）
 
 ## 架构
 

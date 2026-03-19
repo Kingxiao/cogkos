@@ -38,37 +38,63 @@ CogKOS is a **cognitive knowledge backend for AI Agents** — providing long-ter
 git clone https://github.com/Kingxiao/cogkos.git
 cd cogkos
 
-# Start PostgreSQL + FalkorDB
+# Start PostgreSQL (pgvector) + FalkorDB
 docker-compose up -d
 ```
 
-### 2. Configure & Run
+### 2. Configure & Build
 
 ```bash
 cp .env.example .env
-# Edit .env — set DATABASE_URL, FALKORDB_URL, embedding API key
+# Edit .env — see comments for required vs optional vars
 
 cargo build --release
-./target/release/cogkos
 ```
 
-The MCP server starts on `http://localhost:3000/mcp`, health endpoint on `:8081/healthz`.
+### 3. First Run — Initialize & Create API Key
 
-### 3. Connect an Agent
+```bash
+# Start the server (runs DB migrations automatically)
+./target/release/cogkos &
+
+# Create your first API key (tenant = your org/project name)
+./target/release/cogkos-admin create-key my-org read,write
+# Output: API Key: ck_xxxxxxxxxxxx (save this — shown only once)
+
+# Verify
+curl http://localhost:8081/healthz   # → "ok"
+curl http://localhost:8081/readyz    # → "ready" (checks PG + FalkorDB)
+```
+
+> **Quick dev mode**: Set `DEFAULT_MCP_API_KEY=any-string` in `.env` to skip admin CLI key creation.
+
+### 4. Connect Your Agents
+
+CogKOS uses a **tenant/agent** model:
+- **Tenant** = your organization (data isolation boundary)
+- **Agents** = multiple AI agents sharing one tenant's knowledge pool
 
 ```json
-// MCP client config (e.g., Claude Code ~/.claude/mcp_servers.json)
+// Agent A — Claude Code (~/.claude/mcp_servers.json)
 {
   "cogkos": {
     "type": "streamable-http",
     "url": "http://localhost:3000/mcp",
     "headers": {
-      "X-API-Key": "<your-key>",
-      "X-Tenant-ID": "default"
+      "X-API-Key": "ck_xxxxxxxxxxxx",
+      "X-Tenant-ID": "my-org"
     }
   }
 }
+
+// Agent B — same tenant, different key (or same key)
+// Both agents read/write the same knowledge pool
 ```
+
+All agents within a tenant:
+- **Share** the same knowledge graph and semantic search index
+- **Detect conflicts** across each other's claims (Agent A says X, Agent B says not-X)
+- Are identified by `source.agent_id` in each request (for provenance tracking)
 
 ## Architecture
 

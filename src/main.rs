@@ -647,7 +647,8 @@ async fn main() -> Result<()> {
                     let _ = stream.read(&mut buf).await;
                     let req = String::from_utf8_lossy(&buf);
 
-                    if req.contains("/readyz") {
+                    if req.contains("/readyz") || req.contains("/ready") || req.contains("/healthz")
+                    {
                         // Readiness: check DB + FalkorDB connectivity
                         let pg_ok = sqlx::query("SELECT 1").fetch_one(&pool).await.is_ok();
                         let redis_ok = match redis.get().await {
