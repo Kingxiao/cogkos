@@ -33,6 +33,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  config-audit:
+    name: Config Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run config audit
+        run: bash scripts/audit.sh
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
