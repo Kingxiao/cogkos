@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["chunk_text","clean_text"],"struct":["AudioParser","AudioParserConfig","AudioTranscription","DocxParser","ExcelParser","MarkdownParser","ParserRegistry","PdfParser","PptxParser","TextParser","VideoParser"]};

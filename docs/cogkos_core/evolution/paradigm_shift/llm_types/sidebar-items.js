@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["LlmClientError","LlmRole"],"struct":["LlmMessage","LlmRequest","LlmResponse","LlmUsage","OpenAiLlmClient"],"trait":["LlmClient"]};

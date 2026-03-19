@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DocumentType"],"mod":["classifier","coordinator","deep_classifier","embedding","image","parser","pipeline"],"struct":["IngestResult","TextChunk","UploadedFile"],"trait":["DocumentParser"]};

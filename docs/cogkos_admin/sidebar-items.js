@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["connect_db","connect_pool","main","print_usage"]};

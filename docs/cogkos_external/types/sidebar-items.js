@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SearchFilter","SortOption","SourceType"],"struct":["ConnectorConfig","ExternalDocument","SearchQuery","SearchResult"]};

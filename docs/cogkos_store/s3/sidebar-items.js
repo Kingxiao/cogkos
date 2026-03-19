@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["S3StoreWithFallback"],"struct":["InMemoryObjectStore","LocalStore","S3Store"]};

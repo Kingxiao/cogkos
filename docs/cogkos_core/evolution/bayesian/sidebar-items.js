@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["bayesian_aggregate","bayesian_aggregate_deduplicated","calculate_base_confidence","log_odds","odds_to_prob"]};

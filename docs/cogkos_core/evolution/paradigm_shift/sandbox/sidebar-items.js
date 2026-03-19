@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResolutionLogic","SandboxTestType"],"struct":["AttributeDef","Framework","GenerationRecord","IsolationConfig","LlmSandbox","OntologyConstraint","OntologyDefinition","PredictionConfig","ResolutionRule","SandboxMetrics","SandboxReport","SandboxTestResult","ValidationCriteria"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Claimant","ConsolidationStage","EpistemicStatus","KnowledgeType","MemoryLayer","NodeType"],"struct":["EntityRef","EpistemicClaim","ProvenanceRecord"]};

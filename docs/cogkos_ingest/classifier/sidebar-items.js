@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["coarse_classify","node_type_from_classification"],"struct":["CoarseClassification"]};

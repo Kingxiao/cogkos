@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["calculate_conflict_severity","detect_conflicts","detect_conflicts_enhanced","detect_conflicts_periodic","detect_llm_semantic_conflict","get_open_conflicts","resolve_conflict"],"struct":["ConflictDetectionConfig"]};

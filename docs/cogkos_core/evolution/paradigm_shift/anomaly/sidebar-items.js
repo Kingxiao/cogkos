@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AnomalyAssessment","AnomalyRecommendation","AnomalyType","ParadigmShiftError"],"struct":["Anomaly","AnomalyConfig","AnomalyDetectionResult","AnomalyDetector"],"type":["Result"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["auto_switch","bayesian","conflict","decay","dedicated_model","engine","health_monitor","insight_extraction","paradigm","paradigm_shift"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["bayesian_aggregate_with_weights","calculate_source_diversity","consolidate_claim","consolidate_claims","count_independent_sources"],"struct":["ConsolidationConfig"]};

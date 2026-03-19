@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AggregationMethod"],"struct":["AggregatedResponse","AggregationConfig","AggregationMetadata","BestResultAggregator","ConsensusAggregator","EnsembleAggregator","FederatedResult","NodeResult","SmartAggregator","WeightedAggregator"],"trait":["ResultAggregator"]};

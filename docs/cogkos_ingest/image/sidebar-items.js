@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ImageEntity","ImageParseResult","ImageParser","ImageParserConfig"]};

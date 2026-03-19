@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["calculate_decay","calculate_decay_with_revalidation","calculate_effective_durability","needs_revalidation"]};

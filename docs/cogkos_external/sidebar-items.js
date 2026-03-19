@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["arxiv","error","polling","rss","search","types","webhook","wikipedia"],"struct":["ExternalKnowledgeManager","ExternalKnowledgeManagerBuilder"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["OverallHealthStatus"],"mod":["aggregation_quality","cascade_detection","diversity_entropy","framework_monitoring","gini_coefficient"],"struct":["FederationHealth","FederationHealthChecker"]};

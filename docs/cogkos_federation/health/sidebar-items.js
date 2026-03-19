@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HealthStatus"],"fn":["calculate_collective_health"],"struct":["AggregationResult","CollectiveIntelligenceHealth","ConditionResults","DecentralizationResult","DiversityResult","IndependenceResult","InsightSource","Prediction","ProvenanceInfo"]};

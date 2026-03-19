@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ProviderType"],"fn":["anthropic_client","openai_client"],"mod":["client","dedicated_model","error","prediction","provider","stream","template","types"],"struct":["LlmClientBuilder"]};

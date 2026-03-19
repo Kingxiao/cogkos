@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CentralizationStatus","RiskLevel"],"fn":["analyze_centralization","analyze_node_contributions","calculate_expertise_gini","calculate_gini_coefficient","calculate_knowledge_gini","calculate_load_gini","calculate_lorenz_curve","identify_dominant_nodes"],"struct":["CentralizationResult","GiniHistoryEntry","GiniTracker","NodeContribution"]};

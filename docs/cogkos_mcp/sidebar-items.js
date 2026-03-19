@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["McpTransport"],"mod":["auth","cache","merger","server","tools"],"struct":["McpConfig"]};

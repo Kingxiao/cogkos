@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ApiMethod","AuthMethod"],"struct":["ApiPollingEntry","ApiSubscriptionConfig","ApiSubscriptionManager","RssSubscriptionManager"],"type":["BoxFuture"]};

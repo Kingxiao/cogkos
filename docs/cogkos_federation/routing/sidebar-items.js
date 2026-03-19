@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["QueryPriority","RoutingStrategy"],"struct":["AdaptiveRouter","DomainRouter","FederatedQuery","MetadataDirectoryRouter","NodeRoute","RoutingDecision"],"trait":["QueryRouter"]};

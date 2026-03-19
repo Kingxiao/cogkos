@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["WebhookEventType"],"struct":["WebhookManager","WebhookPayload","WebhookReceiver","WebhookServer","WebhookSignatureValidator","WebhookSubscription"],"trait":["WebhookEventHandler"]};

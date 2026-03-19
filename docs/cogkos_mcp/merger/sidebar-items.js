@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResultSource"],"fn":["calculate_weighted_score","deduplicate_results","merge_results"],"struct":["MergeConfig","MergedResult"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HISTOGRAM_BUCKETS"],"fn":["init_logging","init_metrics"],"struct":["METRICS","MetricsCollector"]};

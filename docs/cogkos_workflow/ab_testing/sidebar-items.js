@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ShiftDecision","SuccessCriteria","TestStatus"],"struct":["AbTest","AbTestFramework","AbTestRunner","MetricStats","ParadigmShiftTest","TestResult","TestVariant","VariantAssignment","VariantStats"]};

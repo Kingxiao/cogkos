@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AutoSwitchError","AutoSwitchStatus","EvolutionAction","RolloutPhase","RolloutReason"],"mod":["controller","integration"],"struct":["AutoSwitchConfig","RolloutRecord","SwitchRecommendation","TestMetrics"],"type":["Result"]};

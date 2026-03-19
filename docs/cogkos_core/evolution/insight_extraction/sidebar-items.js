@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["InsightType","TrendDirection"],"mod":["extractor"],"struct":["ExtractedInsight","InsightExtractionConfig","TemporalContext"]};

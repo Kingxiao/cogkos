@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["elevate_insight_to_claim"],"struct":["InsightExtractor"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TimeBucket"],"mod":["access","claim","conflict","evolution","feedback","query","subscription"],"struct":["ClaimMetadata","Metadata"],"type":["Id","JsonMap","JsonValue"]};

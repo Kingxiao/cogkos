@@ -1,0 +1,2 @@
+window.ALL_CRATES = ["cogkos","cogkos_admin","cogkos_core","cogkos_external","cogkos_federation","cogkos_ingest","cogkos_llm","cogkos_mcp","cogkos_sleep","cogkos_store","cogkos_workflow"];
+//{"start":21,"fragment_lengths":[8,15,14,18,20,16,13,13,15,15,18]}

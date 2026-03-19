@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AccessScope","Permission","ResourceType","Role"],"fn":["authorize","get_context"],"struct":["AccessPolicy","RBAC","RbacContext","RbacEngine","RoleAssignment"]};
