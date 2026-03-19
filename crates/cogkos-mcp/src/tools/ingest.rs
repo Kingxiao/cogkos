@@ -122,11 +122,16 @@ pub async fn handle_submit_experience(
             "content": bg_claim.content,
             "node_type": bg_claim.node_type.as_db_str(),
         });
-        if let Err(e) = vector_store.upsert(bg_claim_id, content_vector.clone(), payload).await {
+        if let Err(e) = vector_store
+            .upsert(bg_claim_id, content_vector.clone(), payload)
+            .await
+        {
             tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background vector upsert failed");
             // Mark for sleep-time reindex
             let mut patched = bg_claim.clone();
-            patched.metadata.insert("needs_reindex".into(), serde_json::Value::Bool(true));
+            patched
+                .metadata
+                .insert("needs_reindex".into(), serde_json::Value::Bool(true));
             claim_store.update_claim(&patched).await.ok();
         }
 
@@ -154,7 +159,10 @@ pub async fn handle_submit_experience(
                 for m in &scored_matches {
                     if m.score > 0.5 {
                         let relation = if m.score > 0.8 { "SIMILAR" } else { "RELATED" };
-                        graph_store.create_edge(bg_claim_id, m.id, relation, m.score).await.ok();
+                        graph_store
+                            .create_edge(bg_claim_id, m.id, relation, m.score)
+                            .await
+                            .ok();
                     }
                 }
 

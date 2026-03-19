@@ -87,9 +87,7 @@ impl ServerHandler for CogkosMcpHandler {
 
         let timeout_secs = self.state.config.request_timeout_secs;
         let tool_name_for_timeout = tool_name.clone();
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            async {
+        let result = tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), async {
             match tool_name.as_str() {
                 "query_knowledge" => {
                     if !auth_context.can_read() {
@@ -456,7 +454,9 @@ impl ServerHandler for CogkosMcpHandler {
                     None,
                 )),
             }
-        }).await.unwrap_or_else(|_| {
+        })
+        .await
+        .unwrap_or_else(|_| {
             tracing::error!(tool = %tool_name_for_timeout, timeout_secs, "Tool call timed out");
             Err(rmcp::ErrorData::new(
                 ErrorCode(-32002),

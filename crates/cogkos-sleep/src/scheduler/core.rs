@@ -34,7 +34,9 @@ impl Scheduler {
             stores,
             config,
             state: Arc::new(RwLock::new(SchedulerState::default())),
-            evolution: Arc::new(RwLock::new(EvolutionEngine::new(EvolutionConfig::default()))),
+            evolution: Arc::new(RwLock::new(
+                EvolutionEngine::new(EvolutionConfig::default()),
+            )),
             cancel: tokio_util::sync::CancellationToken::new(),
         }
     }
@@ -417,7 +419,8 @@ impl Scheduler {
                 if s_gc.check_budget(TaskType::MemoryGc, 100).await {
                     match run_memory_gc(&s_gc.stores).await {
                         Ok(count) => {
-                            s_gc.record_processed(TaskType::MemoryGc, count as u64).await;
+                            s_gc.record_processed(TaskType::MemoryGc, count as u64)
+                                .await;
                         }
                         Err(e) => {
                             error!(error = %e, "Memory GC failed");
@@ -432,8 +435,9 @@ impl Scheduler {
         // Memory promotion: working → episodic → semantic
         let s_promo = self.clone_instance();
         tokio::spawn(async move {
-            let mut ticker =
-                interval(Duration::from_secs(s_promo.config.memory_promotion_interval_secs));
+            let mut ticker = interval(Duration::from_secs(
+                s_promo.config.memory_promotion_interval_secs,
+            ));
             loop {
                 tokio::select! {
                     _ = s_promo.cancel.cancelled() => { info!("Memory promotion task shutting down"); break; }

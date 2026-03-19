@@ -485,7 +485,10 @@ async fn main() -> Result<()> {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                 }
                 Err(e) => {
-                    return Err(anyhow::anyhow!("FalkorDB connection failed after retries: {}", e));
+                    return Err(anyhow::anyhow!(
+                        "FalkorDB connection failed after retries: {}",
+                        e
+                    ));
                 }
             }
         }

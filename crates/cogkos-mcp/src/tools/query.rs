@@ -173,7 +173,10 @@ pub async fn handle_query_knowledge(
     for claim in &claims {
         let layer = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata);
         let delta = layer.lambda() * 0.4;
-        claim_store.update_activation(claim.id, tenant_id, delta).await.ok();
+        claim_store
+            .update_activation(claim.id, tenant_id, delta)
+            .await
+            .ok();
     }
 
     // 4. Graph activation diffusion with threshold

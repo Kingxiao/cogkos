@@ -85,7 +85,8 @@ impl FalkorStore {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| CogKosError::Graph("FalkorDB query exhausted retries".into())))
+        Err(last_err
+            .unwrap_or_else(|| CogKosError::Graph("FalkorDB query exhausted retries".into())))
     }
 }
 

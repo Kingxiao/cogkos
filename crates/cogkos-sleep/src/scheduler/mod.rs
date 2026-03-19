@@ -129,10 +129,10 @@ impl Default for SchedulerConfig {
             conflict_batch_size: 100,
             confidence_boost_batch_size: 50,
             confidence_boost_factor: 0.05,
-            memory_gc_interval_secs: 1800,             // 30 minutes
-            memory_promotion_interval_secs: 3600,      // 1 hour
-            working_to_episodic_rehearsal: 3,           // 3 recalls to promote
-            episodic_to_semantic_rehearsal: 5,           // 5 recalls to promote
+            memory_gc_interval_secs: 1800,        // 30 minutes
+            memory_promotion_interval_secs: 3600, // 1 hour
+            working_to_episodic_rehearsal: 3,     // 3 recalls to promote
+            episodic_to_semantic_rehearsal: 5,    // 5 recalls to promote
             enable_periodic: true,
             max_claims_per_hour: 10000,
             max_task_duration_ms: 300_000, // 5 minutes

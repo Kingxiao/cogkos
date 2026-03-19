@@ -108,9 +108,7 @@ impl ConflictType {
             }
             "source_disagreement" | "sourcedisagreement" => ConflictType::SourceDisagreement,
             "confidence_mismatch" | "confidencemismatch" => ConflictType::ConfidenceMismatch,
-            "contextual_difference" | "contextualdifference" => {
-                ConflictType::ContextualDifference
-            }
+            "contextual_difference" | "contextualdifference" => ConflictType::ContextualDifference,
             _ => ConflictType::DirectContradiction,
         }
     }

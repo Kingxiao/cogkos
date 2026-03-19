@@ -54,8 +54,21 @@ fn detect_conflict_type(
 
     // 1. Negation-based contradiction (EN + CN)
     let negation_words = [
-        "not ", "no ", "false", "incorrect", "wrong", "never", // EN
-        "不", "没有", "并非", "未", "无法", "低于", "少于", "远低", "远慢", // CN
+        "not ",
+        "no ",
+        "false",
+        "incorrect",
+        "wrong",
+        "never", // EN
+        "不",
+        "没有",
+        "并非",
+        "未",
+        "无法",
+        "低于",
+        "少于",
+        "远低",
+        "远慢", // CN
     ];
     let a_negation = negation_words.iter().any(|w| a_content.contains(w));
     let b_negation = negation_words.iter().any(|w| b_content.contains(w));
@@ -150,7 +163,10 @@ fn calculate_content_similarity(a: &str, b: &str) -> f64 {
             if chars.len() < 2 {
                 return chars.iter().map(|c| c.to_string()).collect();
             }
-            chars.windows(2).map(|w| w.iter().collect::<String>()).collect()
+            chars
+                .windows(2)
+                .map(|w| w.iter().collect::<String>())
+                .collect()
         };
         let a_bi = bigrams(a);
         let b_bi = bigrams(b);

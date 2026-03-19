@@ -223,7 +223,12 @@ pub(crate) async fn run_memory_promotion(
         // episodic → semantic
         let e2s = stores
             .memory_layers
-            .promote_memory_layer(tenant, "episodic", "semantic", episodic_to_semantic_threshold)
+            .promote_memory_layer(
+                tenant,
+                "episodic",
+                "semantic",
+                episodic_to_semantic_threshold,
+            )
             .await?;
         if e2s > 0 {
             info!(tenant = %tenant, promoted = e2s, "Promoted episodic → semantic");

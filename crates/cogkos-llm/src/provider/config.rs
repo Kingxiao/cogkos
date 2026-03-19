@@ -242,9 +242,6 @@ mod tests {
 
         // If OPENAI_API_KEY is set in env, it will be used as fallback
         // Otherwise, "key-from-config" is used
-        assert!(
-            !config.api_key.is_empty(),
-            "API key should not be empty"
-        );
+        assert!(!config.api_key.is_empty(), "API key should not be empty");
     }
 }

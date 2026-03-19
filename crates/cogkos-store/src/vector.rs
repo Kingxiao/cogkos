@@ -110,14 +110,12 @@ impl super::VectorStore for PgVectorStore {
                 .join(", ")
         );
 
-        sqlx::query(
-            "UPDATE epistemic_claims SET embedding = $2::vector WHERE id = $1",
-        )
-        .bind(id)
-        .bind(vector_str)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| CogKosError::Vector(e.to_string()))?;
+        sqlx::query("UPDATE epistemic_claims SET embedding = $2::vector WHERE id = $1")
+            .bind(id)
+            .bind(vector_str)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| CogKosError::Vector(e.to_string()))?;
 
         Ok(())
     }

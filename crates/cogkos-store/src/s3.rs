@@ -26,8 +26,8 @@ impl LocalStore {
     /// Create new local store
     /// Respects LOCAL_STORAGE_PATH env var, falls back to ./data/objects
     pub async fn new(bucket: &str) -> Result<Self> {
-        let root = std::env::var("LOCAL_STORAGE_PATH")
-            .unwrap_or_else(|_| "./data/objects".to_string());
+        let root =
+            std::env::var("LOCAL_STORAGE_PATH").unwrap_or_else(|_| "./data/objects".to_string());
         let base_path = std::path::PathBuf::from(root).join(bucket);
         fs::create_dir_all(&base_path)
             .await

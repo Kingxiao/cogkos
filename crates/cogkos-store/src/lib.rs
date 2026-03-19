@@ -111,7 +111,6 @@ pub trait ClaimStore: Send + Sync {
         status: ResolutionStatus,
         note: Option<String>,
     ) -> Result<()>;
-
 }
 
 /// Memory layer store trait — separated from ClaimStore for explicit opt-in
@@ -940,8 +939,27 @@ pub struct NoopMemoryLayerStore;
 
 #[async_trait]
 impl MemoryLayerStore for NoopMemoryLayerStore {
-    async fn list_claims_by_memory_layer(&self, _: &str, _: &str, _: Option<&str>, _: usize) -> Result<Vec<EpistemicClaim>> { Ok(vec![]) }
-    async fn count_claims_by_memory_layer(&self, _: &str, _: &str, _: Option<&str>) -> Result<usize> { Ok(0) }
-    async fn gc_expired_memory_layer(&self, _: &str, _: &str, _: f64) -> Result<usize> { Ok(0) }
-    async fn promote_memory_layer(&self, _: &str, _: &str, _: &str, _: u64) -> Result<usize> { Ok(0) }
+    async fn list_claims_by_memory_layer(
+        &self,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+        _: usize,
+    ) -> Result<Vec<EpistemicClaim>> {
+        Ok(vec![])
+    }
+    async fn count_claims_by_memory_layer(
+        &self,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<usize> {
+        Ok(0)
+    }
+    async fn gc_expired_memory_layer(&self, _: &str, _: &str, _: f64) -> Result<usize> {
+        Ok(0)
+    }
+    async fn promote_memory_layer(&self, _: &str, _: &str, _: &str, _: u64) -> Result<usize> {
+        Ok(0)
+    }
 }

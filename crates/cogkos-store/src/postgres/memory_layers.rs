@@ -3,8 +3,8 @@
 use super::PostgresStore;
 use super::claims::row_to_claim;
 use async_trait::async_trait;
-use cogkos_core::{CogKosError, Result};
 use cogkos_core::models::EpistemicClaim;
+use cogkos_core::{CogKosError, Result};
 
 #[async_trait]
 impl crate::MemoryLayerStore for PostgresStore {

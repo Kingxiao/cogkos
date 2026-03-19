@@ -21,7 +21,9 @@ enum RateLimiterBackend {
     InMemory {
         buckets: Arc<Mutex<HashMap<String, (u32, std::time::Instant)>>>,
     },
-    Redis { pool: deadpool_redis::Pool },
+    Redis {
+        pool: deadpool_redis::Pool,
+    },
 }
 
 impl RateLimiter {
