@@ -16,9 +16,9 @@ use super::types::*;
 pub async fn handle_submit_experience(
     req: SubmitExperienceRequest,
     tenant_id: &str,
-    claim_store: &dyn ClaimStore,
-    vector_store: &dyn VectorStore,
-    graph_store: &dyn GraphStore,
+    claim_store: Arc<dyn ClaimStore>,
+    vector_store: Arc<dyn VectorStore>,
+    graph_store: Arc<dyn GraphStore>,
     embedding_client: Option<Arc<dyn LlmClient>>,
 ) -> Result<serde_json::Value> {
     // Convert source
@@ -82,116 +82,113 @@ pub async fn handle_submit_experience(
         );
     }
 
+    let t0 = std::time::Instant::now();
     let claim_id = claim_store.insert_claim(&claim).await?;
+    tracing::info!(claim_id = %claim_id, pg_ms = t0.elapsed().as_millis() as u64, "Fast-track: claim persisted");
 
-    // Generate vector: try real embedding first, fallback to pseudo-vector
-    let content_vector: Vec<f32> = if let Some(ref client) = embedding_client {
-        let embedding_service = EmbeddingService::new(client.clone());
-        match embedding_service.embed(&claim.content).await {
-            Ok(vec) => {
-                tracing::debug!("Generated real embedding for experience, dim={}", vec.len());
-                vec
-            }
-            Err(e) => {
-                tracing::warn!("Embedding failed, using fallback: {}", e);
-                generate_query_vector(&claim.content, helpers::DEFAULT_FALLBACK_DIM)
-            }
-        }
-    } else {
-        tracing::warn!("No embedding client configured, using fallback");
-        generate_query_vector(&claim.content, helpers::DEFAULT_FALLBACK_DIM)
-    };
+    // S2: Fast capture / slow consolidation
+    // Return immediately after PG write, spawn background task for embedding + vector + graph + conflict
+    let bg_claim = claim.clone();
+    let bg_tenant = tenant_id.to_string();
+    let bg_claim_id = claim_id;
+    let bg_claim_store = Arc::clone(&claim_store);
+    let bg_vector_store = Arc::clone(&vector_store);
+    let bg_graph_store = Arc::clone(&graph_store);
 
-    let payload = serde_json::json!({
-        "tenant_id": tenant_id,
-        "content": claim.content,
-        "node_type": claim.node_type.as_db_str(),
-    });
-    let mut warnings: Vec<String> = Vec::new();
+    tokio::spawn(async move {
+        let claim_store = bg_claim_store;
+        let vector_store = bg_vector_store;
+        let graph_store = bg_graph_store;
+        let t_bg = std::time::Instant::now();
 
-    if let Err(e) = vector_store
-        .upsert(claim_id, content_vector.clone(), payload)
-        .await
-    {
-        tracing::warn!(claim_id = %claim_id, error = %e, "Failed to upsert vector for claim");
-        warnings.push(format!("vector_upsert_failed: {}", e));
-        // Mark for sleep-time reindex
-        let mut patched = claim.clone();
-        patched.metadata.insert("needs_reindex".into(), serde_json::Value::Bool(true));
-        claim_store.update_claim(&patched).await.ok();
-    }
-
-    // Add to graph
-    if let Err(e) = graph_store.upsert_node(&claim).await {
-        tracing::warn!(claim_id = %claim_id, error = %e, "Failed to upsert graph node for claim");
-        warnings.push(format!("graph_upsert_failed: {}", e));
-    }
-
-    // === Semantic conflict detection ===
-    let mut conflicts_detected = 0u32;
-
-    if let Ok(matches) = vector_store
-        .search(content_vector.clone(), tenant_id, 20)
-        .await
-    {
-        let scored_matches: Vec<_> = matches
-            .into_iter()
-            .filter(|m| m.id != claim_id && m.score > 0.3)
-            .take(10)
-            .collect();
-
-        if !scored_matches.is_empty() {
-            let mut candidate_claims: Vec<EpistemicClaim> = Vec::new();
-            for m in &scored_matches {
-                if let Ok(c) = claim_store.get_claim(m.id, tenant_id).await {
-                    candidate_claims.push(c);
+        // 1. Embedding
+        let content_vector: Vec<f32> = if let Some(ref client) = embedding_client {
+            let embedding_service = EmbeddingService::new(client.clone());
+            match embedding_service.embed(&bg_claim.content).await {
+                Ok(vec) => vec,
+                Err(e) => {
+                    tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background embedding failed, using fallback");
+                    generate_query_vector(&bg_claim.content, helpers::DEFAULT_FALLBACK_DIM)
                 }
             }
+        } else {
+            generate_query_vector(&bg_claim.content, helpers::DEFAULT_FALLBACK_DIM)
+        };
+        let t_embed = t_bg.elapsed();
 
-            // Build graph edges for semantically related claims
-            for m in &scored_matches {
-                if m.score > 0.5 {
-                    let relation = if m.score > 0.8 { "SIMILAR" } else { "RELATED" };
-                    if let Err(e) = graph_store
-                        .create_edge(claim_id, m.id, relation, m.score)
-                        .await
-                    {
-                        tracing::debug!(error = %e, "Failed to create graph edge");
+        // 2. Vector upsert
+        let payload = serde_json::json!({
+            "tenant_id": bg_tenant,
+            "content": bg_claim.content,
+            "node_type": bg_claim.node_type.as_db_str(),
+        });
+        if let Err(e) = vector_store.upsert(bg_claim_id, content_vector.clone(), payload).await {
+            tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background vector upsert failed");
+            // Mark for sleep-time reindex
+            let mut patched = bg_claim.clone();
+            patched.metadata.insert("needs_reindex".into(), serde_json::Value::Bool(true));
+            claim_store.update_claim(&patched).await.ok();
+        }
+
+        // 3. Graph upsert
+        if let Err(e) = graph_store.upsert_node(&bg_claim).await {
+            tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background graph upsert failed");
+        }
+
+        // 4. Semantic conflict detection + graph edge building
+        if let Ok(matches) = vector_store.search(content_vector, &bg_tenant, 20).await {
+            let scored_matches: Vec<_> = matches
+                .into_iter()
+                .filter(|m| m.id != bg_claim_id && m.score > 0.3)
+                .take(10)
+                .collect();
+
+            if !scored_matches.is_empty() {
+                let mut candidate_claims: Vec<EpistemicClaim> = Vec::new();
+                for m in &scored_matches {
+                    if let Ok(c) = claim_store.get_claim(m.id, &bg_tenant).await {
+                        candidate_claims.push(c);
                     }
                 }
-            }
 
-            // Conflict detection
-            let conflicts =
-                cogkos_core::evolution::conflict::detect_conflicts_batch(&claim, &candidate_claims);
-
-            conflicts_detected = conflicts.len() as u32;
-
-            for conflict in conflicts {
-                if let Err(e) = claim_store.insert_conflict(&conflict).await {
-                    tracing::warn!("Failed to save conflict record: {}", e);
+                for m in &scored_matches {
+                    if m.score > 0.5 {
+                        let relation = if m.score > 0.8 { "SIMILAR" } else { "RELATED" };
+                        graph_store.create_edge(bg_claim_id, m.id, relation, m.score).await.ok();
+                    }
                 }
+
+                let conflicts = cogkos_core::evolution::conflict::detect_conflicts_batch(
+                    &bg_claim,
+                    &candidate_claims,
+                );
+                for conflict in &conflicts {
+                    claim_store.insert_conflict(conflict).await.ok();
+                }
+
+                tracing::debug!(
+                    claim_id = %bg_claim_id,
+                    edges = scored_matches.iter().filter(|m| m.score > 0.5).count(),
+                    conflicts = conflicts.len(),
+                    "Background: graph edges + conflict detection"
+                );
             }
-
-            tracing::debug!(
-                claim_id = %claim_id,
-                edges = scored_matches.iter().filter(|m| m.score > 0.5).count(),
-                conflicts = conflicts_detected,
-                "Post-ingest: graph edges + conflict detection"
-            );
         }
-    }
 
-    let mut resp = serde_json::json!({
+        tracing::info!(
+            claim_id = %bg_claim_id,
+            embedding_ms = t_embed.as_millis() as u64,
+            total_bg_ms = t_bg.elapsed().as_millis() as u64,
+            "Background consolidation complete"
+        );
+    });
+
+    let resp = serde_json::json!({
         "claim_id": claim_id.to_string(),
         "status": "accepted",
-        "conflicts_detected": conflicts_detected,
-        "novelty_score": 0.5,
-        "estimated_consolidation_time": "24h"
+        "consolidation": "async",
+        "estimated_consolidation_time": "5s"
     });
-    if !warnings.is_empty() {
-        resp["warnings"] = serde_json::json!(warnings);
-    }
     Ok(resp)
 }
 

@@ -148,7 +148,7 @@ pub fn merge_results(
         .iter()
         .filter(|r| r.source != ResultSource::VectorOnly)
         .map(|r| GraphRelation {
-            content: r.content.clone(),
+            content: strip_frontmatter(&r.content),
             relation_type: if r.source == ResultSource::Both {
                 "RELATED".to_string()
             } else {
@@ -160,6 +160,18 @@ pub fn merge_results(
         .collect();
 
     (merged, graph_relations)
+}
+
+/// Strip YAML frontmatter (---\n...\n---) from content
+fn strip_frontmatter(content: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.starts_with("---") {
+        if let Some(end_pos) = trimmed[3..].find("\n---") {
+            let after = &trimmed[3 + end_pos + 4..];
+            return after.trim_start_matches('\n').to_string();
+        }
+    }
+    content.to_string()
 }
 
 /// Deduplicate results by claim ID, keeping the one with higher score

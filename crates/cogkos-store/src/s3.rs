@@ -24,8 +24,11 @@ pub struct LocalStore {
 
 impl LocalStore {
     /// Create new local store
+    /// Respects LOCAL_STORAGE_PATH env var, falls back to ./data/objects
     pub async fn new(bucket: &str) -> Result<Self> {
-        let base_path = std::path::PathBuf::from("./data/objects").join(bucket);
+        let root = std::env::var("LOCAL_STORAGE_PATH")
+            .unwrap_or_else(|_| "./data/objects".to_string());
+        let base_path = std::path::PathBuf::from(root).join(bucket);
         fs::create_dir_all(&base_path)
             .await
             .map_err(|e| CogKosError::Storage(format!("Failed to create directory: {}", e)))?;

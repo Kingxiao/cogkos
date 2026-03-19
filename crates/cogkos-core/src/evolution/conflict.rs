@@ -24,6 +24,13 @@ pub fn detect_conflict(
 
     conflict_type.map(|ct| {
         let mut record = ConflictRecord::new(&claim_a.tenant_id, claim_a.id, claim_b.id, ct);
+        // Enrich description with content summaries for human readability
+        let summary_a: String = claim_a.content.chars().take(80).collect();
+        let summary_b: String = claim_b.content.chars().take(80).collect();
+        record.description = Some(format!(
+            "{:?}: [{}...] vs [{}...]",
+            ct, summary_a, summary_b
+        ));
         record.resolution_status = ResolutionStatus::Open;
         record
     })
@@ -60,8 +67,8 @@ fn detect_conflict_type(
     }
 
     // 2. Numeric contradiction — same topic, different numbers
-    // Lower similarity bar when numbers provide strong contradiction signal
-    if similarity > 0.15 && detect_numeric_contradiction(&a_content, &b_content) {
+    // Require high topic similarity to avoid false positives from incidental numbers
+    if similarity > 0.5 && detect_numeric_contradiction(&a_content, &b_content) {
         return Some(ConflictType::ConfidenceMismatch);
     }
 

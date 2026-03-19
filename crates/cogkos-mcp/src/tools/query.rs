@@ -190,11 +190,15 @@ pub async fn handle_query_knowledge(
                 vec![]
             }
         };
-        for node in related {
+        for mut node in related {
             if !all_graph_nodes
                 .iter()
                 .any(|n: &GraphNode| n.content == node.content)
             {
+                // Enrich with live activation from PG (FalkorDB stores stale initial value)
+                if let Ok(live_claim) = claim_store.get_claim(node.id, tenant_id).await {
+                    node.activation = live_claim.activation_weight;
+                }
                 all_graph_nodes.push(node);
             }
         }
@@ -225,7 +229,7 @@ pub async fn handle_query_knowledge(
             let claim = claims.iter().find(|c| c.id == r.claim_id);
             BeliefSummary {
                 claim_id: Some(r.claim_id),
-                content: r.content.clone(),
+                content: strip_yaml_frontmatter(&r.content),
                 confidence: r.confidence,
                 based_on: claims.len(),
                 consolidation_stage: claim
@@ -733,7 +737,7 @@ fn detect_knowledge_gaps(
         ));
     }
 
-    if related_graph.len() < claims.len() && claims.len() > 1 {
+    if related_graph.is_empty() && claims.len() > 2 {
         gaps.push("关联缺口：发现孤立知识点，知识库中缺乏逻辑连接".to_string());
     }
 
@@ -750,7 +754,7 @@ fn detect_knowledge_gaps(
         ));
     }
 
-    if conflicts.len() as f64 / claims.len() as f64 > 0.5 {
+    if claims.len() >= 3 && conflicts.len() as f64 / claims.len() as f64 > 1.0 {
         gaps.push("认知冲突：该领域存在大量矛盾信息，知识一致性极低".to_string());
     }
 
@@ -804,4 +808,16 @@ async fn detect_and_record_knowledge_gaps(
     }
 
     gaps
+}
+
+/// Strip YAML frontmatter (---\n...\n---) from content
+fn strip_yaml_frontmatter(content: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.starts_with("---") {
+        if let Some(end_pos) = trimmed[3..].find("\n---") {
+            let after = &trimmed[3 + end_pos + 4..];
+            return after.trim_start_matches('\n').to_string();
+        }
+    }
+    content.to_string()
 }

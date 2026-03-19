@@ -8,6 +8,7 @@ use rmcp::{
     },
     service::{RequestContext, RoleServer},
 };
+use std::sync::Arc;
 use tracing::info;
 
 use super::McpServerState;
@@ -174,9 +175,9 @@ impl ServerHandler for CogkosMcpHandler {
                     let result = handle_submit_experience(
                         req,
                         &auth_context.tenant_id,
-                        self.state.stores.claims.as_ref(),
-                        self.state.stores.vectors.as_ref(),
-                        self.state.stores.graph.as_ref(),
+                        Arc::clone(&self.state.stores.claims),
+                        Arc::clone(&self.state.stores.vectors),
+                        Arc::clone(&self.state.stores.graph),
                         self.state.embedding_client.clone(),
                     )
                     .await

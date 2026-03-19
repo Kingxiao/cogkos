@@ -7,6 +7,8 @@ build/
 Cargo.lock
 config/local.toml
 data/
+local-storage/
+scripts/cogkos-bg.sh
 # Data directories
 *.db
 dist/
