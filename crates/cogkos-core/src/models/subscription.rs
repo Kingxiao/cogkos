@@ -36,6 +36,7 @@ impl SubscriptionSource {
 pub enum SubscriptionType {
     Rss,
     Webhook,
+    Api,
 }
 
 impl SubscriptionType {
@@ -43,6 +44,7 @@ impl SubscriptionType {
         match self {
             SubscriptionType::Rss => "rss",
             SubscriptionType::Webhook => "webhook",
+            SubscriptionType::Api => "api",
         }
     }
 
@@ -50,6 +52,7 @@ impl SubscriptionType {
         match s.to_lowercase().as_str() {
             "rss" => SubscriptionType::Rss,
             "webhook" => SubscriptionType::Webhook,
+            "api" => SubscriptionType::Api,
             _ => SubscriptionType::Rss,
         }
     }

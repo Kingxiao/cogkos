@@ -249,6 +249,7 @@ pub struct SubscriptionResponse {
 pub enum ListSubscriptionsRequest {
     Rss,
     Webhook,
+    Api,
 }
 
 /// Cross-instance query response

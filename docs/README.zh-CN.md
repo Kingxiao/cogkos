@@ -81,14 +81,13 @@ CogKOS 采用 **租户/Agent** 模型：
     "type": "streamable-http",
     "url": "http://localhost:3000/mcp",
     "headers": {
-      "X-API-Key": "ck_xxxxxxxxxxxx",
-      "X-Tenant-ID": "my-org"
+      "X-API-Key": "ck_xxxxxxxxxxxx"
     }
   }
 }
 
 // Agent B — 同一租户，不同 Key（或相同 Key）
-// 两个 Agent 读写同一个知识池
+// 租户绑定在 API Key 上，无需额外 header
 ```
 
 同一租户内的所有 Agent：

@@ -3,7 +3,7 @@ FROM rust:1.94-bookworm AS builder
 
 WORKDIR /app
 
-# 安装系统依赖
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
@@ -59,6 +59,6 @@ COPY --from=builder /app/migrations /app/migrations
 
 USER nonroot:nonroot
 
-EXPOSE 3000 8080
+EXPOSE 3000 8081
 
 ENTRYPOINT ["/app/cogkos"]

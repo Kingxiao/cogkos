@@ -172,6 +172,7 @@ pub async fn handle_list_subscriptions(
         .filter(|s| match req {
             ListSubscriptionsRequest::Rss => s.source_type == SubscriptionType::Rss,
             ListSubscriptionsRequest::Webhook => s.source_type == SubscriptionType::Webhook,
+            ListSubscriptionsRequest::Api => s.source_type == SubscriptionType::Api,
         })
         .collect();
 
@@ -193,6 +194,7 @@ pub async fn handle_list_subscriptions(
     let type_str = match req {
         ListSubscriptionsRequest::Rss => "rss",
         ListSubscriptionsRequest::Webhook => "webhook",
+        ListSubscriptionsRequest::Api => "api",
     };
 
     Ok(serde_json::json!({

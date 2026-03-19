@@ -66,6 +66,7 @@ impl AuthMiddleware {
             if !default_key.is_empty() && api_key == default_key {
                 let tenant =
                     std::env::var("DEFAULT_MCP_TENANT").unwrap_or_else(|_| "default".to_string());
+                tracing::warn!(tenant_id = %tenant, "Dev mode auth: DEFAULT_MCP_API_KEY matched, bypassing DB validation");
                 return Ok(AuthContext {
                     tenant_id: tenant,
                     permissions: vec!["read".to_string(), "write".to_string()],

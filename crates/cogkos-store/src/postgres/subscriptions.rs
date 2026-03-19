@@ -263,6 +263,7 @@ fn parse_subscription_type(s: &str) -> cogkos_core::models::SubscriptionType {
     match s.to_lowercase().as_str() {
         "rss" => cogkos_core::models::SubscriptionType::Rss,
         "webhook" => cogkos_core::models::SubscriptionType::Webhook,
+        "api" => cogkos_core::models::SubscriptionType::Api,
         _ => cogkos_core::models::SubscriptionType::Rss,
     }
 }

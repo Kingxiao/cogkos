@@ -23,7 +23,7 @@ spec:
         component: mcp
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "8081"
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: cogkos-sa
@@ -41,7 +41,7 @@ spec:
             - name: http
               containerPort: 3000
             - name: metrics
-              containerPort: 9090
+              containerPort: 8081
           env:
             - name: RUST_LOG
               value: "info,cogkos=debug"

@@ -16,14 +16,14 @@ CogKOS MCP Server 基于 **rmcp SDK 的 MCP 标准协议**。
 
 ### 鉴权方式
 
-所有请求必须携带以下 Header：
+请求通过 `X-API-Key` HTTP Header 鉴权：
 
 ```
 X-API-Key: <api_key>
-X-Tenant-ID: <tenant_id>
 ```
 
-服务端校验 API Key 后，从 `api_keys` 表获取 `tenant_id` 和 `permissions`，注入全部后续查询。
+服务端校验 API Key 后，从 `api_keys` 表获取绑定的 `tenant_id` 和 `permissions`，注入全部后续查询。
+租户隔离通过 API Key 绑定实现，无需单独传递 tenant ID。
 
 **权限级别：**
 - `read` - 查询知识库
@@ -530,7 +530,6 @@ Agent 主动报告发现的知识空洞。
 
 ```bash
 curl -H "X-API-Key: your-api-key" \
-     -H "X-Tenant-ID: your-tenant" \
      http://localhost:3000/pipeline/status/pipe-abc123
 ```
 
@@ -570,7 +569,6 @@ GET /health
 POST /api/v1/query
 Content-Type: application/json
 X-API-Key: your-api-key
-X-Tenant-ID: your-tenant
 
 {
   "query": "竞品X的评价",
@@ -583,7 +581,6 @@ X-Tenant-ID: your-tenant
 ```bash
 GET /api/v1/claims/{claim_id}
 X-API-Key: your-api-key
-X-Tenant-ID: your-tenant
 ```
 
 ---
@@ -634,7 +631,7 @@ X-Tenant-ID: your-tenant
 | `INVALID_JSON` | -32700 | 400 | JSON 解析错误 | 检查请求体格式 |
 | `INVALID_METHOD` | -32601 | 400 | 方法不存在 | 检查工具名称拼写 |
 | `INVALID_PARAMS` | -32602 | 400 | 参数类型错误 | 检查参数类型 |
-| `TENANT_NOT_FOUND` | -32002 | 400 | 租户不存在 | 确认 X-Tenant-ID 正确 |
+| `TENANT_NOT_FOUND` | -32002 | 400 | 租户不存在 | 确认 API Key 绑定的租户正确 |
 | `INVALID_API_KEY` | -32004 | 401 | API Key 无效 | 检查 X-API-Key 是否正确 |
 | `API_KEY_EXPIRED` | -32005 | 401 | API Key 已过期 | 申请新的 API Key |
 | `FORBIDDEN` | -32001 | 403 | 权限不足 | 确认 API Key 有相应权限 |

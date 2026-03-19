@@ -350,9 +350,9 @@ cargo test --workspace --test '*'
 Phase 1 鉴权方案（简单有效）：
 
 ```
-Agent → MCP 请求 (Header: X-API-Key + X-Tenant-ID)
+Agent → MCP 请求 (Header: X-API-Key)
   → Gateway 校验 API Key（数据库查询，结果缓存 5 分钟）
-  → 提取 tenant_id → 注入到所有后续数据库查询的 WHERE 条件中
+  → 从 API Key 绑定关系提取 tenant_id → 注入到所有后续数据库查询的 WHERE 条件中
 ```
 
 ```sql

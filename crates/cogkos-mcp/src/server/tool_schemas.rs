@@ -2,17 +2,15 @@
 
 use rmcp::model::{JsonObject, Tool};
 
-/// Inject api_key into every tool schema and required array
+/// Inject api_key as optional field into every tool schema.
+/// When using Streamable HTTP transport, clients can pass api_key via
+/// the `X-API-Key` HTTP header instead of tool arguments.
 fn inject_api_key(schema: &mut JsonObject) {
     schema.insert(
         "api_key".to_string(),
-        serde_json::json!({"type": "string", "description": "API key for authentication"}),
+        serde_json::json!({"type": "string", "description": "API key for authentication. Optional when X-API-Key header is provided."}),
     );
-    if let Some(serde_json::Value::Array(required)) = schema.get_mut("required") {
-        required.push(serde_json::json!("api_key"));
-    } else {
-        schema.insert("required".to_string(), serde_json::json!(["api_key"]));
-    }
+    // api_key is intentionally NOT added to required — header auth is the primary path
 }
 
 /// Build all MCP tool schema definitions

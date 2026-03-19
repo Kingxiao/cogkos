@@ -16,8 +16,10 @@
 
 3. **启动开发环境**
    ```bash
+   cp .env.example .env
+   # Edit .env — at minimum DATABASE_URL must match your docker-compose ports
    docker-compose up -d
-   sqlx migrate run
+   # Migrations run automatically on first server start
    ```
 
 ## 代码提交规范
