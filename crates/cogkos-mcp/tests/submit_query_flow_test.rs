@@ -310,9 +310,9 @@ async fn test_submit_experience_to_query_knowledge_flow() {
     let stores = MockStores::new();
 
     // Create mock store instances using the same stores
-    let claim_store = MockClaimStore::new(&stores);
-    let vector_store = MockVectorStore::new(&stores);
-    let graph_store = MockGraphStore;
+    let claim_store: Arc<dyn ClaimStore> = Arc::new(MockClaimStore::new(&stores));
+    let vector_store: Arc<dyn VectorStore> = Arc::new(MockVectorStore::new(&stores));
+    let graph_store: Arc<dyn GraphStore> = Arc::new(MockGraphStore);
     let cache_store = MockCacheStore;
     let gap_store = InMemoryGapStore::default();
 
@@ -340,9 +340,9 @@ async fn test_submit_experience_to_query_knowledge_flow() {
     let submit_result = handle_submit_experience(
         submit_req,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
@@ -394,9 +394,9 @@ async fn test_submit_experience_to_query_knowledge_flow() {
     let _submit_result2 = handle_submit_experience(
         submit_req2,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
@@ -431,9 +431,9 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         query_req,
         tenant_id,
         &[], // roles
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        claim_store.as_ref(),
+        vector_store.as_ref(),
+        graph_store.as_ref(),
         &cache_store,
         &gap_store,
         None, // llm_client
@@ -506,9 +506,9 @@ async fn test_submit_and_query_with_conflicts() {
     let stores = MockStores::new();
 
     // Create mock store instances using the same stores
-    let claim_store = MockClaimStore::new(&stores);
-    let vector_store = MockVectorStore::new(&stores);
-    let graph_store = MockGraphStore;
+    let claim_store: Arc<dyn ClaimStore> = Arc::new(MockClaimStore::new(&stores));
+    let vector_store: Arc<dyn VectorStore> = Arc::new(MockVectorStore::new(&stores));
+    let graph_store: Arc<dyn GraphStore> = Arc::new(MockGraphStore);
     let cache_store = MockCacheStore;
     let gap_store = InMemoryGapStore::default();
 
@@ -536,9 +536,9 @@ async fn test_submit_and_query_with_conflicts() {
     let _result1 = handle_submit_experience(
         submit_req1,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
@@ -565,9 +565,9 @@ async fn test_submit_and_query_with_conflicts() {
     let _result2 = handle_submit_experience(
         submit_req2,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
@@ -596,9 +596,9 @@ async fn test_submit_and_query_with_conflicts() {
         query_req,
         tenant_id,
         &[], // roles
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        claim_store.as_ref(),
+        vector_store.as_ref(),
+        graph_store.as_ref(),
         &cache_store,
         &gap_store,
         None, // llm_client
@@ -628,9 +628,9 @@ async fn test_query_returns_cached_result() {
     }
 
     // Create mock store instances using the same stores
-    let claim_store = MockClaimStore::new(&stores);
-    let vector_store = MockVectorStore::new(&stores);
-    let graph_store = MockGraphStore;
+    let claim_store: Arc<dyn ClaimStore> = Arc::new(MockClaimStore::new(&stores));
+    let vector_store: Arc<dyn VectorStore> = Arc::new(MockVectorStore::new(&stores));
+    let graph_store: Arc<dyn GraphStore> = Arc::new(MockGraphStore);
     let cache_store = MockCacheStore;
     let gap_store = InMemoryGapStore::default();
 
@@ -655,9 +655,9 @@ async fn test_query_returns_cached_result() {
         query_req1,
         tenant_id,
         &[], // roles
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        claim_store.as_ref(),
+        vector_store.as_ref(),
+        graph_store.as_ref(),
         &cache_store,
         &gap_store,
         None, // llm_client
@@ -677,9 +677,9 @@ async fn test_submit_experience_with_all_fields() {
     let stores = MockStores::new();
 
     // Create mock store instances using the same stores
-    let claim_store = MockClaimStore::new(&stores);
-    let vector_store = MockVectorStore::new(&stores);
-    let graph_store = MockGraphStore;
+    let claim_store: Arc<dyn ClaimStore> = Arc::new(MockClaimStore::new(&stores));
+    let vector_store: Arc<dyn VectorStore> = Arc::new(MockVectorStore::new(&stores));
+    let graph_store: Arc<dyn GraphStore> = Arc::new(MockGraphStore);
 
     let tenant_id = "test_tenant";
 
@@ -706,9 +706,9 @@ async fn test_submit_experience_with_all_fields() {
     let result = handle_submit_experience(
         submit_req,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
@@ -739,9 +739,9 @@ async fn test_submit_experience_with_knowledge_type() {
     let stores = MockStores::new();
 
     // Create mock store instances using the same stores
-    let claim_store = MockClaimStore::new(&stores);
-    let vector_store = MockVectorStore::new(&stores);
-    let graph_store = MockGraphStore;
+    let claim_store: Arc<dyn ClaimStore> = Arc::new(MockClaimStore::new(&stores));
+    let vector_store: Arc<dyn VectorStore> = Arc::new(MockVectorStore::new(&stores));
+    let graph_store: Arc<dyn GraphStore> = Arc::new(MockGraphStore);
     let _cache_store = MockCacheStore;
     let _gap_store = InMemoryGapStore::default();
 
@@ -770,9 +770,9 @@ async fn test_submit_experience_with_knowledge_type() {
     let _submit_result = handle_submit_experience(
         submit_req,
         tenant_id,
-        &claim_store,
-        &vector_store,
-        &graph_store,
+        Arc::clone(&claim_store),
+        Arc::clone(&vector_store),
+        Arc::clone(&graph_store),
         None, // embedding_client
     )
     .await
