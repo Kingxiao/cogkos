@@ -1,0 +1,44 @@
+apiVersion: v1
+entries:
+  cogkos:
+  - annotations:
+      artifacthub.io/changes: |
+        - Initial release
+      artifacthub.io/images: |
+        - name: cogkos
+          image: cogkos/cogkos:v0.1.0
+        - name: cogkos-sleep
+          image: cogkos/cogkos-sleep:v0.1.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/cogkos/cogkos
+        - name: support
+          url: https://github.com/cogkos/cogkos/issues
+      artifacthub.io/operator: "false"
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/requiresKubeVersion: '>= 1.28.0'
+      category: AI/ML
+      licenses: MIT
+    apiVersion: v2
+    appVersion: 0.1.0
+    created: "2026-03-19T15:36:16.472555745Z"
+    description: CogKOS - Cognitive Knowledge Operating System
+    digest: ea4485c77bd110f8a813e4f7618fbc1fa392f9ea6c65ff5e1b0b175f1be3b1fe
+    home: https://cogkos.io
+    keywords:
+    - knowledge-graph
+    - mcp
+    - ai
+    - cognitive
+    kubeVersion: '>=1.28.0-0'
+    maintainers:
+    - email: team@cogkos.io
+      name: CogKOS Team
+    name: cogkos
+    sources:
+    - https://github.com/cogkos/cogkos
+    type: application
+    urls:
+    - https://github.com/Kingxiao/cogkos/releases/download/v0.1.0-beta.1/cogkos-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-03-19T15:36:16.471505184Z"
