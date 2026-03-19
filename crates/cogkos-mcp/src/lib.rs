@@ -30,6 +30,9 @@ pub struct McpConfig {
     pub cache_max_entries: usize,
     pub rate_limit_per_minute: Option<u32>,
     pub transport: McpTransport,
+    pub request_timeout_secs: u64,
+    /// Redis pool for rate limiter persistence (None = in-memory fallback)
+    pub redis_pool: Option<deadpool_redis::Pool>,
 }
 
 impl Default for McpConfig {
@@ -42,6 +45,8 @@ impl Default for McpConfig {
             cache_max_entries: 10000,
             rate_limit_per_minute: Some(600),
             transport: McpTransport::default(),
+            request_timeout_secs: 30,
+            redis_pool: None,
         }
     }
 }

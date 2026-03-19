@@ -176,45 +176,21 @@ impl IngestionPipeline {
             );
         }
 
-        // Store entities as JSON
-        if !deep_classification.entities.is_empty() {
-            let entities_json =
-                serde_json::to_string(&deep_classification.entities).unwrap_or_default();
-            file_claim.metadata.insert(
-                "entities".to_string(),
-                serde_json::Value::String(entities_json),
-            );
+        // Store deep classification fields as JSON metadata
+        macro_rules! store_meta {
+            ($key:expr, $val:expr) => {
+                if !$val.is_empty() {
+                    match serde_json::to_value(&$val) {
+                        Ok(v) => { file_claim.metadata.insert($key.to_string(), v); }
+                        Err(e) => { tracing::warn!(field = $key, error = %e, "Failed to serialize deep classification field"); }
+                    }
+                }
+            };
         }
-
-        // Store predictions as JSON
-        if !deep_classification.predictions.is_empty() {
-            let predictions_json =
-                serde_json::to_string(&deep_classification.predictions).unwrap_or_default();
-            file_claim.metadata.insert(
-                "predictions".to_string(),
-                serde_json::Value::String(predictions_json),
-            );
-        }
-
-        // Store data points as JSON
-        if !deep_classification.data_points.is_empty() {
-            let data_points_json =
-                serde_json::to_string(&deep_classification.data_points).unwrap_or_default();
-            file_claim.metadata.insert(
-                "data_points".to_string(),
-                serde_json::Value::String(data_points_json),
-            );
-        }
-
-        // Store methodologies as JSON
-        if !deep_classification.methodologies.is_empty() {
-            let methodologies_json =
-                serde_json::to_string(&deep_classification.methodologies).unwrap_or_default();
-            file_claim.metadata.insert(
-                "methodologies".to_string(),
-                serde_json::Value::String(methodologies_json),
-            );
-        }
+        store_meta!("entities", deep_classification.entities);
+        store_meta!("predictions", deep_classification.predictions);
+        store_meta!("data_points", deep_classification.data_points);
+        store_meta!("methodologies", deep_classification.methodologies);
 
         // Store confidence score
         file_claim.metadata.insert(

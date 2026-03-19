@@ -119,6 +119,7 @@ async fn main() {
             Arc::new(InMemoryGapStore::new()),
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
+            Arc::new(cogkos_store::NoopMemoryLayerStore),
         )
     } else {
         println!("⚠️ DATABASE_URL 为空，使用 InMemory 存储");
@@ -133,6 +134,7 @@ async fn main() {
             Arc::new(InMemoryGapStore::new()),
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
+            Arc::new(cogkos_store::NoopMemoryLayerStore),
         )
     };
     

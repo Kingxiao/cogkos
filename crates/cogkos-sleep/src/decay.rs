@@ -118,8 +118,9 @@ pub async fn decay_claims(
             0, // confirmation_count - would come from feedback
         );
 
-        // Apply decay with adjusted lambda based on durability
-        let adjusted_lambda = config.lambda * (1.0 - effective_durability * 0.5);
+        // Use memory-layer-specific λ (working=0.5, episodic=0.05, semantic=0.01)
+        let base_lambda = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata).lambda();
+        let adjusted_lambda = base_lambda * (1.0 - effective_durability * 0.5);
 
         // Ensure minimum activation weight
         let activation = claim.activation_weight.max(config.min_activation_weight);

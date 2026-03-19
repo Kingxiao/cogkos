@@ -94,27 +94,29 @@ pub async fn consolidate_claims(
         );
 
         // Determine new status based on confidence
-        let _new_status = if aggregated_confidence >= config.promotion_threshold {
+        let new_status = if aggregated_confidence >= config.promotion_threshold {
             EpistemicStatus::Corroborated
         } else {
             EpistemicStatus::Asserted
         };
 
-        // Update all claims in the group
-        // In a real implementation, we might create a new "Consolidated" claim
-        // and mark the originals as derived_from
-        for claim in &group_claims {
-            // Update confidence to aggregated value
-            if let Err(e) = stores
-                .claims
-                .update_confidence(claim.id, &claim.tenant_id, aggregated_confidence)
-                .await
-            {
-                warn!(error = %e, claim_id = %claim.id, "Failed to update confidence");
-            }
+        let new_stage = if aggregated_confidence >= config.promotion_threshold {
+            ConsolidationStage::Consolidated
+        } else {
+            ConsolidationStage::FastTrack
+        };
 
-            // NOTE: Update epistemic_status when store supports it
-            // NOTE: Update consolidation_stage when confidence is high enough
+        // Update all claims in the group
+        for claim in &group_claims {
+            let mut updated = claim.clone();
+            updated.confidence = aggregated_confidence;
+            updated.epistemic_status = new_status;
+            updated.consolidation_stage = new_stage;
+            updated.updated_at = chrono::Utc::now();
+
+            if let Err(e) = stores.claims.update_claim(&updated).await {
+                warn!(error = %e, claim_id = %claim.id, "Failed to update consolidated claim");
+            }
         }
 
         consolidated_count += group_claims.len();

@@ -3,6 +3,7 @@
 mod handler;
 mod rate_limiter;
 mod startup;
+mod tool_schemas;
 
 use std::sync::Arc;
 

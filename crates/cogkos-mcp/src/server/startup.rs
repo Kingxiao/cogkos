@@ -27,7 +27,14 @@ fn build_state(
         config.cache_ttl_seconds,
     ));
 
-    let rate_limiter = RateLimiter::new(config.rate_limit_per_minute.unwrap_or(600));
+    let rate_limit = config.rate_limit_per_minute.unwrap_or(600);
+    let rate_limiter = if let Some(ref pool) = config.redis_pool {
+        tracing::info!("Rate limiter: Redis-backed (persistent across restarts)");
+        RateLimiter::with_redis(pool.clone(), rate_limit)
+    } else {
+        tracing::info!("Rate limiter: in-memory (resets on restart)");
+        RateLimiter::new(rate_limit)
+    };
 
     McpServerState {
         stores,

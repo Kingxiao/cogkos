@@ -148,6 +148,34 @@ pub async fn handle_query_knowledge(
         }
     }
 
+    // 3b. Filter by memory_layer / session_id if requested
+    if let Some(ref layer) = req.memory_layer {
+        claims.retain(|c| {
+            c.metadata
+                .get("memory_layer")
+                .and_then(|v| v.as_str())
+                .is_some_and(|l| l == layer)
+        });
+    }
+    if let Some(ref sid) = req.session_id {
+        claims.retain(|c| {
+            c.metadata
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == sid)
+        });
+    }
+    if req.memory_layer.is_some() || req.session_id.is_some() {
+        claim_ids = claims.iter().map(|c| c.id).collect();
+    }
+
+    // 3c. Record rehearsal for retrieved claims (S3: read equals write)
+    for claim in &claims {
+        let layer = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata);
+        let delta = layer.lambda() * 0.4;
+        claim_store.update_activation(claim.id, tenant_id, delta).await.ok();
+    }
+
     // 4. Graph activation diffusion with threshold
     let mut all_graph_nodes: Vec<GraphNode> = Vec::new();
     let threshold = req.activation_threshold.clamp(0.0, 1.0);
@@ -155,7 +183,13 @@ pub async fn handle_query_knowledge(
     let _max_depth = 2;
 
     for claim in &claims {
-        let related = graph_store.find_related(claim.id, 2, threshold).await?;
+        let related = match graph_store.find_related(claim.id, 2, threshold).await {
+            Ok(nodes) => nodes,
+            Err(e) => {
+                tracing::warn!(claim_id = %claim.id, error = %e, "Graph diffusion failed, degrading");
+                vec![]
+            }
+        };
         for node in related {
             if !all_graph_nodes
                 .iter()
@@ -210,9 +244,16 @@ pub async fn handle_query_knowledge(
     if req.include_conflicts {
         let mut seen_conflicts = std::collections::HashSet::new();
         for claim in &claims {
-            let claim_conflicts = claim_store
+            let claim_conflicts = match claim_store
                 .get_conflicts_for_claim(claim.id, tenant_id)
-                .await?;
+                .await
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(claim_id = %claim.id, error = %e, "Conflict query failed");
+                    vec![]
+                }
+            };
             for c in &claim_conflicts {
                 if !seen_conflicts.contains(&c.id) {
                     seen_conflicts.insert(c.id);

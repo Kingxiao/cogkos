@@ -21,7 +21,6 @@ enum RateLimiterBackend {
     InMemory {
         buckets: Arc<Mutex<HashMap<String, (u32, std::time::Instant)>>>,
     },
-    #[cfg(feature = "redis-ratelimit")]
     Redis { pool: deadpool_redis::Pool },
 }
 
@@ -37,7 +36,6 @@ impl RateLimiter {
     }
 
     /// Create a Redis-backed rate limiter (multi-node deployment)
-    #[cfg(feature = "redis-ratelimit")]
     pub fn with_redis(pool: deadpool_redis::Pool, max_requests_per_minute: u32) -> Self {
         Self {
             inner: RateLimiterBackend::Redis { pool },
@@ -51,7 +49,6 @@ impl RateLimiter {
             RateLimiterBackend::InMemory { buckets } => {
                 self.check_in_memory(buckets, tenant_id).await
             }
-            #[cfg(feature = "redis-ratelimit")]
             RateLimiterBackend::Redis { pool } => self.check_redis(pool, tenant_id).await,
         }
     }
@@ -94,7 +91,6 @@ impl RateLimiter {
         }
     }
 
-    #[cfg(feature = "redis-ratelimit")]
     async fn check_redis(
         &self,
         pool: &deadpool_redis::Pool,

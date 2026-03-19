@@ -36,6 +36,12 @@ pub struct QueryKnowledgeRequest {
     /// Delegate to sampling protocol for advanced analysis
     #[serde(default)]
     pub delegate_to_sampling: bool,
+    /// Filter results by memory layer: "working", "episodic", "semantic", or None (all)
+    #[serde(default)]
+    pub memory_layer: Option<String>,
+    /// Filter results by session ID (for working/episodic memory)
+    #[serde(default)]
+    pub session_id: Option<String>,
 }
 
 pub fn default_activation_threshold() -> f64 {
@@ -100,6 +106,12 @@ pub struct SubmitExperienceRequest {
     pub tags: Vec<String>,
     #[serde(default)]
     pub related_to: Vec<uuid::Uuid>,
+    /// Memory layer: "working", "episodic", or "semantic" (default)
+    #[serde(default)]
+    pub memory_layer: Option<String>,
+    /// Session ID for working/episodic memory scoping
+    #[serde(default)]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

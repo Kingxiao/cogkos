@@ -10,7 +10,7 @@ use config::{Config, File, FileFormat};
 use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt};
 
 /// Application configuration
@@ -406,6 +406,14 @@ async fn main() -> Result<()> {
                 .idle_timeout(std::time::Duration::from_secs(
                     config.database.idle_timeout_secs,
                 ))
+                .after_connect(|conn, _meta| {
+                    Box::pin(async move {
+                        sqlx::query("SET statement_timeout = '30s'")
+                            .execute(&mut *conn)
+                            .await?;
+                        Ok(())
+                    })
+                })
                 .connect(&database_url)
                 .await
             {
@@ -440,13 +448,48 @@ async fn main() -> Result<()> {
     let auth_store: Arc<dyn cogkos_store::AuthStore> = claim_store.clone();
     let gap_store: Arc<dyn cogkos_store::GapStore> = claim_store.clone();
     let subscription_store: Arc<dyn cogkos_store::SubscriptionStore> = claim_store.clone();
+    let memory_layer_store: Arc<dyn cogkos_store::MemoryLayerStore> = claim_store.clone();
 
-    // Create graph store (FalkorDB)
+    // Create graph store (FalkorDB) with startup retry
     info!("Connecting to FalkorDB...");
     let redis_cfg = deadpool_redis::Config::from_url(&falkordb_url);
     let redis_pool = redis_cfg
         .create_pool(Some(deadpool_redis::Runtime::Tokio1))
         .map_err(|e| anyhow::anyhow!("FalkorDB pool creation failed: {}", e))?;
+    {
+        let mut retries = 5u32;
+        loop {
+            match redis_pool.get().await {
+                Ok(mut conn) => {
+                    match deadpool_redis::redis::cmd("PING")
+                        .query_async::<String>(&mut conn)
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("FalkorDB connection verified");
+                            break;
+                        }
+                        Err(e) if retries > 0 => {
+                            retries -= 1;
+                            warn!(retries, error = %e, "FalkorDB PING failed, retrying...");
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        }
+                        Err(e) => {
+                            return Err(anyhow::anyhow!("FalkorDB health check failed: {}", e));
+                        }
+                    }
+                }
+                Err(e) if retries > 0 => {
+                    retries -= 1;
+                    warn!(retries, error = %e, "FalkorDB pool.get() failed, retrying...");
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("FalkorDB connection failed after retries: {}", e));
+                }
+            }
+        }
+    }
     let redis_pool_health = redis_pool.clone();
     let graph_store = Arc::new(cogkos_store::FalkorStore::new(redis_pool, &falkordb_graph));
 
@@ -458,10 +501,10 @@ async fn main() -> Result<()> {
             .map_err(|e| anyhow::anyhow!("PgVectorStore init failed: {}", e))?,
     );
 
-    // Create object store (S3)
-    info!("Connecting to S3...");
-    let object_store = Arc::new(
-        cogkos_store::S3Store::new(
+    // Create object store (S3 with local fallback)
+    info!("Connecting to object store...");
+    let object_store: Arc<dyn cogkos_store::ObjectStore> = Arc::new(
+        cogkos_store::S3StoreWithFallback::new(
             s3_endpoint.as_deref(),
             &s3_region,
             &s3_bucket,
@@ -469,7 +512,7 @@ async fn main() -> Result<()> {
             &s3_secret_key,
         )
         .await
-        .map_err(|e| anyhow::anyhow!("S3 connection failed: {}", e))?,
+        .map_err(|e| anyhow::anyhow!("Object store init failed: {}", e))?,
     );
 
     // Create audit store (schema already created by migrations)
@@ -487,6 +530,7 @@ async fn main() -> Result<()> {
         gap_store,
         audit_store,
         subscription_store,
+        memory_layer_store,
     );
 
     let stores_arc = Arc::new(stores.clone());
@@ -566,14 +610,9 @@ async fn main() -> Result<()> {
         cache_max_entries: config.cache.max_entries,
         rate_limit_per_minute: Some(config.security.rate_limit_requests_per_minute as u32),
         transport,
+        request_timeout_secs: config.server.request_timeout_secs,
+        redis_pool: Some(redis_pool_health.clone()),
     };
-
-    // Validate S3 credentials at startup
-    if s3_access_key.is_empty() || s3_secret_key.is_empty() {
-        tracing::warn!(
-            "S3_ACCESS_KEY or S3_SECRET_KEY is empty — object storage operations will fail"
-        );
-    }
 
     // Start health/readiness HTTP endpoint for k8s probes
     let health_port: u16 = std::env::var("HEALTH_PORT")

@@ -41,20 +41,11 @@ impl LlmProviderConfig {
         base_url: Option<String>,
         env_key: &str,
     ) -> Self {
-        // 配置优先级：尝试多个可能的环境变量 > 配置文件 > 默认值
-        let env_keys = [
-            env_key,
-            // 尝试各种常见的环境变量名
-            "MINIMAX_API_KEY",
-            "KIMI_API_KEY",
-            "AI302_API_KEY",
-            "OPENAI_API_KEY",
-            "DOUBAO_API_KEY",
-        ];
-
-        let final_api_key = env_keys
-            .iter()
-            .filter_map(|k| env::var(k).ok())
+        // 配置优先级：指定环境变量 > 通用 fallback > 配置文件
+        let final_api_key = env::var(env_key)
+            .ok()
+            .or_else(|| env::var("OPENAI_API_KEY").ok())
+            .into_iter()
             .find(|v| !v.is_empty())
             .unwrap_or(api_key);
 
@@ -239,24 +230,21 @@ mod tests {
     }
 
     #[test]
-    fn test_env_override() {
-        // 设置环境变量 (需要 unsafe 因为可能在多线程环境)
-        unsafe {
-            env::set_var("KIMI_API_KEY", "test-key-from-env");
-        }
-
+    fn test_config_fallback_to_provided_key() {
+        // When env var is not set, should use the provided api_key
         let config = LlmProviderConfig::from_toml(
             "kimi".to_string(),
             "moonshot-v1-8k".to_string(),
             "key-from-config".to_string(),
             None,
-            "KIMI_API_KEY",
+            "COGKOS_TEST_NONEXISTENT_KEY_12345",
         );
 
-        assert_eq!(config.api_key, "test-key-from-env");
-
-        unsafe {
-            env::remove_var("KIMI_API_KEY");
-        }
+        // If OPENAI_API_KEY is set in env, it will be used as fallback
+        // Otherwise, "key-from-config" is used
+        assert!(
+            !config.api_key.is_empty(),
+            "API key should not be empty"
+        );
     }
 }

@@ -301,10 +301,16 @@ impl QueryCacheEntry {
     /// Create a new cache entry
     pub fn new(query_hash: u64, response: McpQueryResponse) -> Self {
         let now = chrono::Utc::now();
+        // Cache confidence derived from best_belief (enables System 1 on high-confidence results)
+        let confidence = response
+            .best_belief
+            .as_ref()
+            .map(|b| b.confidence)
+            .unwrap_or(0.5);
         Self {
             query_hash,
             response,
-            confidence: 0.6,
+            confidence,
             hit_count: 0,
             success_count: 0,
             last_used: now,

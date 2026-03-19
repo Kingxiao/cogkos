@@ -4,7 +4,8 @@ use crate::conflict::{ConflictDetectionConfig, detect_conflicts, detect_conflict
 use crate::consolidate::ConsolidationConfig;
 use crate::decay::DecayConfig;
 use cogkos_core::Result;
-use cogkos_core::models::EpistemicClaim;
+use cogkos_core::evolution::engine::{EvolutionConfig, EvolutionEngine};
+use cogkos_core::models::{AnomalySignals, EpistemicClaim, EvolutionMode};
 use cogkos_store::Stores;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +14,8 @@ use tokio::time::interval;
 use tracing::{error, info, warn};
 
 use super::tasks::{
-    run_confidence_boost, run_consolidation, run_decay, run_health_check, run_pending_aggregation,
+    run_confidence_boost, run_consolidation, run_decay, run_health_check, run_memory_gc,
+    run_memory_promotion, run_pending_aggregation,
 };
 use super::{SchedulerConfig, SchedulerState, TaskType};
 
@@ -22,6 +24,7 @@ pub struct Scheduler {
     stores: Arc<Stores>,
     config: SchedulerConfig,
     state: Arc<RwLock<SchedulerState>>,
+    evolution: Arc<RwLock<EvolutionEngine>>,
     cancel: tokio_util::sync::CancellationToken,
 }
 
@@ -31,6 +34,7 @@ impl Scheduler {
             stores,
             config,
             state: Arc::new(RwLock::new(SchedulerState::default())),
+            evolution: Arc::new(RwLock::new(EvolutionEngine::new(EvolutionConfig::default()))),
             cancel: tokio_util::sync::CancellationToken::new(),
         }
     }
@@ -197,6 +201,21 @@ impl Scheduler {
                                 .await;
                             let mut state = s_consolidation.state.write().await;
                             state.last_consolidation = Some(chrono::Utc::now());
+
+                            // Tick evolution engine with anomaly signals
+                            let signals = AnomalySignals {
+                                prediction_error_streak: 0, // TODO: wire up from PredictionHistoryStore
+                                conflict_density_pct: 0.0,  // TODO: compute from recent conflicts
+                                cache_hit_rate_trend: 0.0,  // TODO: compute from cache stats
+                            };
+                            let mut engine = s_consolidation.evolution.write().await;
+                            engine.tick(signals);
+                            if engine.state().mode == EvolutionMode::ParadigmShift {
+                                warn!(
+                                    anomaly_counter = engine.state().anomaly_counter,
+                                    "Evolution engine triggered ParadigmShift mode — Phase 3 will implement shift logic"
+                                );
+                            }
                         }
                         Err(e) => {
                             error!(error = %e, "Consolidation failed");
@@ -385,6 +404,63 @@ impl Scheduler {
                 }
             }
         });
+
+        // Memory GC: expire old working/episodic claims
+        let s_gc = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(s_gc.config.memory_gc_interval_secs));
+            loop {
+                tokio::select! {
+                    _ = s_gc.cancel.cancelled() => { info!("Memory GC task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+                if s_gc.check_budget(TaskType::MemoryGc, 100).await {
+                    match run_memory_gc(&s_gc.stores).await {
+                        Ok(count) => {
+                            s_gc.record_processed(TaskType::MemoryGc, count as u64).await;
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Memory GC failed");
+                            let mut state = s_gc.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Memory promotion: working → episodic → semantic
+        let s_promo = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker =
+                interval(Duration::from_secs(s_promo.config.memory_promotion_interval_secs));
+            loop {
+                tokio::select! {
+                    _ = s_promo.cancel.cancelled() => { info!("Memory promotion task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+                if s_promo.check_budget(TaskType::MemoryPromotion, 100).await {
+                    match run_memory_promotion(
+                        &s_promo.stores,
+                        s_promo.config.working_to_episodic_rehearsal,
+                        s_promo.config.episodic_to_semantic_rehearsal,
+                    )
+                    .await
+                    {
+                        Ok(count) => {
+                            s_promo
+                                .record_processed(TaskType::MemoryPromotion, count as u64)
+                                .await;
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Memory promotion failed");
+                            let mut state = s_promo.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+                }
+            }
+        });
     }
 
     /// Helper to clone scheduler for task spawns
@@ -393,6 +469,7 @@ impl Scheduler {
             stores: self.stores.clone(),
             config: self.config.clone(),
             state: self.state.clone(),
+            evolution: self.evolution.clone(),
             cancel: self.cancel.clone(),
         }
     }

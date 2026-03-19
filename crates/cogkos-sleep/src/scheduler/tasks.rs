@@ -52,10 +52,17 @@ pub(crate) async fn run_pending_aggregation(
 
     info!("Running event-driven consolidation for PendingAggregation claims");
 
-    let tenants = vec!["default"];
+    let tenants = match stores.claims.list_tenants().await {
+        Ok(t) if !t.is_empty() => t,
+        Ok(_) => vec!["default".to_string()],
+        Err(e) => {
+            warn!("Failed to list tenants for pending aggregation: {}", e);
+            vec!["default".to_string()]
+        }
+    };
     let mut total_processed = 0;
 
-    for tenant in tenants {
+    for tenant in &tenants {
         // Get claims with PendingAggregation stage
         let claims = stores
             .claims
@@ -121,10 +128,17 @@ pub(crate) async fn run_pending_aggregation(
 pub(crate) async fn run_decay(stores: &Arc<Stores>, config: &DecayConfig) -> Result<usize> {
     info!("Running scheduled decay");
 
-    let tenants = vec!["default"];
+    let tenants = match stores.claims.list_tenants().await {
+        Ok(t) if !t.is_empty() => t,
+        Ok(_) => vec!["default".to_string()],
+        Err(e) => {
+            warn!("Failed to list tenants for decay: {}", e);
+            vec!["default".to_string()]
+        }
+    };
     let mut total_processed = 0;
 
-    for tenant in tenants {
+    for tenant in &tenants {
         let count = decay_claims(stores, tenant, config).await?;
         total_processed += count;
     }
@@ -132,6 +146,94 @@ pub(crate) async fn run_decay(stores: &Arc<Stores>, config: &DecayConfig) -> Res
     info!(decayed_count = total_processed, "Decay complete");
 
     Ok(total_processed)
+}
+
+/// Run memory GC — delete expired working and episodic claims
+pub(crate) async fn run_memory_gc(stores: &Arc<Stores>) -> Result<usize> {
+    use cogkos_core::models::MemoryLayer;
+
+    info!("Running memory GC");
+
+    let tenants = match stores.claims.list_tenants().await {
+        Ok(t) if !t.is_empty() => t,
+        Ok(_) => vec!["default".to_string()],
+        Err(e) => {
+            warn!("Failed to list tenants for memory GC: {}", e);
+            vec!["default".to_string()]
+        }
+    };
+
+    let mut total_gc = 0;
+
+    for tenant in &tenants {
+        // GC working memory (max_age = 8h)
+        let working_gc = stores
+            .memory_layers
+            .gc_expired_memory_layer(tenant, "working", MemoryLayer::Working.max_age_hours())
+            .await?;
+        if working_gc > 0 {
+            info!(tenant = %tenant, deleted = working_gc, "GC'd expired working memory claims");
+        }
+
+        // GC episodic memory (max_age = 168h / 7d)
+        let episodic_gc = stores
+            .memory_layers
+            .gc_expired_memory_layer(tenant, "episodic", MemoryLayer::Episodic.max_age_hours())
+            .await?;
+        if episodic_gc > 0 {
+            info!(tenant = %tenant, deleted = episodic_gc, "GC'd expired episodic memory claims");
+        }
+
+        total_gc += working_gc + episodic_gc;
+    }
+
+    info!(total_gc = total_gc, "Memory GC complete");
+    Ok(total_gc)
+}
+
+/// Run memory promotion — working → episodic → semantic
+pub(crate) async fn run_memory_promotion(
+    stores: &Arc<Stores>,
+    working_to_episodic_threshold: u64,
+    episodic_to_semantic_threshold: u64,
+) -> Result<usize> {
+    info!("Running memory promotion");
+
+    let tenants = match stores.claims.list_tenants().await {
+        Ok(t) if !t.is_empty() => t,
+        Ok(_) => vec!["default".to_string()],
+        Err(e) => {
+            warn!("Failed to list tenants for memory promotion: {}", e);
+            vec!["default".to_string()]
+        }
+    };
+
+    let mut total_promoted = 0;
+
+    for tenant in &tenants {
+        // working → episodic
+        let w2e = stores
+            .memory_layers
+            .promote_memory_layer(tenant, "working", "episodic", working_to_episodic_threshold)
+            .await?;
+        if w2e > 0 {
+            info!(tenant = %tenant, promoted = w2e, "Promoted working → episodic");
+        }
+
+        // episodic → semantic
+        let e2s = stores
+            .memory_layers
+            .promote_memory_layer(tenant, "episodic", "semantic", episodic_to_semantic_threshold)
+            .await?;
+        if e2s > 0 {
+            info!(tenant = %tenant, promoted = e2s, "Promoted episodic → semantic");
+        }
+
+        total_promoted += w2e + e2s;
+    }
+
+    info!(total_promoted = total_promoted, "Memory promotion complete");
+    Ok(total_promoted)
 }
 
 /// Run health check

@@ -27,8 +27,10 @@ services:
     restart: unless-stopped
     ports:
       - "6381:6379"
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --save 900 1 --save 300 10"
     volumes:
-      - ./data/falkordb:/data
+      - ./data/falkordb:/var/lib/falkordb/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -63,6 +65,7 @@ services:
         condition: service_healthy
     volumes:
       - ./config:/app/config:ro
+      - ./data/objects:/app/data/objects
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/healthz"]
       interval: 10s

@@ -33,11 +33,10 @@ lru.workspace = true
 base64 = "0.22"
 tokio-util.workspace = true
 rand = "0.8"
-deadpool-redis = { version = "0.23", optional = true }
+deadpool-redis = "0.23"
 
 [features]
 default = []
-redis-ratelimit = ["dep:deadpool-redis"]
 
 [dev-dependencies]
 tokio-test.workspace = true

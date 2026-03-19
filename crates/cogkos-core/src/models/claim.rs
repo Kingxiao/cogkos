@@ -14,17 +14,36 @@ pub enum NodeType {
     File,
 }
 
+impl NodeType {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            NodeType::Entity => "entity",
+            NodeType::Relation => "relation",
+            NodeType::Event => "event",
+            NodeType::Attribute => "attribute",
+            NodeType::Prediction => "prediction",
+            NodeType::Insight => "insight",
+            NodeType::File => "file",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "entity" => NodeType::Entity,
+            "relation" => NodeType::Relation,
+            "event" => NodeType::Event,
+            "attribute" => NodeType::Attribute,
+            "prediction" => NodeType::Prediction,
+            "insight" => NodeType::Insight,
+            "file" => NodeType::File,
+            _ => NodeType::Entity,
+        }
+    }
+}
+
 impl std::fmt::Display for NodeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NodeType::Entity => write!(f, "Entity"),
-            NodeType::Relation => write!(f, "Relation"),
-            NodeType::Event => write!(f, "Event"),
-            NodeType::Attribute => write!(f, "Attribute"),
-            NodeType::Prediction => write!(f, "Prediction"),
-            NodeType::Insight => write!(f, "Insight"),
-            NodeType::File => write!(f, "File"),
-        }
+        f.write_str(self.as_db_str())
     }
 }
 
@@ -136,15 +155,32 @@ pub enum ConsolidationStage {
     Archived,
 }
 
+impl ConsolidationStage {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            ConsolidationStage::FastTrack => "fast_track",
+            ConsolidationStage::PendingAggregation => "pending_aggregation",
+            ConsolidationStage::Consolidated => "consolidated",
+            ConsolidationStage::Insight => "insight",
+            ConsolidationStage::Archived => "archived",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "fast_track" | "fasttrack" => ConsolidationStage::FastTrack,
+            "pending_aggregation" | "pendingaggregation" => ConsolidationStage::PendingAggregation,
+            "consolidated" => ConsolidationStage::Consolidated,
+            "insight" => ConsolidationStage::Insight,
+            "archived" => ConsolidationStage::Archived,
+            _ => ConsolidationStage::FastTrack,
+        }
+    }
+}
+
 impl std::fmt::Display for ConsolidationStage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConsolidationStage::FastTrack => write!(f, "FastTrack"),
-            ConsolidationStage::PendingAggregation => write!(f, "PendingAggregation"),
-            ConsolidationStage::Consolidated => write!(f, "Consolidated"),
-            ConsolidationStage::Insight => write!(f, "Insight"),
-            ConsolidationStage::Archived => write!(f, "Archived"),
-        }
+        f.write_str(self.as_db_str())
     }
 }
 
@@ -159,15 +195,32 @@ pub enum EpistemicStatus {
     Superseded,
 }
 
+impl EpistemicStatus {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            EpistemicStatus::Asserted => "asserted",
+            EpistemicStatus::Corroborated => "corroborated",
+            EpistemicStatus::Contested => "contested",
+            EpistemicStatus::Retracted => "retracted",
+            EpistemicStatus::Superseded => "superseded",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "asserted" => EpistemicStatus::Asserted,
+            "corroborated" => EpistemicStatus::Corroborated,
+            "contested" => EpistemicStatus::Contested,
+            "retracted" => EpistemicStatus::Retracted,
+            "superseded" => EpistemicStatus::Superseded,
+            _ => EpistemicStatus::Asserted,
+        }
+    }
+}
+
 impl std::fmt::Display for EpistemicStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EpistemicStatus::Asserted => write!(f, "Asserted"),
-            EpistemicStatus::Corroborated => write!(f, "Corroborated"),
-            EpistemicStatus::Contested => write!(f, "Contested"),
-            EpistemicStatus::Retracted => write!(f, "Retracted"),
-            EpistemicStatus::Superseded => write!(f, "Superseded"),
-        }
+        f.write_str(self.as_db_str())
     }
 }
 

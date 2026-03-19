@@ -112,25 +112,43 @@ pub trait ClaimStore: Send + Sync {
         note: Option<String>,
     ) -> Result<()>;
 
-    // Working memory support (default impls for backward compatibility)
+}
+
+/// Memory layer store trait — separated from ClaimStore for explicit opt-in
+#[async_trait]
+pub trait MemoryLayerStore: Send + Sync {
     async fn list_claims_by_memory_layer(
         &self,
-        _tenant_id: &str,
-        _memory_layer: &str,
-        _session_id: Option<&str>,
-        _limit: usize,
-    ) -> Result<Vec<EpistemicClaim>> {
-        Ok(vec![])
-    }
+        tenant_id: &str,
+        memory_layer: &str,
+        session_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<EpistemicClaim>>;
 
     async fn count_claims_by_memory_layer(
         &self,
-        _tenant_id: &str,
-        _memory_layer: &str,
-        _session_id: Option<&str>,
-    ) -> Result<usize> {
-        Ok(0)
-    }
+        tenant_id: &str,
+        memory_layer: &str,
+        session_id: Option<&str>,
+    ) -> Result<usize>;
+
+    /// Delete expired claims by memory layer (based on max_age_hours).
+    async fn gc_expired_memory_layer(
+        &self,
+        tenant_id: &str,
+        memory_layer: &str,
+        max_age_hours: f64,
+    ) -> Result<usize>;
+
+    /// Promote claims: set metadata memory_layer from `from_layer` to `to_layer`
+    /// where rehearsal_count >= threshold. Returns count of promoted claims.
+    async fn promote_memory_layer(
+        &self,
+        tenant_id: &str,
+        from_layer: &str,
+        to_layer: &str,
+        min_rehearsal_count: u64,
+    ) -> Result<usize>;
 }
 
 /// Vector store trait
@@ -229,8 +247,7 @@ pub struct Stores {
     pub gaps: std::sync::Arc<dyn GapStore>,
     pub audit: std::sync::Arc<dyn AuditStore>,
     pub subscription: std::sync::Arc<dyn SubscriptionStore>,
-    // Alias for compatibility
-    pub vector: std::sync::Arc<dyn VectorStore>,
+    pub memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
 }
 
 impl Stores {
@@ -246,8 +263,8 @@ impl Stores {
         gaps: std::sync::Arc<dyn GapStore>,
         audit: std::sync::Arc<dyn AuditStore>,
         subscription: std::sync::Arc<dyn SubscriptionStore>,
+        memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
     ) -> Self {
-        let vectors_clone = vectors.clone();
         Self {
             claims,
             vectors,
@@ -259,7 +276,7 @@ impl Stores {
             gaps,
             audit,
             subscription,
-            vector: vectors_clone,
+            memory_layers,
         }
     }
 }
@@ -916,4 +933,15 @@ impl AuthStore for InMemoryAuthStoreWithKey {
     async fn revoke_api_key(&self, _key_hash: &str) -> Result<()> {
         Ok(())
     }
+}
+
+/// No-op memory layer store for testing
+pub struct NoopMemoryLayerStore;
+
+#[async_trait]
+impl MemoryLayerStore for NoopMemoryLayerStore {
+    async fn list_claims_by_memory_layer(&self, _: &str, _: &str, _: Option<&str>, _: usize) -> Result<Vec<EpistemicClaim>> { Ok(vec![]) }
+    async fn count_claims_by_memory_layer(&self, _: &str, _: &str, _: Option<&str>) -> Result<usize> { Ok(0) }
+    async fn gc_expired_memory_layer(&self, _: &str, _: &str, _: f64) -> Result<usize> { Ok(0) }
+    async fn promote_memory_layer(&self, _: &str, _: &str, _: &str, _: u64) -> Result<usize> { Ok(0) }
 }

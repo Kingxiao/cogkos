@@ -38,6 +38,23 @@ pub enum SubscriptionType {
     Webhook,
 }
 
+impl SubscriptionType {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            SubscriptionType::Rss => "rss",
+            SubscriptionType::Webhook => "webhook",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "rss" => SubscriptionType::Rss,
+            "webhook" => SubscriptionType::Webhook,
+            _ => SubscriptionType::Rss,
+        }
+    }
+}
+
 /// Meta knowledge entry for federation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetaKnowledgeEntry {

@@ -69,6 +69,7 @@ fn test_stores() -> Arc<Stores> {
         Arc::new(InMemoryGapStore::new()),
         Arc::new(InMemoryAuditStore::new(1000)),
         Arc::new(InMemorySubscriptionStore::new()),
+        Arc::new(NoopMemoryLayerStore),
     ))
 }
 

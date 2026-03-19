@@ -42,84 +42,128 @@ fn detect_conflict_type(
     claim_a: &EpistemicClaim,
     claim_b: &EpistemicClaim,
 ) -> Option<ConflictType> {
-    // Check for direct contradiction indicators
     let a_content = claim_a.content.to_lowercase();
     let b_content = claim_b.content.to_lowercase();
 
-    // Simple heuristic: negation detection
-    let negation_words = ["not ", "no ", "false", "incorrect", "wrong", "never"];
+    // 1. Negation-based contradiction (EN + CN)
+    let negation_words = [
+        "not ", "no ", "false", "incorrect", "wrong", "never", // EN
+        "不", "没有", "并非", "未", "无法", "低于", "少于", "远低", "远慢", // CN
+    ];
+    let a_negation = negation_words.iter().any(|w| a_content.contains(w));
+    let b_negation = negation_words.iter().any(|w| b_content.contains(w));
 
-    let a_has_negation = negation_words.iter().any(|w| a_content.contains(w));
-    let b_has_negation = negation_words.iter().any(|w| b_content.contains(w));
+    let similarity = calculate_content_similarity(&a_content, &b_content);
 
-    // If one is negation and other isn't, and content is similar
-    if a_has_negation != b_has_negation {
-        // Check content similarity (simple word overlap)
-        let a_words: std::collections::HashSet<_> = a_content.split_whitespace().collect();
-        let b_words: std::collections::HashSet<_> = b_content.split_whitespace().collect();
-
-        let common_words: std::collections::HashSet<_> = a_words.intersection(&b_words).collect();
-        let total_unique_words: std::collections::HashSet<_> = a_words.union(&b_words).collect();
-
-        if !total_unique_words.is_empty() {
-            let similarity = common_words.len() as f64 / total_unique_words.len() as f64;
-            if similarity > 0.5 {
-                return Some(ConflictType::DirectContradiction);
-            }
-        }
+    if a_negation != b_negation && similarity > 0.3 {
+        return Some(ConflictType::DirectContradiction);
     }
 
-    // Check for temporal shift (same entity, different time periods)
+    // 2. Numeric contradiction — same topic, different numbers
+    // Lower similarity bar when numbers provide strong contradiction signal
+    if similarity > 0.15 && detect_numeric_contradiction(&a_content, &b_content) {
+        return Some(ConflictType::ConfidenceMismatch);
+    }
+
+    // 3. Confidence gap — same topic, confidence diff > 0.3
+    if similarity > 0.4
+        && (claim_a.confidence - claim_b.confidence).abs() > 0.3
+        && claim_a.provenance.source_id != claim_b.provenance.source_id
+    {
+        return Some(ConflictType::ConfidenceMismatch);
+    }
+
+    // 4. Temporal shift (same entity, shared derivation)
     if claim_a.node_type == claim_b.node_type
         && !claim_a.derived_from.is_empty()
-        && !claim_b.derived_from.is_empty()
-    {
-        // If they share derivation but have different validity periods
-        if claim_a
+        && claim_a
             .derived_from
             .iter()
             .any(|id| claim_b.derived_from.contains(id))
-        {
-            return Some(ConflictType::TemporalShift);
-        }
+    {
+        return Some(ConflictType::TemporalShift);
     }
 
-    // Check for source disagreement (different sources, same claim type)
+    // 5. Source disagreement (different sources, high similarity but not identical)
     if claim_a.provenance.source_id != claim_b.provenance.source_id
         && claim_a.node_type == claim_b.node_type
+        && similarity > 0.5
+        && similarity < 1.0
     {
-        // Simple semantic similarity check
-        let similarity = calculate_content_similarity(&a_content, &b_content);
-        if similarity > 0.7 && similarity < 1.0 {
-            return Some(ConflictType::SourceDisagreement);
-        }
+        return Some(ConflictType::SourceDisagreement);
     }
 
-    // Context-dependent conflicts (different scopes/conditions)
-    // Detected when content is similar but not identical, and both have different scopes
-    if claim_a.tenant_id != claim_b.tenant_id {
-        let similarity = calculate_content_similarity(&a_content, &b_content);
-        if similarity > 0.6 {
-            return Some(ConflictType::ContextualDifference);
-        }
+    // 6. Contextual difference (different tenants, similar content)
+    if claim_a.tenant_id != claim_b.tenant_id && similarity > 0.6 {
+        return Some(ConflictType::ContextualDifference);
     }
 
     None
 }
 
-/// Calculate simple content similarity (Jaccard index on words)
-fn calculate_content_similarity(a: &str, b: &str) -> f64 {
-    let a_words: std::collections::HashSet<_> = a.split_whitespace().collect();
-    let b_words: std::collections::HashSet<_> = b.split_whitespace().collect();
-
-    if a_words.is_empty() || b_words.is_empty() {
-        return 0.0;
+/// Detect numeric contradiction: both texts contain numbers but they differ significantly
+fn detect_numeric_contradiction(a: &str, b: &str) -> bool {
+    // Match numbers with optional % or 万/亿 suffix
+    let re = match regex::Regex::new(r"(\d+(?:\.\d+)?)\s*[%万亿]?") {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    let extract = |text: &str| -> Vec<f64> {
+        re.captures_iter(text)
+            .filter_map(|c| c.get(1).and_then(|m| m.as_str().parse::<f64>().ok()))
+            .filter(|n| *n > 0.0) // skip zero
+            .collect()
+    };
+    let a_nums = extract(a);
+    let b_nums = extract(b);
+    if a_nums.is_empty() || b_nums.is_empty() {
+        return false;
     }
+    // If any pair of numbers differs by >50% relative, it's a contradiction
+    for an in &a_nums {
+        for bn in &b_nums {
+            let diff = (an - bn).abs();
+            let max = an.abs().max(bn.abs());
+            if max > 0.0 && diff / max > 0.5 {
+                return true;
+            }
+        }
+    }
+    false
+}
 
-    let intersection: std::collections::HashSet<_> = a_words.intersection(&b_words).collect();
-    let union: std::collections::HashSet<_> = a_words.union(&b_words).collect();
+/// Content similarity — uses char-level bigrams for CJK, word-level for Latin
+fn calculate_content_similarity(a: &str, b: &str) -> f64 {
+    let is_cjk = a.chars().any(|c| c > '\u{2E80}') || b.chars().any(|c| c > '\u{2E80}');
 
-    intersection.len() as f64 / union.len() as f64
+    if is_cjk {
+        // Char bigram Jaccard for Chinese/Japanese/Korean
+        let bigrams = |s: &str| -> std::collections::HashSet<String> {
+            let chars: Vec<char> = s.chars().filter(|c| !c.is_whitespace()).collect();
+            if chars.len() < 2 {
+                return chars.iter().map(|c| c.to_string()).collect();
+            }
+            chars.windows(2).map(|w| w.iter().collect::<String>()).collect()
+        };
+        let a_bi = bigrams(a);
+        let b_bi = bigrams(b);
+        if a_bi.is_empty() || b_bi.is_empty() {
+            return 0.0;
+        }
+        let intersection = a_bi.intersection(&b_bi).count();
+        let union = a_bi.union(&b_bi).count();
+        intersection as f64 / union as f64
+    } else {
+        // Word-level Jaccard for Latin scripts
+        let a_words: std::collections::HashSet<_> = a.split_whitespace().collect();
+        let b_words: std::collections::HashSet<_> = b.split_whitespace().collect();
+        if a_words.is_empty() || b_words.is_empty() {
+            return 0.0;
+        }
+        let intersection = a_words.intersection(&b_words).count();
+        let union = a_words.union(&b_words).count();
+        intersection as f64 / union as f64
+    }
 }
 
 /// Batch conflict detection for a new claim against existing claims

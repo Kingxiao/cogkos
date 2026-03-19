@@ -32,6 +32,10 @@ impl ConflictRecord {
         claim_b_id: Uuid,
         conflict_type: ConflictType,
     ) -> Self {
+        let desc = format!(
+            "{:?} between {} and {}",
+            conflict_type, claim_a_id, claim_b_id
+        );
         Self {
             id: Uuid::new_v4(),
             tenant_id: tenant_id.into(),
@@ -39,7 +43,7 @@ impl ConflictRecord {
             claim_b_id,
             conflict_type,
             severity: 0.5,
-            description: None,
+            description: Some(desc),
             detected_at: chrono::Utc::now(),
             resolved_at: None,
             resolution_status: ResolutionStatus::Open,
@@ -81,6 +85,37 @@ pub enum ConflictType {
     ContextualDifference,
 }
 
+impl ConflictType {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            ConflictType::DirectContradiction => "direct_contradiction",
+            ConflictType::ContextDependent => "context_dependent",
+            ConflictType::TemporalShift => "temporal_shift",
+            ConflictType::TemporalInconsistency => "temporal_inconsistency",
+            ConflictType::SourceDisagreement => "source_disagreement",
+            ConflictType::ConfidenceMismatch => "confidence_mismatch",
+            ConflictType::ContextualDifference => "contextual_difference",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "direct_contradiction" | "directcontradiction" => ConflictType::DirectContradiction,
+            "context_dependent" | "contextdependent" => ConflictType::ContextDependent,
+            "temporal_shift" | "temporalshift" => ConflictType::TemporalShift,
+            "temporal_inconsistency" | "temporalinconsistency" => {
+                ConflictType::TemporalInconsistency
+            }
+            "source_disagreement" | "sourcedisagreement" => ConflictType::SourceDisagreement,
+            "confidence_mismatch" | "confidencemismatch" => ConflictType::ConfidenceMismatch,
+            "contextual_difference" | "contextualdifference" => {
+                ConflictType::ContextualDifference
+            }
+            _ => ConflictType::DirectContradiction,
+        }
+    }
+}
+
 /// Resolution status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -89,4 +124,25 @@ pub enum ResolutionStatus {
     Elevated,
     Dismissed,
     Accepted,
+}
+
+impl ResolutionStatus {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            ResolutionStatus::Open => "open",
+            ResolutionStatus::Elevated => "elevated",
+            ResolutionStatus::Dismissed => "dismissed",
+            ResolutionStatus::Accepted => "accepted",
+        }
+    }
+
+    pub fn from_db_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "open" => ResolutionStatus::Open,
+            "elevated" => ResolutionStatus::Elevated,
+            "dismissed" => ResolutionStatus::Dismissed,
+            "accepted" => ResolutionStatus::Accepted,
+            _ => ResolutionStatus::Open,
+        }
+    }
 }

@@ -88,6 +88,18 @@ impl PgVectorStore {
 #[async_trait]
 impl super::VectorStore for PgVectorStore {
     async fn upsert(&self, id: Id, vector: Vec<f32>, metadata: serde_json::Value) -> Result<()> {
+        let dim = vector.len() as i32;
+        let expected = self.detected_dim.load(std::sync::atomic::Ordering::Relaxed);
+        if expected == 0 {
+            // First vector — set dimension and ensure HNSW index
+            self.ensure_index(dim).await?;
+        } else if dim != expected {
+            return Err(CogKosError::Vector(format!(
+                "Dimension mismatch: expected {}, got {}",
+                expected, dim
+            )));
+        }
+
         // Convert vector to pgvector format: [1.0, 2.0, ...]
         let vector_str = format!(
             "[{}]",
@@ -99,11 +111,10 @@ impl super::VectorStore for PgVectorStore {
         );
 
         sqlx::query(
-            "UPDATE epistemic_claims SET embedding = $2::vector, metadata = $3 WHERE id = $1",
+            "UPDATE epistemic_claims SET embedding = $2::vector WHERE id = $1",
         )
         .bind(id)
         .bind(vector_str)
-        .bind(&metadata)
         .execute(&self.pool)
         .await
         .map_err(|e| CogKosError::Vector(e.to_string()))?;
@@ -117,6 +128,15 @@ impl super::VectorStore for PgVectorStore {
         tenant_id: &str,
         limit: u32,
     ) -> Result<Vec<VectorMatch>> {
+        let expected = self.detected_dim.load(std::sync::atomic::Ordering::Relaxed);
+        if expected > 0 && vector.len() as i32 != expected {
+            return Err(CogKosError::Vector(format!(
+                "Search dimension mismatch: expected {}, got {}",
+                expected,
+                vector.len()
+            )));
+        }
+
         // Convert vector to pgvector format
         let vector_str = format!(
             "[{}]",

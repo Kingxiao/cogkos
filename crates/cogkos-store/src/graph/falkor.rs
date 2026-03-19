@@ -3,7 +3,6 @@
 use async_trait::async_trait;
 use cogkos_core::models::{EpistemicClaim, GraphNode, Id};
 use cogkos_core::{CogKosError, Result};
-use redis::RedisError;
 use uuid::Uuid;
 
 /// Validate a UUID string to prevent Cypher injection.
@@ -54,26 +53,39 @@ impl FalkorStore {
         }
     }
 
-    /// Execute Cypher query
+    /// Execute Cypher query with retry (3 attempts, exponential backoff)
     async fn query(&self, cypher: &str) -> Result<Vec<redis::Value>> {
-        let mut conn = self
-            .pool
-            .get()
-            .await
-            .map_err(|e| CogKosError::Graph(e.to_string()))?;
+        let mut last_err = None;
+        for attempt in 0..3u32 {
+            if attempt > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(100 * 2u64.pow(attempt))).await;
+            }
 
-        let result: redis::Value = redis::cmd("GRAPH.QUERY")
-            .arg(&self.graph_name)
-            .arg(cypher)
-            .query_async(&mut conn)
-            .await
-            .map_err(|e: RedisError| CogKosError::Graph(e.to_string()))?;
+            let conn = match self.pool.get().await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(attempt, error = %e, "FalkorDB pool.get() failed, retrying");
+                    last_err = Some(CogKosError::Graph(e.to_string()));
+                    continue;
+                }
+            };
+            let mut conn = conn;
 
-        // Parse result
-        match result {
-            redis::Value::Array(items) => Ok(items),
-            _ => Ok(vec![]),
+            match redis::cmd("GRAPH.QUERY")
+                .arg(&self.graph_name)
+                .arg(cypher)
+                .query_async::<redis::Value>(&mut conn)
+                .await
+            {
+                Ok(redis::Value::Array(items)) => return Ok(items),
+                Ok(_) => return Ok(vec![]),
+                Err(e) => {
+                    tracing::warn!(attempt, error = %e, "FalkorDB query failed, retrying");
+                    last_err = Some(CogKosError::Graph(e.to_string()));
+                }
+            }
         }
+        Err(last_err.unwrap_or_else(|| CogKosError::Graph("FalkorDB query exhausted retries".into())))
     }
 }
 
@@ -113,10 +125,10 @@ impl crate::GraphStore for FalkorStore {
         depth: u32,
         min_activation: f64,
     ) -> Result<Vec<GraphNode>> {
-        // Support CAUSES, SIMILAR_TO, DERIVED_FROM edge types for activation diffusion
+        // Support all known edge types for activation diffusion
         let safe_id = validate_uuid(&id)?;
         let cypher = format!(
-            "MATCH (start:Claim {{id: '{}'}})-[:CAUSES|SIMILAR_TO|DERIVED_FROM*1..{}]->(related:Claim)
+            "MATCH (start:Claim {{id: '{}'}})-[:CAUSES|SIMILAR_TO|DERIVED_FROM|RELATED|SIMILAR*1..{}]->(related:Claim)
              WHERE related.activation >= {}
              RETURN related.id as id, related.content as content, related.activation as activation",
             safe_id, depth, min_activation

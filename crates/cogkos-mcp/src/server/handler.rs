@@ -22,248 +22,8 @@ pub struct CogkosMcpHandler {
 
 impl CogkosMcpHandler {
     pub fn new(state: McpServerState) -> Self {
-        let tools = Self::build_tools();
+        let tools = crate::server::tool_schemas::build_tools();
         Self { state, tools }
-    }
-
-    fn build_tools() -> Vec<Tool> {
-        let mut tools = Vec::new();
-
-        // Helper: inject api_key into every tool schema and required array
-        let inject_api_key = |schema: &mut JsonObject| {
-            schema.insert(
-                "api_key".to_string(),
-                serde_json::json!({"type": "string", "description": "API key for authentication"}),
-            );
-            if let Some(serde_json::Value::Array(required)) = schema.get_mut("required") {
-                required.push(serde_json::json!("api_key"));
-            } else {
-                schema.insert("required".to_string(), serde_json::json!(["api_key"]));
-            }
-        };
-
-        // query_knowledge
-        let mut input_schema = JsonObject::new();
-        input_schema.insert("query".to_string(), serde_json::json!({"type": "string"}));
-        input_schema.insert("context".to_string(), serde_json::json!({"type": "object"}));
-        input_schema.insert(
-            "include_predictions".to_string(),
-            serde_json::json!({"type": "boolean"}),
-        );
-        input_schema.insert(
-            "include_conflicts".to_string(),
-            serde_json::json!({"type": "boolean"}),
-        );
-        input_schema.insert(
-            "include_gaps".to_string(),
-            serde_json::json!({"type": "boolean"}),
-        );
-        input_schema.insert("required".to_string(), serde_json::json!(["query"]));
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "query_knowledge",
-            "Query the knowledge base for decision support",
-            input_schema,
-        ));
-
-        // submit_experience
-        let mut input_schema = JsonObject::new();
-        input_schema.insert("content".to_string(), serde_json::json!({"type": "string"}));
-        input_schema.insert(
-            "node_type".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        input_schema.insert(
-            "confidence".to_string(),
-            serde_json::json!({"type": "number"}),
-        );
-        input_schema.insert("source".to_string(), serde_json::json!({"type": "object"}));
-        input_schema.insert("tags".to_string(), serde_json::json!({"type": "array"}));
-        input_schema.insert(
-            "required".to_string(),
-            serde_json::json!(["content", "node_type", "source"]),
-        );
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "submit_experience",
-            "Submit experience/observation to the knowledge base",
-            input_schema,
-        ));
-
-        // submit_feedback
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "query_hash".to_string(),
-            serde_json::json!({"type": "integer"}),
-        );
-        input_schema.insert(
-            "success".to_string(),
-            serde_json::json!({"type": "boolean"}),
-        );
-        input_schema.insert("note".to_string(), serde_json::json!({"type": "string"}));
-        input_schema.insert(
-            "required".to_string(),
-            serde_json::json!(["query_hash", "success"]),
-        );
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "submit_feedback",
-            "Submit feedback on previous query results",
-            input_schema,
-        ));
-
-        // report_gap
-        let mut input_schema = JsonObject::new();
-        input_schema.insert("domain".to_string(), serde_json::json!({"type": "string"}));
-        input_schema.insert(
-            "description".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        input_schema.insert(
-            "priority".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        input_schema.insert(
-            "required".to_string(),
-            serde_json::json!(["domain", "description"]),
-        );
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "report_gap",
-            "Report a knowledge gap",
-            input_schema,
-        ));
-
-        // get_meta_directory
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "query_domain".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "get_meta_directory",
-            "Get meta knowledge directory",
-            input_schema,
-        ));
-
-        // upload_document
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "filename".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        input_schema.insert(
-            "content_base64".to_string(),
-            serde_json::json!({"type": "string"}),
-        );
-        input_schema.insert("source".to_string(), serde_json::json!({"type": "object"}));
-        input_schema.insert("tags".to_string(), serde_json::json!({"type": "array"}));
-        input_schema.insert(
-            "auto_process".to_string(),
-            serde_json::json!({"type": "boolean"}),
-        );
-        input_schema.insert(
-            "required".to_string(),
-            serde_json::json!(["filename", "content_base64", "source"]),
-        );
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "upload_document",
-            "Upload document to CogKOS for ingestion",
-            input_schema,
-        ));
-
-        // subscribe_rss
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "url".to_string(),
-            serde_json::json!({"type": "string", "description": "RSS feed URL"}),
-        );
-        input_schema.insert(
-            "poll_interval_secs".to_string(),
-            serde_json::json!({"type": "number", "description": "Polling interval in seconds"}),
-        );
-        input_schema.insert(
-            "max_items".to_string(),
-            serde_json::json!({"type": "number", "description": "Maximum items per poll"}),
-        );
-        input_schema.insert(
-            "fetch_full_content".to_string(),
-            serde_json::json!({"type": "boolean", "description": "Whether to fetch full content"}),
-        );
-        input_schema.insert("required".to_string(), serde_json::json!(["url"]));
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "subscribe_rss",
-            "Subscribe to an RSS feed for continuous knowledge ingestion",
-            input_schema,
-        ));
-
-        // subscribe_webhook
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "url".to_string(),
-            serde_json::json!({"type": "string", "description": "Webhook endpoint URL"}),
-        );
-        input_schema.insert(
-            "secret".to_string(),
-            serde_json::json!({"type": "string", "description": "Secret for signature validation"}),
-        );
-        input_schema.insert(
-            "events".to_string(),
-            serde_json::json!({"type": "array", "description": "Event types to subscribe to"}),
-        );
-        input_schema.insert("required".to_string(), serde_json::json!(["url"]));
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "subscribe_webhook",
-            "Register a webhook endpoint for receiving external knowledge updates",
-            input_schema,
-        ));
-
-        // subscribe_api
-        let mut input_schema = JsonObject::new();
-        input_schema.insert(
-            "url".to_string(),
-            serde_json::json!({"type": "string", "description": "API endpoint URL"}),
-        );
-        input_schema.insert(
-            "poll_interval_secs".to_string(),
-            serde_json::json!({"type": "number", "description": "Polling interval in seconds"}),
-        );
-        input_schema.insert(
-            "method".to_string(),
-            serde_json::json!({"type": "string", "description": "HTTP method"}),
-        );
-        input_schema.insert(
-            "headers".to_string(),
-            serde_json::json!({"type": "object", "description": "Request headers"}),
-        );
-        input_schema.insert(
-            "body".to_string(),
-            serde_json::json!({"type": "string", "description": "Request body for POST"}),
-        );
-        input_schema.insert("required".to_string(), serde_json::json!(["url"]));
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "subscribe_api",
-            "Subscribe to an API endpoint for periodic polling",
-            input_schema,
-        ));
-
-        // list_subscriptions
-        let mut input_schema = JsonObject::new();
-        input_schema.insert("type".to_string(), serde_json::json!({"type": "string", "enum": ["rss", "webhook", "api"], "description": "Subscription type"}));
-        input_schema.insert("required".to_string(), serde_json::json!(["type"]));
-        inject_api_key(&mut input_schema);
-        tools.push(Tool::new(
-            "list_subscriptions",
-            "List active knowledge subscriptions",
-            input_schema,
-        ));
-
-        tools
     }
 }
 
@@ -324,7 +84,11 @@ impl ServerHandler for CogkosMcpHandler {
         const MAX_CONTENT_LEN: usize = 100_000;
         const MAX_UPLOAD_SIZE: usize = 500 * 1024 * 1024; // 500MB
 
-        let result =
+        let timeout_secs = self.state.config.request_timeout_secs;
+        let tool_name_for_timeout = tool_name.clone();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            async {
             match tool_name.as_str() {
                 "query_knowledge" => {
                     if !auth_context.can_read() {
@@ -690,7 +454,15 @@ impl ServerHandler for CogkosMcpHandler {
                     tool_name,
                     None,
                 )),
-            };
+            }
+        }).await.unwrap_or_else(|_| {
+            tracing::error!(tool = %tool_name_for_timeout, timeout_secs, "Tool call timed out");
+            Err(rmcp::ErrorData::new(
+                ErrorCode(-32002),
+                format!("Tool call timed out after {}s", timeout_secs),
+                None,
+            ))
+        });
 
         cogkos_core::monitoring::METRICS
             .record_duration("cogkos_mcp_call_duration_seconds", call_start.elapsed());
@@ -745,7 +517,7 @@ mod tests {
 
     #[test]
     fn build_tools_returns_all_tools() {
-        let tools = CogkosMcpHandler::build_tools();
+        let tools = crate::server::tool_schemas::build_tools();
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"query_knowledge"));
         assert!(names.contains(&"submit_experience"));
@@ -762,7 +534,7 @@ mod tests {
 
     #[test]
     fn build_tools_all_have_api_key() {
-        let tools = CogkosMcpHandler::build_tools();
+        let tools = crate::server::tool_schemas::build_tools();
         for tool in &tools {
             let schema = &tool.input_schema;
             assert!(

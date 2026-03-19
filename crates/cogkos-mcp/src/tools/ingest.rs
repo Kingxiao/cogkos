@@ -68,6 +68,20 @@ pub async fn handle_submit_experience(
         .metadata
         .insert("domain".to_string(), serde_json::Value::String(domain));
 
+    // Memory layer + session scoping
+    if let Some(ref layer) = req.memory_layer {
+        claim.metadata.insert(
+            "memory_layer".to_string(),
+            serde_json::Value::String(layer.clone()),
+        );
+    }
+    if let Some(ref sid) = req.session_id {
+        claim.metadata.insert(
+            "session_id".to_string(),
+            serde_json::Value::String(sid.clone()),
+        );
+    }
+
     let claim_id = claim_store.insert_claim(&claim).await?;
 
     // Generate vector: try real embedding first, fallback to pseudo-vector
@@ -91,18 +105,26 @@ pub async fn handle_submit_experience(
     let payload = serde_json::json!({
         "tenant_id": tenant_id,
         "content": claim.content,
-        "node_type": format!("{:?}", claim.node_type),
+        "node_type": claim.node_type.as_db_str(),
     });
+    let mut warnings: Vec<String> = Vec::new();
+
     if let Err(e) = vector_store
         .upsert(claim_id, content_vector.clone(), payload)
         .await
     {
         tracing::warn!(claim_id = %claim_id, error = %e, "Failed to upsert vector for claim");
+        warnings.push(format!("vector_upsert_failed: {}", e));
+        // Mark for sleep-time reindex
+        let mut patched = claim.clone();
+        patched.metadata.insert("needs_reindex".into(), serde_json::Value::Bool(true));
+        claim_store.update_claim(&patched).await.ok();
     }
 
     // Add to graph
     if let Err(e) = graph_store.upsert_node(&claim).await {
         tracing::warn!(claim_id = %claim_id, error = %e, "Failed to upsert graph node for claim");
+        warnings.push(format!("graph_upsert_failed: {}", e));
     }
 
     // === Semantic conflict detection ===
@@ -112,20 +134,34 @@ pub async fn handle_submit_experience(
         .search(content_vector.clone(), tenant_id, 20)
         .await
     {
-        let candidate_ids: Vec<_> = matches
+        let scored_matches: Vec<_> = matches
             .into_iter()
-            .filter(|m| m.id != claim_id)
+            .filter(|m| m.id != claim_id && m.score > 0.3)
             .take(10)
             .collect();
 
-        if !candidate_ids.is_empty() {
+        if !scored_matches.is_empty() {
             let mut candidate_claims: Vec<EpistemicClaim> = Vec::new();
-            for m in candidate_ids {
+            for m in &scored_matches {
                 if let Ok(c) = claim_store.get_claim(m.id, tenant_id).await {
                     candidate_claims.push(c);
                 }
             }
 
+            // Build graph edges for semantically related claims
+            for m in &scored_matches {
+                if m.score > 0.5 {
+                    let relation = if m.score > 0.8 { "SIMILAR" } else { "RELATED" };
+                    if let Err(e) = graph_store
+                        .create_edge(claim_id, m.id, relation, m.score)
+                        .await
+                    {
+                        tracing::debug!(error = %e, "Failed to create graph edge");
+                    }
+                }
+            }
+
+            // Conflict detection
             let conflicts =
                 cogkos_core::evolution::conflict::detect_conflicts_batch(&claim, &candidate_claims);
 
@@ -138,20 +174,25 @@ pub async fn handle_submit_experience(
             }
 
             tracing::debug!(
-                "Conflict detection: {} potential conflicts found for claim {}",
-                conflicts_detected,
-                claim_id
+                claim_id = %claim_id,
+                edges = scored_matches.iter().filter(|m| m.score > 0.5).count(),
+                conflicts = conflicts_detected,
+                "Post-ingest: graph edges + conflict detection"
             );
         }
     }
 
-    Ok(serde_json::json!({
+    let mut resp = serde_json::json!({
         "claim_id": claim_id.to_string(),
         "status": "accepted",
         "conflicts_detected": conflicts_detected,
         "novelty_score": 0.5,
         "estimated_consolidation_time": "24h"
-    }))
+    });
+    if !warnings.is_empty() {
+        resp["warnings"] = serde_json::json!(warnings);
+    }
+    Ok(resp)
 }
 
 /// Upload document handler

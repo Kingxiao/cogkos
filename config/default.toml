@@ -9,7 +9,7 @@ url = "postgres://localhost:5432/cogkos"
 max_connections = 20
 min_connections = 2
 idle_timeout_secs = 600
-acquire_timeout_secs = 5
+acquire_timeout_secs = 15
 
 [cache]
 enabled = true

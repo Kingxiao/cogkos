@@ -333,6 +333,8 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         valid_to: None,
         tags: vec!["programming".to_string(), "rust".to_string()],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let submit_result = handle_submit_experience(
@@ -385,6 +387,8 @@ async fn test_submit_experience_to_query_knowledge_flow() {
             "memory".to_string(),
         ],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let _submit_result2 = handle_submit_experience(
@@ -419,6 +423,8 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         include_gaps: true,
         activation_threshold: 0.3,
         delegate_to_sampling: false,
+        memory_layer: None,
+        session_id: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -523,6 +529,8 @@ async fn test_submit_and_query_with_conflicts() {
         valid_to: None,
         tags: vec!["programming".to_string()],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let _result1 = handle_submit_experience(
@@ -550,6 +558,8 @@ async fn test_submit_and_query_with_conflicts() {
         valid_to: None,
         tags: vec!["programming".to_string()],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let _result2 = handle_submit_experience(
@@ -578,6 +588,8 @@ async fn test_submit_and_query_with_conflicts() {
         include_gaps: false,
         activation_threshold: 0.3,
         delegate_to_sampling: false,
+        memory_layer: None,
+        session_id: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -635,6 +647,8 @@ async fn test_query_returns_cached_result() {
         include_gaps: false,
         activation_threshold: 0.3,
         delegate_to_sampling: false,
+        memory_layer: None,
+        session_id: None,
     };
 
     let result1 = handle_query_knowledge(
@@ -685,6 +699,8 @@ async fn test_submit_experience_with_all_fields() {
         valid_to: Some(Utc::now() + chrono::Duration::days(30)),
         tags: vec!["test".to_string(), "integration".to_string()],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let result = handle_submit_experience(
@@ -747,6 +763,8 @@ async fn test_submit_experience_with_knowledge_type() {
         valid_to: None,
         tags: vec!["product".to_string(), "price".to_string()],
         related_to: vec![],
+        memory_layer: None,
+        session_id: None,
     };
 
     let _submit_result = handle_submit_experience(

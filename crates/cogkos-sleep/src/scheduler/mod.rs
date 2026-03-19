@@ -34,6 +34,10 @@ pub enum TaskType {
     ConflictDetectionPeriodic,
     /// Confidence boost for similar knowledge (triggered by Sleep-time scheduler)
     ConfidenceBoost,
+    /// Working memory GC (expire old working/episodic claims)
+    MemoryGc,
+    /// Memory layer promotion (working → episodic → semantic)
+    MemoryPromotion,
 }
 
 impl TaskType {
@@ -46,6 +50,8 @@ impl TaskType {
             TaskType::HealthCheck => "health_check",
             TaskType::ConflictDetectionPeriodic => "conflict_detection_periodic",
             TaskType::ConfidenceBoost => "confidence_boost",
+            TaskType::MemoryGc => "memory_gc",
+            TaskType::MemoryPromotion => "memory_promotion",
         }
     }
 }
@@ -71,6 +77,14 @@ pub struct SchedulerConfig {
     pub confidence_boost_batch_size: usize,
     /// Confidence boost factor (how much to boost each time)
     pub confidence_boost_factor: f64,
+    /// Memory GC interval in seconds
+    pub memory_gc_interval_secs: u64,
+    /// Memory promotion interval in seconds
+    pub memory_promotion_interval_secs: u64,
+    /// Min rehearsal count to promote working → episodic
+    pub working_to_episodic_rehearsal: u64,
+    /// Min rehearsal count to promote episodic → semantic
+    pub episodic_to_semantic_rehearsal: u64,
     /// Whether to enable periodic tasks
     pub enable_periodic: bool,
     /// Maximum claims to process across all tasks per hour (budget)
@@ -91,14 +105,18 @@ impl Default for SchedulerConfig {
         // - Decay: 15%
         // - Conflict Detection Periodic: 15%
         // - Conflict Detection (event-driven): 5%
-        // - Confidence Boost: 15% (for similar knowledge aggregation)
+        // - Confidence Boost: 10% (for similar knowledge aggregation)
+        // - Memory GC: 5% (expire working/episodic claims)
+        // - Memory Promotion: 5% (promote across layers)
         // - Health Check: 5% (minimal work)
         task_budget_percentages.insert(TaskType::ConsolidationEventDriven.name().to_string(), 20);
         task_budget_percentages.insert(TaskType::Consolidation.name().to_string(), 15);
         task_budget_percentages.insert(TaskType::Decay.name().to_string(), 15);
-        task_budget_percentages.insert(TaskType::ConflictDetectionPeriodic.name().to_string(), 15);
+        task_budget_percentages.insert(TaskType::ConflictDetectionPeriodic.name().to_string(), 10);
         task_budget_percentages.insert(TaskType::ConflictDetection.name().to_string(), 5);
-        task_budget_percentages.insert(TaskType::ConfidenceBoost.name().to_string(), 15);
+        task_budget_percentages.insert(TaskType::ConfidenceBoost.name().to_string(), 10);
+        task_budget_percentages.insert(TaskType::MemoryGc.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::MemoryPromotion.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::HealthCheck.name().to_string(), 5);
 
         Self {
@@ -111,6 +129,10 @@ impl Default for SchedulerConfig {
             conflict_batch_size: 100,
             confidence_boost_batch_size: 50,
             confidence_boost_factor: 0.05,
+            memory_gc_interval_secs: 1800,             // 30 minutes
+            memory_promotion_interval_secs: 3600,      // 1 hour
+            working_to_episodic_rehearsal: 3,           // 3 recalls to promote
+            episodic_to_semantic_rehearsal: 5,           // 5 recalls to promote
             enable_periodic: true,
             max_claims_per_hour: 10000,
             max_task_duration_ms: 300_000, // 5 minutes

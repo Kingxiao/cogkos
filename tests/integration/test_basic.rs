@@ -41,6 +41,8 @@ async fn create_stores() -> Stores {
     let audit: Arc<dyn AuditStore> = Arc::new(InMemoryAuditStore::new(1000));
     let subscription: Arc<dyn SubscriptionStore> = Arc::new(InMemorySubscriptionStore::new());
 
+    let memory_layers: Arc<dyn MemoryLayerStore> = Arc::new(NoopMemoryLayerStore);
+
     Stores::new(
         claims,
         vectors,
@@ -52,6 +54,7 @@ async fn create_stores() -> Stores {
         gaps,
         audit,
         subscription,
+        memory_layers,
     )
 }
 
