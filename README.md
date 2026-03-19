@@ -57,7 +57,8 @@ cargo build --release
 # Start the server (runs DB migrations automatically)
 ./target/release/cogkos &
 
-# Create your first API key (tenant = your org/project name)
+# Create your first API key (needs DATABASE_URL from .env)
+source .env  # or: export DATABASE_URL=postgres://cogkos:cogkos_dev@localhost:5432/cogkos
 ./target/release/cogkos-admin create-key my-org read,write
 # Output: API Key: ck_xxxxxxxxxxxx (save this — shown only once)
 
@@ -66,7 +67,7 @@ curl http://localhost:8081/healthz   # → "ok"
 curl http://localhost:8081/readyz    # → "ready" (checks PG + FalkorDB)
 ```
 
-> **Quick dev mode**: Set `DEFAULT_MCP_API_KEY=any-string` in `.env` to skip admin CLI key creation.
+> **Quick dev mode**: Set `DEFAULT_MCP_API_KEY=any-string` in `.env` to skip admin CLI key creation. Optionally set `DEFAULT_MCP_TENANT=my-org` to specify the tenant (defaults to "default").
 
 ### 4. Connect Your Agents
 

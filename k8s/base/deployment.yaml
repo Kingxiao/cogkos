@@ -84,7 +84,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: http
+              port: metrics
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -92,7 +92,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /readyz
-              port: http
+              port: metrics
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
@@ -100,7 +100,7 @@ spec:
           startupProbe:
             httpGet:
               path: /healthz
-              port: http
+              port: metrics
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3

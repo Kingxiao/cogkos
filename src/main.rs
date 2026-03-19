@@ -585,8 +585,14 @@ async fn main() -> Result<()> {
             _ => ProviderType::OpenAi,
         };
         let mut builder = LlmClientBuilder::new(api_key, provider);
-        let base_url = std::env::var("EMBEDDING_BASE_URL")
-            .unwrap_or_else(|_| "https://api.302.ai/v1".to_string());
+        // Smart default: if using OPENAI_API_KEY directly (not 302.ai proxy), use OpenAI endpoint
+        let base_url = std::env::var("EMBEDDING_BASE_URL").unwrap_or_else(|_| {
+            if std::env::var("EMBEDDING_API_KEY").is_ok() || std::env::var("API_302_KEY").is_ok() {
+                "https://api.302.ai/v1".to_string()
+            } else {
+                "https://api.openai.com/v1".to_string()
+            }
+        });
         builder = builder.with_base_url(base_url);
         let model = std::env::var("EMBEDDING_MODEL")
             .unwrap_or_else(|_| "text-embedding-3-large".to_string());
@@ -625,7 +631,7 @@ async fn main() -> Result<()> {
     let health_port: u16 = std::env::var("HEALTH_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+        .unwrap_or(8081);
     let health_pool = pg_pool.clone();
     let health_redis = redis_pool_health;
     tokio::spawn(async move {

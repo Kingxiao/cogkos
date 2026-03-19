@@ -57,7 +57,8 @@ cargo build --release
 # 启动服务（自动执行数据库迁移）
 ./target/release/cogkos &
 
-# 创建首个 API Key（tenant = 你的组织/项目名）
+# 创建首个 API Key（需要 DATABASE_URL 环境变量）
+source .env  # 或: export DATABASE_URL=postgres://cogkos:cogkos_dev@localhost:5432/cogkos
 ./target/release/cogkos-admin create-key my-org read,write
 # 输出: API Key: ck_xxxxxxxxxxxx（仅显示一次，请保存）
 
@@ -66,7 +67,7 @@ curl http://localhost:8081/healthz   # → "ok"
 curl http://localhost:8081/readyz    # → "ready"（检查 PG + FalkorDB）
 ```
 
-> **快速开发模式**: 在 `.env` 中设置 `DEFAULT_MCP_API_KEY=any-string` 可跳过 admin CLI 创建密钥。
+> **快速开发模式**: 在 `.env` 中设置 `DEFAULT_MCP_API_KEY=any-string` 可跳过 admin CLI 创建密钥。可选设置 `DEFAULT_MCP_TENANT=my-org` 指定租户（默认为 "default"）。
 
 ### 4. 连接你的 Agent
 
