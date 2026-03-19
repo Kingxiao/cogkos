@@ -81,14 +81,13 @@ CogKOS uses a **tenant/agent** model:
     "type": "streamable-http",
     "url": "http://localhost:3000/mcp",
     "headers": {
-      "X-API-Key": "ck_xxxxxxxxxxxx",
-      "X-Tenant-ID": "my-org"
+      "X-API-Key": "ck_xxxxxxxxxxxx"
     }
   }
 }
 
 // Agent B — same tenant, different key (or same key)
-// Both agents read/write the same knowledge pool
+// Tenant is bound to the API key — no separate header needed
 ```
 
 All agents within a tenant:

@@ -55,11 +55,11 @@ impl ServerHandler for CogkosMcpHandler {
         })
     }
 
-    #[tracing::instrument(skip(self, request, _context), fields(tool = %request.name))]
+    #[tracing::instrument(skip(self, request, context), fields(tool = %request.name))]
     async fn call_tool(
         &self,
         request: rmcp::model::CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let call_start = std::time::Instant::now();
         let tool_name = request.name.to_string();
@@ -71,8 +71,10 @@ impl ServerHandler for CogkosMcpHandler {
         cogkos_core::monitoring::METRICS.inc_counter("cogkos_mcp_tool_calls_total", 1);
         cogkos_core::monitoring::METRICS.inc_counter(&format!("cogkos_mcp_tool_{}", tool_name), 1);
 
-        // Authenticate via api_key in arguments
-        let auth_context = self.get_auth_context_from_args(&arguments).await?;
+        // Authenticate: tool args > HTTP header > env var
+        let auth_context = self
+            .get_auth_context_from_args(&arguments, &context)
+            .await?;
 
         // Rate limit per tenant
         self.state
@@ -478,26 +480,27 @@ impl ServerHandler for CogkosMcpHandler {
 }
 
 impl CogkosMcpHandler {
-    /// Extract and validate authentication from tool arguments.
+    /// Extract and validate authentication from tool arguments, HTTP headers, or env var.
     ///
-    /// MCP stdio transport has no HTTP headers, so the API key is passed
-    /// as an `api_key` field in the tool call arguments. The key is validated
-    /// against the AuthStore to resolve tenant_id and permissions.
+    /// Authentication priority:
+    /// 1. `api_key` field in tool call arguments (stdio transport)
+    /// 2. `x-api-key` HTTP header (Streamable HTTP transport)
+    /// 3. `DEFAULT_MCP_API_KEY` env var (dev mode — bypasses DB, see auth.rs)
     async fn get_auth_context_from_args(
         &self,
         arguments: &JsonObject,
+        context: &RequestContext<RoleServer>,
     ) -> Result<AuthContext, rmcp::ErrorData> {
-        // Try api_key from arguments first, then fallback to DEFAULT_MCP_API_KEY env var.
-        // This enables Claude Code MCP clients (which can't inject api_key into tool args)
-        // to authenticate via a pre-configured default key.
         let api_key = if let Some(key) = arguments.get("api_key").and_then(|v| v.as_str()) {
             key.to_string()
+        } else if let Some(key) = Self::extract_api_key_from_headers(context) {
+            key
         } else if let Ok(default_key) = std::env::var("DEFAULT_MCP_API_KEY") {
             default_key
         } else {
             return Err(rmcp::ErrorData::new(
                 ErrorCode::INVALID_PARAMS,
-                "Missing api_key in arguments and DEFAULT_MCP_API_KEY not set",
+                "Missing api_key: provide in arguments, X-API-Key header, or set DEFAULT_MCP_API_KEY",
                 None,
             ));
         };
@@ -509,6 +512,13 @@ impl CogkosMcpHandler {
                 None,
             )
         })
+    }
+
+    /// Try to extract API key from HTTP request headers via rmcp's RequestContext.
+    fn extract_api_key_from_headers(context: &RequestContext<RoleServer>) -> Option<String> {
+        let parts = context.extensions.get::<http::request::Parts>()?;
+        let value = parts.headers.get("x-api-key")?;
+        value.to_str().ok().map(|s| s.to_string())
     }
 }
 

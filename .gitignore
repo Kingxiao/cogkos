@@ -4,7 +4,6 @@ backups/
 bin/test_*.rs
 build/
 # Build artifacts
-Cargo.lock
 config/local.toml
 data/
 local-storage/

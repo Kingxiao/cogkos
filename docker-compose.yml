@@ -1,6 +1,6 @@
-# CogKOS 自用生产环境
-# 端口: PG=5435, FalkorDB=6381, MCP=3000, Health=8081
-# 启动: docker compose up -d
+# CogKOS development environment
+# Ports: PG=5432, FalkorDB=6379, MCP=3000, Health=8081
+# Usage: docker compose up -d
 
 services:
   postgres:
@@ -8,7 +8,7 @@ services:
     container_name: cogkos-postgres
     restart: unless-stopped
     ports:
-      - "5435:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: cogkos
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cogkos_dev}
@@ -26,7 +26,7 @@ services:
     container_name: cogkos-falkordb
     restart: unless-stopped
     ports:
-      - "6381:6379"
+      - "6379:6379"
     environment:
       REDIS_ARGS: "--appendonly yes --appendfsync everysec --save 900 1 --save 300 10"
     volumes:

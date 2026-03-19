@@ -55,8 +55,25 @@ impl AuthMiddleware {
         }
     }
 
-    /// Authenticate request
+    /// Authenticate request.
+    ///
+    /// Dev mode shortcut: if `DEFAULT_MCP_API_KEY` is set and the provided key
+    /// matches, return a synthetic AuthContext without hitting the database.
+    /// Tenant comes from `DEFAULT_MCP_TENANT` env var (defaults to "default").
     pub async fn authenticate(&self, api_key: &str) -> Result<AuthContext> {
+        // Dev mode: bypass DB when using the default key
+        if let Ok(default_key) = std::env::var("DEFAULT_MCP_API_KEY") {
+            if !default_key.is_empty() && api_key == default_key {
+                let tenant =
+                    std::env::var("DEFAULT_MCP_TENANT").unwrap_or_else(|_| "default".to_string());
+                return Ok(AuthContext {
+                    tenant_id: tenant,
+                    permissions: vec!["read".to_string(), "write".to_string()],
+                    api_key_hash: self.hash_key(api_key),
+                });
+            }
+        }
+
         // Check cache first
         {
             let cache = self.cache.read().await;

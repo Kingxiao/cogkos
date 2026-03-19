@@ -2,7 +2,7 @@
 
 ## 开发环境设置
 
-1. **安装Rust 1.85+**
+1. **安装Rust 1.94+**
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    rustup update

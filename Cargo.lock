@@ -1383,6 +1383,7 @@ dependencies = [
  "deadpool-redis",
  "fastembed",
  "hex",
+ "http 1.4.0",
  "lru",
  "mockall",
  "rand 0.8.5",
