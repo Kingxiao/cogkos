@@ -1,7 +1,7 @@
 # CogKOS — Long-term Memory for AI Agents
 
 [![CI](https://github.com/Kingxiao/cogkos/actions/workflows/ci.yml/badge.svg)](https://github.com/Kingxiao/cogkos/actions)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE-APACHE)
 [![Rust](https://img.shields.io/badge/rust-1.94+-orange.svg)](https://www.rust-lang.org)
 
 **[中文文档 / Chinese](docs/README.zh-CN.md)**
@@ -143,7 +143,7 @@ curl http://localhost:8081/readyz    # → "ready"
 
 ## License
 
-Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
+Licensed under [Apache-2.0](LICENSE-APACHE).
 
 ## Links
 

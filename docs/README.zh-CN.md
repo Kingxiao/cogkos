@@ -1,7 +1,7 @@
 # CogKOS — AI 智能体的长期记忆
 
 [![CI](https://github.com/Kingxiao/cogkos/actions/workflows/ci.yml/badge.svg)](https://github.com/Kingxiao/cogkos/actions)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](../LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](../LICENSE-APACHE)
 [![Rust](https://img.shields.io/badge/rust-1.94+-orange.svg)](https://www.rust-lang.org)
 
 **[English](../README.md) | 中文**
@@ -143,7 +143,7 @@ curl http://localhost:8081/readyz    # → "ready"
 
 ## 许可证
 
-双许可：[MIT](../LICENSE-MIT) 或 [Apache-2.0](../LICENSE-APACHE)。
+基于 [Apache-2.0](../LICENSE-APACHE) 协议开源。
 
 ## 相关链接
 
