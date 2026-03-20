@@ -48,17 +48,29 @@ services:
       - "3000:3000"
       - "8081:8081"
     environment:
-      RUST_LOG: info
+      RUST_LOG: ${RUST_LOG:-info}
       DATABASE_URL: postgres://cogkos:${POSTGRES_PASSWORD:-cogkos_dev}@postgres:5432/cogkos
       FALKORDB_URL: redis://falkordb:6379
+      FALKORDB_GRAPH: ${FALKORDB_GRAPH:-cogkos}
       MCP_HOST: 0.0.0.0
       MCP_PORT: "3000"
       MCP_TRANSPORT: http
       HEALTH_PORT: "8081"
+      LOCAL_STORAGE_PATH: /app/data/objects
+      # Auth — set DEFAULT_MCP_API_KEY for dev mode (bypasses DB key validation)
+      DEFAULT_MCP_API_KEY: ${DEFAULT_MCP_API_KEY:-}
+      DEFAULT_MCP_TENANT: ${DEFAULT_MCP_TENANT:-default}
       # Embedding — set API_302_KEY in .env or environment
       API_302_KEY: ${API_302_KEY:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.302.ai/v1}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      # LLM (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
     depends_on:
       postgres:
         condition: service_healthy

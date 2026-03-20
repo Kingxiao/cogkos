@@ -35,3 +35,4 @@ test_output/
 Thumbs.db
 .vscode/
 # 测试文件
+sdk/python/**/__pycache__/
