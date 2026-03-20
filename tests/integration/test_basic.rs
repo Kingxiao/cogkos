@@ -137,7 +137,11 @@ async fn test_graph_add_and_find() {
         .add_edge(c1.id, c2.id, "CAUSES", 0.8)
         .await
         .unwrap();
-    let related = stores.graph.find_related(c1.id, "test-tenant", 1, 0.0).await.unwrap();
+    let related = stores
+        .graph
+        .find_related(c1.id, "test-tenant", 1, 0.0)
+        .await
+        .unwrap();
     assert!(!related.is_empty());
 }
 
@@ -301,7 +305,11 @@ async fn test_ingest_store_query_flow() {
 
     // Step 4: Query — vector search should find both claims
     let query_vec = vec![0.88, 0.12, 0.32, 0.48]; // similar to both
-    let results = stores.vectors.search(query_vec, "t1", 10, None).await.unwrap();
+    let results = stores
+        .vectors
+        .search(query_vec, "t1", 10, None)
+        .await
+        .unwrap();
     assert!(
         results.len() >= 2,
         "Expected at least 2 vector matches, got {}",
@@ -316,7 +324,11 @@ async fn test_ingest_store_query_flow() {
     );
 
     // Step 6: Graph traversal finds related claims
-    let related = stores.graph.find_related(claim1.id, "test-tenant", 1, 0.0).await.unwrap();
+    let related = stores
+        .graph
+        .find_related(claim1.id, "test-tenant", 1, 0.0)
+        .await
+        .unwrap();
     assert!(!related.is_empty(), "Graph should find related nodes");
 
     // Step 7: Cache round-trip

@@ -176,8 +176,13 @@ pub trait VectorStore: Send + Sync {
 pub trait GraphStore: Send + Sync {
     async fn add_node(&self, claim: &EpistemicClaim) -> Result<()>;
     async fn add_edge(&self, from: Id, to: Id, relation: &str, weight: f64) -> Result<()>;
-    async fn find_related(&self, id: Id, tenant_id: &str, depth: u32, min_activation: f64)
-    -> Result<Vec<GraphNode>>;
+    async fn find_related(
+        &self,
+        id: Id,
+        tenant_id: &str,
+        depth: u32,
+        min_activation: f64,
+    ) -> Result<Vec<GraphNode>>;
     async fn find_path(&self, from: Id, to: Id) -> Result<Vec<GraphNode>>;
 
     // Additional methods needed by other crates
@@ -219,7 +224,11 @@ pub trait CacheStore: Send + Sync {
 #[async_trait]
 pub trait FeedbackStore: Send + Sync {
     async fn insert_feedback(&self, tenant_id: &str, feedback: &AgentFeedback) -> Result<()>;
-    async fn get_feedback_for_query(&self, tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>>;
+    async fn get_feedback_for_query(
+        &self,
+        tenant_id: &str,
+        query_hash: u64,
+    ) -> Result<Vec<AgentFeedback>>;
 }
 
 /// Object store trait
@@ -320,7 +329,11 @@ impl FeedbackStore for InMemoryFeedbackStore {
         Ok(())
     }
 
-    async fn get_feedback_for_query(&self, _tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>> {
+    async fn get_feedback_for_query(
+        &self,
+        _tenant_id: &str,
+        query_hash: u64,
+    ) -> Result<Vec<AgentFeedback>> {
         let store = self.feedback.read().await;
         Ok(store.get(&query_hash).cloned().unwrap_or_default())
     }
@@ -778,7 +791,12 @@ pub trait SubscriptionStore: Send + Sync {
     async fn list_enabled_subscriptions(&self, tenant_id: &str) -> Result<Vec<SubscriptionSource>>;
 
     /// Update subscription status (last_run_at, last_run_status)
-    async fn update_subscription_status(&self, id: uuid::Uuid, tenant_id: &str, status: &str) -> Result<()>;
+    async fn update_subscription_status(
+        &self,
+        id: uuid::Uuid,
+        tenant_id: &str,
+        status: &str,
+    ) -> Result<()>;
 
     /// Increment error count for a subscription
     async fn increment_error_count(&self, id: uuid::Uuid, tenant_id: &str) -> Result<()>;

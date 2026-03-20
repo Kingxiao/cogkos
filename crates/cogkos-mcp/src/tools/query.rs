@@ -141,7 +141,12 @@ pub async fn handle_query_knowledge(
     let effective_layer = req.memory_layer.as_deref().or(Some("semantic"));
 
     let vector_matches = vector_store
-        .search(query_vector, tenant_id, req.context.max_results, effective_layer)
+        .search(
+            query_vector,
+            tenant_id,
+            req.context.max_results,
+            effective_layer,
+        )
         .await?;
 
     // 3. Get claims from vector matches with comprehensive permission filtering
@@ -182,7 +187,10 @@ pub async fn handle_query_knowledge(
     let _max_depth = 2;
 
     for claim in &claims {
-        let related = match graph_store.find_related(claim.id, tenant_id, 2, threshold).await {
+        let related = match graph_store
+            .find_related(claim.id, tenant_id, 2, threshold)
+            .await
+        {
             Ok(nodes) => nodes,
             Err(e) => {
                 tracing::warn!(claim_id = %claim.id, error = %e, "Graph diffusion failed, degrading");

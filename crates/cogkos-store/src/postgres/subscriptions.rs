@@ -170,7 +170,12 @@ impl crate::SubscriptionStore for PostgresStore {
         rows.iter().map(row_to_subscription).collect()
     }
 
-    async fn update_subscription_status(&self, id: uuid::Uuid, tenant_id: &str, _status: &str) -> Result<()> {
+    async fn update_subscription_status(
+        &self,
+        id: uuid::Uuid,
+        tenant_id: &str,
+        _status: &str,
+    ) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE subscriptions

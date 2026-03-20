@@ -7,7 +7,11 @@ use sqlx::Row;
 
 #[async_trait]
 impl crate::FeedbackStore for PostgresStore {
-    async fn insert_feedback(&self, tenant_id: &str, feedback: &cogkos_core::models::AgentFeedback) -> Result<()> {
+    async fn insert_feedback(
+        &self,
+        tenant_id: &str,
+        feedback: &cogkos_core::models::AgentFeedback,
+    ) -> Result<()> {
         let mut tx = self
             .pool
             .begin()

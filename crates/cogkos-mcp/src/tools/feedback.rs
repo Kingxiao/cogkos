@@ -293,7 +293,11 @@ mod feedback_cache_tests {
             Ok(())
         }
 
-        async fn get_feedback_for_query(&self, _tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>> {
+        async fn get_feedback_for_query(
+            &self,
+            _tenant_id: &str,
+            query_hash: u64,
+        ) -> Result<Vec<AgentFeedback>> {
             let feedbacks = self.feedbacks.read().await;
             Ok(feedbacks
                 .iter()
@@ -428,7 +432,7 @@ mod feedback_cache_tests {
         .unwrap();
 
         let feedbacks = feedback_store
-            .get_feedback_for_query(query_hash)
+            .get_feedback_for_query("test-tenant", query_hash)
             .await
             .unwrap();
         assert_eq!(feedbacks.len(), 1);
@@ -516,7 +520,7 @@ mod feedback_cache_tests {
         .unwrap();
 
         let feedbacks = feedback_store
-            .get_feedback_for_query(query_hash)
+            .get_feedback_for_query("test-tenant", query_hash)
             .await
             .unwrap();
         assert_eq!(feedbacks.len(), 1);
