@@ -12,7 +12,7 @@
 #   curl -X POST http://localhost:3000/mcp \
 #     -H "Content-Type: application/json" \
 #     -H "X-API-Key: cogkos-quickstart-key" \
-#     -H "X-Tenant-ID: default" \
+#     -H "Accept: application/json, text/event-stream" \
 #     -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
 
 services:
