@@ -108,7 +108,7 @@ pub async fn handle_submit_feedback(
     let note = req.note.clone().unwrap_or_default();
     let feedback = AgentFeedback::new(req.query_hash, agent_id, req.success).with_note(&note);
 
-    feedback_store.insert_feedback(&feedback).await?;
+    feedback_store.insert_feedback(tenant_id, &feedback).await?;
 
     let mut cache_adjusted = false;
     let mut claims_updated: usize = 0;
@@ -116,7 +116,7 @@ pub async fn handle_submit_feedback(
 
     if let Some(cached) = cache_store.get_cached(tenant_id, req.query_hash).await? {
         let history = feedback_store
-            .get_feedback_for_query(req.query_hash)
+            .get_feedback_for_query(tenant_id, req.query_hash)
             .await?;
 
         let total = history.len();
@@ -173,7 +173,7 @@ pub async fn handle_submit_feedback(
     }
 
     let history = feedback_store
-        .get_feedback_for_query(req.query_hash)
+        .get_feedback_for_query(tenant_id, req.query_hash)
         .await?;
     let anomaly_score = calculate_anomaly_score(&history, req.success);
 
@@ -287,13 +287,13 @@ mod feedback_cache_tests {
 
     #[async_trait]
     impl FeedbackStore for MockFeedbackStore {
-        async fn insert_feedback(&self, feedback: &AgentFeedback) -> Result<()> {
+        async fn insert_feedback(&self, _tenant_id: &str, feedback: &AgentFeedback) -> Result<()> {
             let mut feedbacks = self.feedbacks.write().await;
             feedbacks.push(feedback.clone());
             Ok(())
         }
 
-        async fn get_feedback_for_query(&self, query_hash: u64) -> Result<Vec<AgentFeedback>> {
+        async fn get_feedback_for_query(&self, _tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>> {
             let feedbacks = self.feedbacks.read().await;
             Ok(feedbacks
                 .iter()

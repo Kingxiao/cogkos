@@ -143,7 +143,7 @@ async fn test_graph_activation_diffusion() {
 
     let diffused = stores
         .graph
-        .activation_diffusion(c1.id, 1.0, 3, 0.8, 0.01)
+        .activation_diffusion(c1.id, "test-tenant", 1.0, 3, 0.8, 0.01)
         .await
         .unwrap();
 

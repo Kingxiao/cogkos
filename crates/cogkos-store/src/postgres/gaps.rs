@@ -174,15 +174,16 @@ impl crate::GapStore for PostgresStore {
             .collect())
     }
 
-    async fn mark_gap_filled(&self, gap_id: uuid::Uuid) -> Result<()> {
+    async fn mark_gap_filled(&self, gap_id: uuid::Uuid, tenant_id: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE knowledge_gaps
             SET status = 'filled', filled_at = NOW()
-            WHERE gap_id = $1
+            WHERE gap_id = $1 AND tenant_id = $2
             "#,
         )
         .bind(gap_id)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;

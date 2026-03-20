@@ -134,8 +134,14 @@ pub async fn handle_query_knowledge(
         tracing::warn!("No embedding client configured, using fallback");
         generate_query_vector(&req.query, helpers::DEFAULT_FALLBACK_DIM)
     };
+    // Default to semantic layer — prevents working/episodic memory from leaking
+    // into queries that don't explicitly request them.
+    // Agents share the semantic layer within the same tenant (shared brain).
+    // Working/episodic require explicit memory_layer + session_id to access.
+    let effective_layer = req.memory_layer.as_deref().or(Some("semantic"));
+
     let vector_matches = vector_store
-        .search(query_vector, tenant_id, req.context.max_results)
+        .search(query_vector, tenant_id, req.context.max_results, effective_layer)
         .await?;
 
     // 3. Get claims from vector matches with comprehensive permission filtering
@@ -148,15 +154,7 @@ pub async fn handle_query_knowledge(
         }
     }
 
-    // 3b. Filter by memory_layer / session_id if requested
-    if let Some(ref layer) = req.memory_layer {
-        claims.retain(|c| {
-            c.metadata
-                .get("memory_layer")
-                .and_then(|v| v.as_str())
-                .is_some_and(|l| l == layer)
-        });
-    }
+    // 3b. Post-filter by session_id if requested (for working/episodic scoping)
     if let Some(ref sid) = req.session_id {
         claims.retain(|c| {
             c.metadata
@@ -164,8 +162,6 @@ pub async fn handle_query_knowledge(
                 .and_then(|v| v.as_str())
                 .is_some_and(|s| s == sid)
         });
-    }
-    if req.memory_layer.is_some() || req.session_id.is_some() {
         claim_ids = claims.iter().map(|c| c.id).collect();
     }
 
@@ -186,7 +182,7 @@ pub async fn handle_query_knowledge(
     let _max_depth = 2;
 
     for claim in &claims {
-        let related = match graph_store.find_related(claim.id, 2, threshold).await {
+        let related = match graph_store.find_related(claim.id, tenant_id, 2, threshold).await {
             Ok(nodes) => nodes,
             Err(e) => {
                 tracing::warn!(claim_id = %claim.id, error = %e, "Graph diffusion failed, degrading");
@@ -199,7 +195,13 @@ pub async fn handle_query_knowledge(
                 .any(|n: &GraphNode| n.content == node.content)
             {
                 // Enrich with live activation from PG (FalkorDB stores stale initial value)
+                // Also filter: only include nodes from the same memory layer as the query
                 if let Ok(live_claim) = claim_store.get_claim(node.id, tenant_id).await {
+                    let node_layer = live_claim.memory_layer().to_string();
+                    let target_layer = effective_layer.unwrap_or("semantic");
+                    if node_layer != target_layer {
+                        continue;
+                    }
                     node.activation = live_claim.activation_weight;
                 }
                 all_graph_nodes.push(node);

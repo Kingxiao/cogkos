@@ -170,15 +170,16 @@ impl crate::SubscriptionStore for PostgresStore {
         rows.iter().map(row_to_subscription).collect()
     }
 
-    async fn update_subscription_status(&self, id: uuid::Uuid, _status: &str) -> Result<()> {
+    async fn update_subscription_status(&self, id: uuid::Uuid, tenant_id: &str, _status: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE subscriptions
             SET last_polled = NOW(), updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             "#,
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
@@ -186,15 +187,16 @@ impl crate::SubscriptionStore for PostgresStore {
         Ok(())
     }
 
-    async fn increment_error_count(&self, id: uuid::Uuid) -> Result<()> {
+    async fn increment_error_count(&self, id: uuid::Uuid, tenant_id: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE subscriptions
             SET error_count = error_count + 1, updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             "#,
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
@@ -202,15 +204,16 @@ impl crate::SubscriptionStore for PostgresStore {
         Ok(())
     }
 
-    async fn reset_error_count(&self, id: uuid::Uuid) -> Result<()> {
+    async fn reset_error_count(&self, id: uuid::Uuid, tenant_id: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE subscriptions
             SET error_count = 0, updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             "#,
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;

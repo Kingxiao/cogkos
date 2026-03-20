@@ -154,11 +154,16 @@ pub trait MemoryLayerStore: Send + Sync {
 #[async_trait]
 pub trait VectorStore: Send + Sync {
     async fn upsert(&self, id: Id, vector: Vec<f32>, metadata: serde_json::Value) -> Result<()>;
+    /// Search for similar vectors. `memory_layer` filters by metadata->>'memory_layer':
+    /// - Some("semantic") → only semantic layer (default for queries)
+    /// - Some("working") / Some("episodic") → specific layer
+    /// - None → all layers (used internally for conflict detection)
     async fn search(
         &self,
         vector: Vec<f32>,
         tenant_id: &str,
         limit: u32,
+        memory_layer: Option<&str>,
     ) -> Result<Vec<VectorMatch>>;
     async fn delete(&self, id: Id) -> Result<()>;
 
@@ -171,7 +176,7 @@ pub trait VectorStore: Send + Sync {
 pub trait GraphStore: Send + Sync {
     async fn add_node(&self, claim: &EpistemicClaim) -> Result<()>;
     async fn add_edge(&self, from: Id, to: Id, relation: &str, weight: f64) -> Result<()>;
-    async fn find_related(&self, id: Id, depth: u32, min_activation: f64)
+    async fn find_related(&self, id: Id, tenant_id: &str, depth: u32, min_activation: f64)
     -> Result<Vec<GraphNode>>;
     async fn find_path(&self, from: Id, to: Id) -> Result<Vec<GraphNode>>;
 
@@ -189,6 +194,7 @@ pub trait GraphStore: Send + Sync {
     async fn activation_diffusion(
         &self,
         start_id: Id,
+        tenant_id: &str,
         initial_activation: f64,
         depth: u32,
         decay_factor: f64,
@@ -212,8 +218,8 @@ pub trait CacheStore: Send + Sync {
 /// Feedback store trait
 #[async_trait]
 pub trait FeedbackStore: Send + Sync {
-    async fn insert_feedback(&self, feedback: &AgentFeedback) -> Result<()>;
-    async fn get_feedback_for_query(&self, query_hash: u64) -> Result<Vec<AgentFeedback>>;
+    async fn insert_feedback(&self, tenant_id: &str, feedback: &AgentFeedback) -> Result<()>;
+    async fn get_feedback_for_query(&self, tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>>;
 }
 
 /// Object store trait
@@ -307,14 +313,14 @@ impl Default for InMemoryFeedbackStore {
 
 #[async_trait]
 impl FeedbackStore for InMemoryFeedbackStore {
-    async fn insert_feedback(&self, feedback: &AgentFeedback) -> Result<()> {
+    async fn insert_feedback(&self, _tenant_id: &str, feedback: &AgentFeedback) -> Result<()> {
         let mut store = self.feedback.write().await;
         let entry = store.entry(feedback.query_hash).or_insert_with(Vec::new);
         entry.push(feedback.clone());
         Ok(())
     }
 
-    async fn get_feedback_for_query(&self, query_hash: u64) -> Result<Vec<AgentFeedback>> {
+    async fn get_feedback_for_query(&self, _tenant_id: &str, query_hash: u64) -> Result<Vec<AgentFeedback>> {
         let store = self.feedback.read().await;
         Ok(store.get(&query_hash).cloned().unwrap_or_default())
     }
@@ -669,7 +675,7 @@ pub trait GapStore: Send + Sync {
     ) -> Result<Vec<KnowledgeGapRecord>>;
 
     /// Mark gap as filled
-    async fn mark_gap_filled(&self, gap_id: uuid::Uuid) -> Result<()>;
+    async fn mark_gap_filled(&self, gap_id: uuid::Uuid, tenant_id: &str) -> Result<()>;
 }
 
 /// In-memory gap store for testing/development
@@ -739,7 +745,7 @@ impl GapStore for InMemoryGapStore {
         Ok(gaps)
     }
 
-    async fn mark_gap_filled(&self, gap_id: uuid::Uuid) -> Result<()> {
+    async fn mark_gap_filled(&self, gap_id: uuid::Uuid, _tenant_id: &str) -> Result<()> {
         let mut store = self.gaps.write().await;
         if let Some(gap) = store.get_mut(&gap_id) {
             gap.status = "filled".to_string();
@@ -772,13 +778,13 @@ pub trait SubscriptionStore: Send + Sync {
     async fn list_enabled_subscriptions(&self, tenant_id: &str) -> Result<Vec<SubscriptionSource>>;
 
     /// Update subscription status (last_run_at, last_run_status)
-    async fn update_subscription_status(&self, id: uuid::Uuid, status: &str) -> Result<()>;
+    async fn update_subscription_status(&self, id: uuid::Uuid, tenant_id: &str, status: &str) -> Result<()>;
 
     /// Increment error count for a subscription
-    async fn increment_error_count(&self, id: uuid::Uuid) -> Result<()>;
+    async fn increment_error_count(&self, id: uuid::Uuid, tenant_id: &str) -> Result<()>;
 
     /// Reset error count for a subscription
-    async fn reset_error_count(&self, id: uuid::Uuid) -> Result<()>;
+    async fn reset_error_count(&self, id: uuid::Uuid, tenant_id: &str) -> Result<()>;
 }
 
 // Re-export implementations
@@ -864,13 +870,13 @@ impl SubscriptionStore for InMemorySubscriptionStore {
             .map_err(|_| cogkos_core::CogKosError::Internal("lock poisoned".into()))?;
         Ok(guard.values().filter(|s| s.enabled).cloned().collect())
     }
-    async fn update_subscription_status(&self, _: uuid::Uuid, _: &str) -> Result<()> {
+    async fn update_subscription_status(&self, _: uuid::Uuid, _: &str, _: &str) -> Result<()> {
         Ok(())
     }
-    async fn increment_error_count(&self, _: uuid::Uuid) -> Result<()> {
+    async fn increment_error_count(&self, _: uuid::Uuid, _: &str) -> Result<()> {
         Ok(())
     }
-    async fn reset_error_count(&self, _: uuid::Uuid) -> Result<()> {
+    async fn reset_error_count(&self, _: uuid::Uuid, _: &str) -> Result<()> {
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-# CogKOS — AI Agent 知识进化引擎
+# CogKOS — AI 智能体的长期记忆
 
 [![CI](https://github.com/Kingxiao/cogkos/actions/workflows/ci.yml/badge.svg)](https://github.com/Kingxiao/cogkos/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](../LICENSE)
@@ -6,164 +6,124 @@
 
 **[English](../README.md) | 中文**
 
-CogKOS 是 AI Agent 的**知识进化引擎**——知识会衰减、冲突会被检测、预测会自我修正。Agent 通过 [MCP 协议](https://modelcontextprotocol.io/) 接入，共享一个活的知识图谱。
+让你的 AI Agent 拥有跨会话、跨 Agent 的持久记忆。本地部署，开源，通过 [MCP 协议](https://modelcontextprotocol.io/) 接入。
 
-> Agent 负责决策，CogKOS 负责记住*为什么*。
+你的 Agent 每次新会话都从零开始。CogKOS 解决这个问题——它记住 Agent 学到的东西，下次自动找到相关知识，过时的知识自动淡出，不用你手动维护。
 
-## 核心特性
+> 别再对你的 Agent 重复同样的话了。
 
-| 特性 | 描述 |
-|------|------|
-| **七层架构** | 从持久化到摄入管道的完整分层，每层职责清晰 |
-| **MCP 协议** | 基于 rmcp SDK，支持 stdio 和 Streamable HTTP 双传输 |
-| **双模式进化** | 渐进模式 (99%) 持续优化 + 范式转换模式 (1%) 突破创新 |
-| **多租户隔离** | 数据库级别 RLS，租户数据完全隔离 |
-| **Sleep-time 计算** | 异步知识整合、置信度衰减、冲突检测与解决 |
-| **知识图谱** | FalkorDB 图数据库 + 激活扩散机制 |
-| **语义检索** | PostgreSQL pgvector，运行时动态检测向量维度 |
-| **异步写入** | PG 快写 (~1ms 返回)，embedding + 索引后台异步完成（S2 原则） |
+## 为什么需要 CogKOS
+
+| 痛点 | CogKOS 怎么解决 |
+|------|----------------|
+| **Agent 换个会话就失忆** | 持久记忆——重启、新会话都不丢 |
+| **Agent 之间互不知道对方学了什么** | 一个 Agent 的发现，其他 Agent 自动可用 |
+| **上下文窗口被"提醒"塞满** | 语义搜索只召回相关知识，不浪费 token |
+| **笔记越积越多没人维护** | 置信度自动衰减，矛盾自动标记 |
+| **不想把知识存到云端** | 跑在你自己的机器上，数据不出本地 |
+| **临时笔记污染长期知识** | 三层隔离——会话草稿、Agent 经历、共享长期记忆 |
 
 ## 快速开始
 
 ### 环境要求
 
 - **Rust**: 1.94+ (edition 2024)
-- **PostgreSQL**: 17+ (需要 pgvector 扩展)
-- **FalkorDB**: Redis 协议兼容
-- **Docker & Docker Compose**: 推荐
+- **Docker & Docker Compose**
 
-### 1. 克隆并启动基础设施
+### 1. 启动基础设施并构建
 
 ```bash
-git clone https://github.com/Kingxiao/cogkos.git
-cd cogkos
-
-# 启动 PostgreSQL (pgvector) + FalkorDB
-docker-compose up -d
-```
-
-### 2. 配置并构建
-
-```bash
-cp .env.example .env
-# 编辑 .env — 参考注释了解必填/选填项
-
+git clone https://github.com/Kingxiao/cogkos.git && cd cogkos
+docker-compose up -d        # PostgreSQL (pgvector) + FalkorDB
+cp .env.example .env        # 按需编辑
 cargo build --release
+./target/release/cogkos &   # 自动执行数据库迁移
 ```
 
-### 3. 首次启动 — 初始化并创建 API Key
+> 在 `.env` 中设置 `DEFAULT_MCP_API_KEY=any-string` 可跳过 API Key 创建，快速开始开发。
 
-```bash
-# 启动服务（自动执行数据库迁移）
-./target/release/cogkos &
+### 2. 接入你的 Agent
 
-# 创建首个 API Key（需要 DATABASE_URL 环境变量）
-source .env  # 或: export DATABASE_URL=postgres://cogkos:cogkos_dev@localhost:5435/cogkos
-./target/release/cogkos-admin create-key my-org read,write
-# 输出: API Key: ck_xxxxxxxxxxxx（仅显示一次，请保存）
-
-# 验证
-curl http://localhost:8081/healthz   # → "ok"
-curl http://localhost:8081/readyz    # → "ready"（检查 PG + FalkorDB）
-```
-
-> **快速开发模式**: 在 `.env` 中设置 `DEFAULT_MCP_API_KEY=any-string` 可跳过 admin CLI 创建密钥。可选设置 `DEFAULT_MCP_TENANT=my-org` 指定租户（默认为 "default"）。
-
-### 4. 连接你的 Agent
-
-CogKOS 采用 **租户/Agent** 模型：
-- **租户 (Tenant)** = 你的组织（数据隔离边界）
-- **Agent** = 同一租户内共享知识池的多个 AI Agent
+以 Claude Code 为例，编辑 `~/.claude/mcp_servers.json`：
 
 ```json
-// Agent A — Claude Code (~/.claude/mcp_servers.json)
 {
   "cogkos": {
     "type": "streamable-http",
     "url": "http://localhost:3000/mcp",
     "headers": {
-      "X-API-Key": "ck_xxxxxxxxxxxx"
+      "X-API-Key": "your-key"
     }
   }
 }
-
-// Agent B — 同一租户，不同 Key（或相同 Key）
-// 租户绑定在 API Key 上，无需额外 header
 ```
 
-同一租户内的所有 Agent：
-- **共享**同一个知识图谱和语义搜索索引
-- **跨 Agent 冲突检测**（Agent A 说 X，Agent B 说非 X → 自动检测）
-- 通过请求中的 `source.agent_id` 标识身份（用于溯源追踪）
+### 3. 开始使用
 
-## 架构
+Agent 接入后自动获得以下 MCP 工具：
 
-```
-L7  摄入管道 — PDF/Word/Markdown 解析 + LLM 分类
-L6  MCP 服务器 (rmcp SDK) — 认证、缓存、激活扩散
-L5  知识图谱 (FalkorDB) — EpistemicClaim 节点、关系、冲突记录
-L4  进化引擎 — 渐进进化 (99%) + 范式转换 (1%)
-L3  异步整合 (Sleep-time) — 冲突检测、贝叶斯聚合、衰减
-L2  外部知识 — RSS/Webhook/API 轮询
-L1  持久化 — PostgreSQL + pgvector / FalkorDB / S3
-```
-
-## MCP 工具
-
-| 工具 | 描述 |
-|------|------|
-| `query_knowledge` | 语义搜索 + 图扩散，返回结构化决策包 |
-| `submit_experience` | 提交知识，异步 embedding + 冲突检测 |
-| `submit_feedback` | 反馈回路——70/30 混合比例调整置信度 |
-| `report_gap` | 报告知识空洞，引导定向采集 |
-| `upload_document` | 上传文档触发摄入管道 |
+| 工具 | 做什么 |
+|------|-------|
+| `query_knowledge` | 检索相关知识——语义搜索 + 图遍历 |
+| `submit_experience` | 存储学习成果、决策或观察 |
+| `submit_feedback` | 告诉 CogKOS 回答是否有用（调整置信度） |
+| `report_gap` | 标记知识空白，引导定向采集 |
+| `upload_document` | 上传文档进入摄入管道 |
 | `get_meta_directory` | 浏览知识领域和专业度评分 |
-| `subscribe_rss` / `subscribe_webhook` / `subscribe_api` | 外部知识源订阅 |
 
-## Crate 结构
+这次会话学到的东西，下次会话还在。
+
+## 工作原理
+
+```
+L7  摄入管道    — PDF/Word/Markdown 解析 + LLM 分类
+L6  MCP 服务器  — 认证、缓存、语义搜索、图扩散
+L5  知识图谱    — 知识节点、关系、冲突记录 (FalkorDB)
+L4  进化引擎    — 置信度衰减、贝叶斯聚合、冲突解决
+L3  后台处理    — 异步 embedding、整合、垃圾回收
+L2  外部知识    — RSS/Webhook/API 轮询
+L1  持久化      — PostgreSQL + pgvector / FalkorDB / S3
+```
+
+**核心概念：**
+
+- **EpistemicClaim** — 知识的原子单元。包含内容、置信度、来源和激活权重。
+- **三层记忆** — Working（会话草稿，自动过期）、Episodic（Agent 经历）、Semantic（共享长期知识）。查询默认只搜语义层，Agent 的工作记忆不会泄漏到其他 Agent 的结果中。
+- **置信度衰减** — `confidence × e^(-λt)`，被使用频率调制。过时知识自动淡出，常用知识保持活跃。
+- **冲突检测** — 两条知识矛盾时，CogKOS 标记冲突等待解决，而不是静默丢弃一方。
+
+## 项目结构
 
 ```
 crates/
-├── cogkos-core/       核心模型、RBAC、进化引擎、健康监控
+├── cogkos-core/       数据模型、RBAC、健康监控
 ├── cogkos-store/      PostgreSQL + pgvector + FalkorDB + S3 存储抽象
 ├── cogkos-mcp/        MCP 服务器、查询/摄入/反馈处理器
 ├── cogkos-ingest/     文档解析 + 向量化管道
-├── cogkos-sleep/      异步任务调度（冲突/衰减/聚合）
+├── cogkos-sleep/      后台任务调度（衰减、聚合）
 ├── cogkos-llm/        多供应商 LLM 客户端
 ├── cogkos-external/   RSS/Webhook/API 轮询
-├── cogkos-federation/ 跨实例路由（实验性）
-└── cogkos-workflow/   工作流引擎（占位）
+└── cogkos-federation/ 跨实例路由（实验性）
 ```
 
-## 设计原则
+## 配置
 
-| # | 原则 | 含义 |
-|---|------|------|
-| S1 | 记忆本质是预测 | 查询返回包含预测和置信度的决策包 |
-| S2 | 快捕获/慢整合 | 写入：同步 PG 插入，异步 embedding + 索引 |
-| S3 | 读即写 | 查询命中时原子更新激活权重 |
-| S4 | 知识有保质期 | `confidence × e^(-λt)`，被激活权重调制 |
-| S5 | 进化三要素 | 变异 (冲突) + 选择 (衰减) + 遗传 (贝叶斯聚合) |
-| S6 | 双路径认知 | System 1 (缓存) + System 2 (完整推理) |
+关键环境变量（完整列表见 `.env.example`）：
 
-## 技术栈
-
-| 组件 | 技术 |
+| 变量 | 用途 |
 |------|------|
-| 语言 | Rust 1.94+ (edition 2024) |
-| 关系库 | PostgreSQL 17 + pgvector (HNSW 索引) |
-| 图数据库 | FalkorDB (Redis 协议) |
-| 对象存储 | S3 / SeaweedFS / 本地文件系统降级 |
-| MCP | rmcp SDK 1.2+ (stdio + Streamable HTTP) |
-| 监控 | Prometheus + OpenTelemetry + JSON 日志 |
+| `DATABASE_URL` | PostgreSQL 连接字符串 |
+| `FALKORDB_URL` | FalkorDB（Redis 协议）连接 |
+| `API_302_KEY` 或 `OPENAI_API_KEY` | 语义搜索的 Embedding 提供商 |
+| `DEFAULT_MCP_API_KEY` | 本地开发跳过 API Key 创建 |
+| `MCP_TRANSPORT` | `http` 启用 Streamable HTTP（默认 stdio） |
 
 ## 开发
 
 ```bash
-cargo test          # 单元测试 (69 tests)
+cargo test          # 69 个测试
 cargo fmt           # 格式化
 cargo clippy        # 静态检查
-cargo audit         # 安全审计
 ```
 
 ## 部署
@@ -175,6 +135,10 @@ docker run -d -p 3000:3000 -p 8081:8081 --env-file .env cogkos:latest
 
 # Kubernetes
 kubectl apply -k k8s/overlays/dev
+
+# 健康检查
+curl http://localhost:8081/healthz   # → "ok"
+curl http://localhost:8081/readyz    # → "ready"
 ```
 
 ## 许可证

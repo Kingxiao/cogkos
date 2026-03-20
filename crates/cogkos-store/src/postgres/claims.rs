@@ -265,11 +265,12 @@ impl crate::ClaimStore for PostgresStore {
                 access_count = access_count + 1,
                 last_accessed = NOW(),
                 updated_at = NOW()
-            WHERE id = $2
+            WHERE id = $2 AND tenant_id = $3
         "#,
         )
         .bind(delta)
         .bind(id)
+        .bind(tenant_id)
         .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
@@ -297,9 +298,10 @@ impl crate::ClaimStore for PostgresStore {
             SELECT id, tenant_id, claim_a_id, claim_b_id, conflict_type, severity,
                 description, detected_at, resolved_at, resolution, resolution_status, elevated_insight_id
             FROM conflict_records
-            WHERE claim_a_id = $1 OR claim_b_id = $1
+            WHERE tenant_id = $2 AND (claim_a_id = $1 OR claim_b_id = $1)
         "#)
         .bind(claim_id)
+        .bind(tenant_id)
         .fetch_all(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
@@ -405,10 +407,11 @@ impl crate::ClaimStore for PostgresStore {
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
         sqlx::query(
-            "UPDATE epistemic_claims SET confidence = $1, updated_at = NOW() WHERE id = $2",
+            "UPDATE epistemic_claims SET confidence = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
         )
         .bind(confidence)
         .bind(id)
+        .bind(tenant_id)
         .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
@@ -561,12 +564,13 @@ impl crate::ClaimStore for PostgresStore {
             SET resolution_status = $1,
                 resolution_note = $2,
                 resolved_at = NOW()
-            WHERE id = $3
+            WHERE id = $3 AND tenant_id = $4
         "#,
         )
         .bind(status.as_db_str())
         .bind(&note)
         .bind(conflict_id)
+        .bind(tenant_id)
         .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;

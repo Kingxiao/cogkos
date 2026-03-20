@@ -123,16 +123,18 @@ impl crate::GraphStore for FalkorStore {
     async fn find_related(
         &self,
         id: Id,
+        tenant_id: &str,
         depth: u32,
         min_activation: f64,
     ) -> Result<Vec<GraphNode>> {
         // Support all known edge types for activation diffusion
         let safe_id = validate_uuid(&id)?;
+        let safe_tenant = cypher_escape(tenant_id);
         let cypher = format!(
             "MATCH (start:Claim {{id: '{}'}})-[:CAUSES|SIMILAR_TO|DERIVED_FROM|RELATED|SIMILAR*1..{}]->(related:Claim)
-             WHERE related.activation >= {}
+             WHERE related.activation >= {} AND related.tenant_id = '{}'
              RETURN related.id as id, related.content as content, related.activation as activation",
-            safe_id, depth, min_activation
+            safe_id, depth, min_activation, safe_tenant
         );
 
         let results = self.query(&cypher).await?;
@@ -218,11 +220,13 @@ impl crate::GraphStore for FalkorStore {
     async fn activation_diffusion(
         &self,
         start_id: Id,
+        tenant_id: &str,
         initial_activation: f64,
         depth: u32,
         decay_factor: f64,
         min_threshold: f64,
     ) -> Result<Vec<GraphNode>> {
+        let safe_tenant = cypher_escape(tenant_id);
         // BFS-based activation diffusion with initial_activation and decay_factor
         let mut activations: std::collections::HashMap<String, (f64, String)> =
             std::collections::HashMap::new();
@@ -272,8 +276,9 @@ impl crate::GraphStore for FalkorStore {
                 let safe_current_id = validate_uuid(&current_id)?;
                 let neighbor_cypher = format!(
                     "MATCH (current:Claim {{id: '{}'}})-[r:CAUSES|SIMILAR_TO|DERIVED_FROM]->(neighbor:Claim)
+                     WHERE neighbor.tenant_id = '{}'
                      RETURN neighbor.id as id, neighbor.content as content, type(r) as rel_type, r.weight as weight",
-                    safe_current_id
+                    safe_current_id, safe_tenant
                 );
 
                 let neighbor_results = self.query(&neighbor_cypher).await?;

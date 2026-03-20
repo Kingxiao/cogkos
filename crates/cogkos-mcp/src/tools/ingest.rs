@@ -141,7 +141,7 @@ pub async fn handle_submit_experience(
         }
 
         // 4. Semantic conflict detection + graph edge building
-        if let Ok(matches) = vector_store.search(content_vector, &bg_tenant, 20).await {
+        if let Ok(matches) = vector_store.search(content_vector, &bg_tenant, 20, None).await {
             let scored_matches: Vec<_> = matches
                 .into_iter()
                 .filter(|m| m.id != bg_claim_id && m.score > 0.3)

@@ -7,41 +7,66 @@ use sqlx::Row;
 
 #[async_trait]
 impl crate::FeedbackStore for PostgresStore {
-    async fn insert_feedback(&self, feedback: &cogkos_core::models::AgentFeedback) -> Result<()> {
+    async fn insert_feedback(&self, tenant_id: &str, feedback: &cogkos_core::models::AgentFeedback) -> Result<()> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         sqlx::query(
             r#"
-            INSERT INTO agent_feedbacks (query_hash, agent_id, success, feedback_note, timestamp)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO agent_feedbacks (tenant_id, query_hash, agent_id, success, feedback_note, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6)
             "#,
         )
+        .bind(tenant_id)
         .bind(feedback.query_hash as i64)
         .bind(&feedback.agent_id)
         .bind(feedback.success)
         .bind(&feedback.feedback_note)
         .bind(feedback.timestamp)
-        .execute(&self.pool)
+        .execute(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         Ok(())
     }
 
     async fn get_feedback_for_query(
         &self,
+        tenant_id: &str,
         query_hash: u64,
     ) -> Result<Vec<cogkos_core::models::AgentFeedback>> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
         let rows = sqlx::query(
             r#"
             SELECT id, query_hash, agent_id, success, feedback_note, timestamp
             FROM agent_feedbacks
-            WHERE query_hash = $1
+            WHERE tenant_id = $1 AND query_hash = $2
             ORDER BY timestamp DESC
             "#,
         )
+        .bind(tenant_id)
         .bind(query_hash as i64)
-        .fetch_all(&self.pool)
+        .fetch_all(tx.as_mut())
         .await
         .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
 
         rows.iter()
             .map(|row| {

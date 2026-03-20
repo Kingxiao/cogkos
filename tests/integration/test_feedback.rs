@@ -13,8 +13,8 @@ async fn test_feedback_insert_and_retrieve() {
         feedback_note: Some("Helpful".into()),
         timestamp: chrono::Utc::now(),
     };
-    store.insert_feedback(&fb).await.unwrap();
-    let results = store.get_feedback_for_query(42).await.unwrap();
+    store.insert_feedback("test-tenant", &fb).await.unwrap();
+    let results = store.get_feedback_for_query("test-tenant", 42).await.unwrap();
     assert_eq!(results.len(), 1);
     assert!(results[0].success);
 }
@@ -31,10 +31,10 @@ async fn test_feedback_multiple_for_same_query() {
             feedback_note: None,
             timestamp: chrono::Utc::now(),
         };
-        store.insert_feedback(&fb).await.unwrap();
+        store.insert_feedback("test-tenant", &fb).await.unwrap();
     }
 
-    let results = store.get_feedback_for_query(100).await.unwrap();
+    let results = store.get_feedback_for_query("test-tenant", 100).await.unwrap();
     assert_eq!(results.len(), 5);
 }
 
@@ -57,10 +57,10 @@ async fn test_feedback_different_queries_isolated() {
         timestamp: chrono::Utc::now(),
     };
 
-    store.insert_feedback(&fb1).await.unwrap();
-    store.insert_feedback(&fb2).await.unwrap();
+    store.insert_feedback("test-tenant", &fb1).await.unwrap();
+    store.insert_feedback("test-tenant", &fb2).await.unwrap();
 
-    assert_eq!(store.get_feedback_for_query(1).await.unwrap().len(), 1);
-    assert_eq!(store.get_feedback_for_query(2).await.unwrap().len(), 1);
-    assert_eq!(store.get_feedback_for_query(999).await.unwrap().len(), 0);
+    assert_eq!(store.get_feedback_for_query("test-tenant", 1).await.unwrap().len(), 1);
+    assert_eq!(store.get_feedback_for_query("test-tenant", 2).await.unwrap().len(), 1);
+    assert_eq!(store.get_feedback_for_query("test-tenant", 999).await.unwrap().len(), 0);
 }

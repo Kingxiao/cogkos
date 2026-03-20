@@ -176,6 +176,7 @@ impl VectorStore for MockVectorStore {
         _vector: Vec<f32>,
         _tenant_id: &str,
         limit: u32,
+        _memory_layer: Option<&str>,
     ) -> Result<Vec<VectorMatch>> {
         let claims = self.stores.claims.lock().unwrap();
 
@@ -218,6 +219,7 @@ impl GraphStore for MockGraphStore {
     async fn find_related(
         &self,
         _id: Id,
+        _tenant_id: &str,
         _depth: u32,
         _min_activation: f64,
     ) -> Result<Vec<GraphNode>> {
@@ -239,6 +241,7 @@ impl GraphStore for MockGraphStore {
     async fn activation_diffusion(
         &self,
         _start_id: Id,
+        _tenant_id: &str,
         _initial_activation: f64,
         _depth: u32,
         _decay_factor: f64,

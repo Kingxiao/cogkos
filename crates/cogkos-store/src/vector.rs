@@ -125,6 +125,7 @@ impl super::VectorStore for PgVectorStore {
         vector: Vec<f32>,
         tenant_id: &str,
         limit: u32,
+        memory_layer: Option<&str>,
     ) -> Result<Vec<VectorMatch>> {
         let expected = self.detected_dim.load(std::sync::atomic::Ordering::Relaxed);
         if expected > 0 && vector.len() as i32 != expected {
@@ -146,18 +147,36 @@ impl super::VectorStore for PgVectorStore {
         );
 
         // Use cosine distance (<=>), convert to similarity score
-        let rows = sqlx::query_as::<_, (Uuid, f64)>(
-            "SELECT id, 1 - (embedding <=> $1::vector) as score
-             FROM epistemic_claims 
-             WHERE tenant_id = $2 AND embedding IS NOT NULL
-             ORDER BY embedding <=> $1::vector
-             LIMIT $3",
-        )
-        .bind(&vector_str)
-        .bind(tenant_id)
-        .bind(limit as i64)
-        .fetch_all(&self.pool)
-        .await
+        // Filter by memory_layer when specified (stored in metadata JSONB)
+        let rows = if let Some(layer) = memory_layer {
+            sqlx::query_as::<_, (Uuid, f64)>(
+                "SELECT id, 1 - (embedding <=> $1::vector) as score
+                 FROM epistemic_claims
+                 WHERE tenant_id = $2 AND embedding IS NOT NULL
+                   AND COALESCE(metadata->>'memory_layer', 'semantic') = $4
+                 ORDER BY embedding <=> $1::vector
+                 LIMIT $3",
+            )
+            .bind(&vector_str)
+            .bind(tenant_id)
+            .bind(limit as i64)
+            .bind(layer)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query_as::<_, (Uuid, f64)>(
+                "SELECT id, 1 - (embedding <=> $1::vector) as score
+                 FROM epistemic_claims
+                 WHERE tenant_id = $2 AND embedding IS NOT NULL
+                 ORDER BY embedding <=> $1::vector
+                 LIMIT $3",
+            )
+            .bind(&vector_str)
+            .bind(tenant_id)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+        }
         .map_err(|e| CogKosError::Vector(e.to_string()))?;
 
         Ok(rows
@@ -238,6 +257,7 @@ impl super::VectorStore for InMemoryVectorStore {
         vector: Vec<f32>,
         _tenant_id: &str,
         limit: u32,
+        _memory_layer: Option<&str>,
     ) -> Result<Vec<VectorMatch>> {
         let vectors = self
             .vectors

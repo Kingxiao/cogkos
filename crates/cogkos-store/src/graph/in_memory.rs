@@ -61,6 +61,7 @@ impl crate::GraphStore for InMemoryGraphStore {
     async fn find_related(
         &self,
         id: Id,
+        _tenant_id: &str,
         depth: u32,
         min_activation: f64,
     ) -> Result<Vec<GraphNode>> {
@@ -177,6 +178,7 @@ impl crate::GraphStore for InMemoryGraphStore {
     async fn activation_diffusion(
         &self,
         start_id: Id,
+        _tenant_id: &str,
         initial_activation: f64,
         depth: u32,
         decay_factor: f64,
