@@ -1,4 +1,4 @@
-# CogKOS — 认知知识操作系统
+# CogKOS — AI Agent 知识进化引擎
 
 [![CI](https://github.com/Kingxiao/cogkos/actions/workflows/ci.yml/badge.svg)](https://github.com/Kingxiao/cogkos/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](../LICENSE)
@@ -6,7 +6,7 @@
 
 **[English](../README.md) | 中文**
 
-CogKOS (Cognitive Knowledge Operating System) 是一个专为 AI Agent 设计的**认知知识后端**——通过 [MCP 协议](https://modelcontextprotocol.io/) 为 Agent 提供长期记忆、知识进化和预测能力。
+CogKOS 是 AI Agent 的**知识进化引擎**——知识会衰减、冲突会被检测、预测会自我修正。Agent 通过 [MCP 协议](https://modelcontextprotocol.io/) 接入，共享一个活的知识图谱。
 
 > Agent 负责决策，CogKOS 负责记住*为什么*。
 

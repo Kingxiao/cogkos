@@ -1,4 +1,4 @@
-# CogKOS — Cognitive Knowledge Operating System
+# CogKOS — Knowledge Evolution Engine for AI Agents
 
 [![CI](https://github.com/Kingxiao/cogkos/actions/workflows/ci.yml/badge.svg)](https://github.com/Kingxiao/cogkos/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE)
@@ -6,7 +6,7 @@
 
 **[中文文档 / Chinese](docs/README.zh-CN.md)**
 
-CogKOS is a **cognitive knowledge backend for AI Agents** — providing long-term memory, knowledge evolution, and prediction capabilities through the [MCP (Model Context Protocol)](https://modelcontextprotocol.io/).
+CogKOS is a **knowledge evolution engine for AI Agents** — knowledge that decays, conflicts that get detected, predictions that self-correct. Agents connect via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) to share a living knowledge graph.
 
 > Agents make decisions. CogKOS remembers *why*.
 
