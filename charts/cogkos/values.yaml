@@ -33,7 +33,7 @@ mcp:
   
   podAnnotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "9090"
+    prometheus.io/port: "8081"
   
   podSecurityContext:
     runAsNonRoot: true
@@ -52,7 +52,7 @@ mcp:
   service:
     type: ClusterIP
     port: 3000
-    metricsPort: 9090
+    metricsPort: 8081
   
   ingress:
     enabled: false

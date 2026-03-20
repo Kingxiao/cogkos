@@ -81,16 +81,16 @@ check_port "Health" "8081" \
     ".env.example:HEALTH_PORT=8081" \
     "Dockerfile:EXPOSE.*8081"
 
-# PostgreSQL port: 5432
-check_port "PostgreSQL" "5432" \
-    "docker-compose.yml:5432:5432" \
-    ".env.example:localhost:5432" \
-    "config/default.toml:localhost:5432"
+# PostgreSQL host port: 5435 (offset to avoid conflict with local PG)
+check_port "PostgreSQL" "5435" \
+    "docker-compose.yml:5435:5432" \
+    ".env.example:localhost:5435" \
+    "config/default.toml:localhost:5435"
 
-# FalkorDB port: 6379
-check_port "FalkorDB" "6379" \
-    "docker-compose.yml:6379:6379" \
-    ".env.example:localhost:6379"
+# FalkorDB host port: 6381 (offset to avoid conflict with local Redis)
+check_port "FalkorDB" "6381" \
+    "docker-compose.yml:6381:6379" \
+    ".env.example:localhost:6381"
 
 # ─────────────────────────────────────────────────────
 # Check 3: Chinese text in public-repo files
@@ -257,7 +257,7 @@ fi
 # ─────────────────────────────────────────────────────
 section "Check 7: Deprecated reference detection"
 
-DEPRECATED_TERMS=("X-Tenant-ID" ":5435" ":6381" "port.*9090")
+DEPRECATED_TERMS=("X-Tenant-ID" "port.*9090")
 
 for term in "${DEPRECATED_TERMS[@]}"; do
     HITS=$(grep -rnP "$term" "$ROOT" \

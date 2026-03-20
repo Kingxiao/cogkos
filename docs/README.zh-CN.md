@@ -58,7 +58,7 @@ cargo build --release
 ./target/release/cogkos &
 
 # 创建首个 API Key（需要 DATABASE_URL 环境变量）
-source .env  # 或: export DATABASE_URL=postgres://cogkos:cogkos_dev@localhost:5432/cogkos
+source .env  # 或: export DATABASE_URL=postgres://cogkos:cogkos_dev@localhost:5435/cogkos
 ./target/release/cogkos-admin create-key my-org read,write
 # 输出: API Key: ck_xxxxxxxxxxxx（仅显示一次，请保存）
 
