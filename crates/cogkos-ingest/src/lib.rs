@@ -9,6 +9,7 @@ pub mod classifier;
 pub mod coordinator;
 pub mod deep_classifier;
 pub mod embedding;
+pub mod extractor;
 pub mod image;
 pub mod parser;
 pub mod pipeline;
@@ -17,6 +18,7 @@ pub use classifier::*;
 pub use coordinator::*;
 pub use deep_classifier::*;
 pub use embedding::*;
+pub use extractor::*;
 pub use image::*;
 pub use parser::*;
 pub use pipeline::*;
@@ -52,9 +54,24 @@ impl DocumentType {
             DocumentType::Word
         } else if lower.ends_with(".md") || lower.ends_with(".markdown") {
             DocumentType::Markdown
-        } else if lower.ends_with(".txt") {
+        } else if lower.ends_with(".csv") || lower.ends_with(".tsv") {
+            DocumentType::Csv
+        } else if lower.ends_with(".txt")
+            || lower.ends_with(".log")
+            || lower.ends_with(".json")
+            || lower.ends_with(".xml")
+            || lower.ends_with(".yaml")
+            || lower.ends_with(".yml")
+            || lower.ends_with(".html")
+            || lower.ends_with(".htm")
+            || lower.ends_with(".toml")
+            || lower.ends_with(".ini")
+            || lower.ends_with(".cfg")
+            || lower.ends_with(".conf")
+            || lower.ends_with(".properties")
+        {
             DocumentType::Text
-        } else if lower.ends_with(".xlsx") || lower.ends_with(".xls") || lower.ends_with(".csv") {
+        } else if lower.ends_with(".xlsx") || lower.ends_with(".xls") {
             DocumentType::Excel
         } else if lower.ends_with(".pptx") || lower.ends_with(".ppt") {
             DocumentType::PowerPoint

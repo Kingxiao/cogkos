@@ -310,6 +310,12 @@ impl ServerHandler for CogkosMcpHandler {
                         ));
                     }
 
+                    let embedding_service = self
+                        .state
+                        .embedding_client
+                        .as_ref()
+                        .map(|c| cogkos_ingest::EmbeddingService::new(Arc::clone(c)));
+
                     let result = handle_upload_document(
                         req,
                         &auth_context.tenant_id,
@@ -317,7 +323,8 @@ impl ServerHandler for CogkosMcpHandler {
                         self.state.stores.graph.as_ref(),
                         self.state.stores.vectors.as_ref(),
                         self.state.stores.objects.as_ref(),
-                        None,
+                        embedding_service,
+                        self.state.llm_client.clone(),
                     )
                     .await
                     .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;

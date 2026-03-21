@@ -1,10 +1,13 @@
 use cogkos_core::Result;
 use cogkos_core::models::*;
+use cogkos_llm::client::LlmClient;
 use cogkos_store::{ClaimStore, GraphStore, ObjectStore, VectorStore};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::deep_classifier::{DeepClassifier, DeepClassifierConfig};
 use crate::embedding::EmbeddingService;
+use crate::extractor::KnowledgeExtractor;
 use crate::{DocumentType, IngestResult, ParserRegistry, TextChunk, UploadedFile, coarse_classify};
 
 /// Maximum upload size: 256 MB
@@ -57,17 +60,31 @@ pub struct IngestionPipeline {
     parser_registry: ParserRegistry,
     embedding_service: EmbeddingService,
     deep_classifier: DeepClassifier,
+    /// Optional LLM client for knowledge extraction (graceful degradation when absent)
+    knowledge_extractor: Option<KnowledgeExtractor>,
 }
 
 impl IngestionPipeline {
-    /// Create new pipeline
+    /// Create new pipeline without LLM knowledge extraction
     pub fn new(embedding_service: EmbeddingService) -> Self {
         Self {
             parser_registry: ParserRegistry::new(),
             embedding_service,
-            // Initialize deep classifier with default config (rule-based)
-            // LLM-based classification can be enabled via config
             deep_classifier: DeepClassifier::new(DeepClassifierConfig::default()),
+            knowledge_extractor: None,
+        }
+    }
+
+    /// Create new pipeline with optional LLM client for knowledge extraction
+    pub fn with_llm(
+        embedding_service: EmbeddingService,
+        llm_client: Option<Arc<dyn LlmClient>>,
+    ) -> Self {
+        Self {
+            parser_registry: ParserRegistry::new(),
+            embedding_service,
+            deep_classifier: DeepClassifier::new(DeepClassifierConfig::default()),
+            knowledge_extractor: llm_client.map(KnowledgeExtractor::new),
         }
     }
 
@@ -131,9 +148,10 @@ impl IngestionPipeline {
 
         // Extract and store domain in metadata
         let domain = extract_domain(&file.filename);
-        file_claim
-            .metadata
-            .insert("domain".to_string(), serde_json::Value::String(domain));
+        file_claim.metadata.insert(
+            "domain".to_string(),
+            serde_json::Value::String(domain.clone()),
+        );
 
         // Store content hash for duplicate detection
         let content_hash = calculate_hash(&file.data);
@@ -201,19 +219,76 @@ impl IngestionPipeline {
             ),
         );
 
-        // 5. Process each chunk
+        // 5. Process each chunk — with optional LLM knowledge extraction
         let mut chunk_claim_ids = Vec::new();
         let mut all_claims = Vec::new();
+        let mut extracted_claim_ids = Vec::new();
 
         for chunk in &chunks {
+            // Always create the raw text chunk claim (for provenance/traceability)
             let chunk_claim = self.chunk_to_claim(chunk, &file, &access_envelope, file_claim_id);
+            let raw_chunk_id = chunk_claim.id;
 
             chunk_claim_ids.push(chunk_claim.id);
             all_claims.push(chunk_claim);
+
+            // 5b. LLM knowledge extraction (when extractor is available)
+            if let Some(ref extractor) = self.knowledge_extractor {
+                let chunk_domain = domain.clone();
+                if let Some(knowledge) = extractor.extract(&chunk.content, &chunk_domain).await {
+                    if !knowledge.is_empty() {
+                        tracing::info!(
+                            chunk_id = %raw_chunk_id,
+                            facts = knowledge.facts.len(),
+                            decisions = knowledge.decisions.len(),
+                            predictions = knowledge.predictions.len(),
+                            relations = knowledge.relations.len(),
+                            "LLM knowledge extraction complete"
+                        );
+
+                        // Create claims for each extracted item
+                        for item in knowledge.all_items() {
+                            let extracted_claim = self.extracted_item_to_claim(
+                                item,
+                                &file,
+                                &access_envelope,
+                                raw_chunk_id,
+                                &chunk_domain,
+                            );
+                            extracted_claim_ids.push(extracted_claim.id);
+                            chunk_claim_ids.push(extracted_claim.id);
+                            all_claims.push(extracted_claim);
+                        }
+
+                        // Store relation metadata on raw chunk for graph building
+                        if !knowledge.relations.is_empty() {
+                            if let Some(raw_claim) =
+                                all_claims.iter_mut().find(|c| c.id == raw_chunk_id)
+                            {
+                                let relations_json: Vec<serde_json::Value> = knowledge
+                                    .relations
+                                    .iter()
+                                    .map(|r| {
+                                        serde_json::json!({
+                                            "subject": r.subject,
+                                            "relation": r.relation,
+                                            "object": r.object,
+                                        })
+                                    })
+                                    .collect();
+                                raw_claim.metadata.insert(
+                                    "extracted_relations".to_string(),
+                                    serde_json::Value::Array(relations_json),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // 6. Embed and store chunks
-        let texts: Vec<String> = chunks.iter().map(|c| c.content.clone()).collect();
+        // 6. Embed and store all claims (raw chunks + extracted items)
+        let texts: Vec<String> = all_claims.iter().map(|c| c.content.clone()).collect();
         let embeddings = self.embedding_service.embed_batch(&texts).await?;
 
         let mut total_novelty = 0.0;
@@ -365,8 +440,8 @@ impl IngestionPipeline {
         file_claim.derived_from = chunk_claim_ids.clone();
         claim_store.update_claim(&file_claim).await?;
 
-        let avg_novelty = if !chunks.is_empty() {
-            total_novelty / chunks.len() as f64
+        let avg_novelty = if !all_claims.is_empty() {
+            total_novelty / all_claims.len() as f64
         } else {
             1.0
         };
@@ -417,6 +492,52 @@ impl IngestionPipeline {
         claim
             .metadata
             .insert("domain".to_string(), serde_json::Value::String(domain));
+
+        claim
+    }
+
+    /// Convert an LLM-extracted knowledge item to a claim
+    fn extracted_item_to_claim(
+        &self,
+        item: &crate::extractor::ExtractedItem,
+        file: &UploadedFile,
+        access_envelope: &AccessEnvelope,
+        parent_chunk_id: Uuid,
+        domain: &str,
+    ) -> EpistemicClaim {
+        let provenance = ProvenanceRecord {
+            source_id: format!("doc:{}", file.filename),
+            source_type: "document".to_string(),
+            ingestion_method: "llm_extraction".to_string(),
+            original_url: None,
+            audit_hash: calculate_hash(item.content.as_bytes()),
+        };
+
+        let mut claim = EpistemicClaim::new(
+            item.content.clone(),
+            file.tenant_id.clone(),
+            item.node_type.clone(),
+            file.source.clone(),
+            access_envelope.clone(),
+            provenance,
+        );
+
+        claim.confidence = item.confidence;
+        claim.derived_from = vec![parent_chunk_id];
+        claim.consolidation_stage = ConsolidationStage::FastTrack;
+
+        claim.metadata.insert(
+            "domain".to_string(),
+            serde_json::Value::String(domain.to_string()),
+        );
+        claim.metadata.insert(
+            "extraction_method".to_string(),
+            serde_json::Value::String("llm".to_string()),
+        );
+        claim.metadata.insert(
+            "source_chunk_id".to_string(),
+            serde_json::Value::String(parent_chunk_id.to_string()),
+        );
 
         claim
     }

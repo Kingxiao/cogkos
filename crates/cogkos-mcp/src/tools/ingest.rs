@@ -212,6 +212,7 @@ pub async fn handle_upload_document(
     vector_store: &dyn VectorStore,
     object_store: &dyn ObjectStore,
     embedding_service: Option<EmbeddingService>,
+    llm_client: Option<Arc<dyn LlmClient>>,
 ) -> Result<DocumentUploadResponse> {
     // Decode base64 content
     let file_data =
@@ -279,7 +280,7 @@ pub async fn handle_upload_document(
                 tenant_id: tenant_id.to_string(),
             };
 
-            let pipeline = IngestionPipeline::new(embedding_svc.clone());
+            let pipeline = IngestionPipeline::with_llm(embedding_svc.clone(), llm_client.clone());
 
             match pipeline
                 .ingest(

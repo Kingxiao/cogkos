@@ -47,7 +47,7 @@ impl Default for McpConfig {
             cache_max_entries: 10000,
             rate_limit_per_minute: Some(600),
             transport: McpTransport::default(),
-            request_timeout_secs: 30,
+            request_timeout_secs: 300,
             auth_cache_ttl_seconds: 300,
             redis_pool: None,
         }

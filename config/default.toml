@@ -2,7 +2,7 @@
 host = "0.0.0.0"
 port = 3000
 max_connections = 10000
-request_timeout_secs = 30
+request_timeout_secs = 300
 
 [database]
 url = "postgres://cogkos:cogkos_dev@localhost:5435/cogkos"
@@ -28,7 +28,7 @@ batch_max_size = 1000
 
 [ingest]
 max_file_size_mb = 500
-supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx", "jpg", "jpeg", "png", "gif", "webp", "bmp"]
+supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx", "csv", "tsv", "json", "xml", "yaml", "yml", "html", "htm", "toml", "ini", "cfg", "conf", "log", "properties", "jpg", "jpeg", "png", "gif", "webp", "bmp"]
 
 [telemetry]
 metrics_enabled = true

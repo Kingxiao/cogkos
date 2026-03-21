@@ -8,7 +8,7 @@ data:
     host = "0.0.0.0"
     port = 3000
     max_connections = 10000
-    request_timeout_secs = 30
+    request_timeout_secs = 300
     
     [cache]
     enabled = true
@@ -27,7 +27,7 @@ data:
     
     [ingest]
     max_file_size_mb = 500
-    supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx"]
+    supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx", "csv", "tsv", "json", "xml", "yaml", "yml", "html", "htm", "toml", "ini", "cfg", "conf", "log", "properties"]
     
     [telemetry]
     metrics_enabled = true

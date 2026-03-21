@@ -65,7 +65,7 @@ fn default_max_connections() -> usize {
     10000
 }
 fn default_request_timeout() -> u64 {
-    30
+    300
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -353,7 +353,7 @@ async fn main() -> Result<()> {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
                 max_connections: 10000,
-                request_timeout_secs: 30,
+                request_timeout_secs: 300,
             },
             cache: CacheConfig {
                 enabled: true,

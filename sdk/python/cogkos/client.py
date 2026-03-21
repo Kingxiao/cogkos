@@ -60,7 +60,7 @@ class CogKOS:
         api_key: str,
         tenant_id: str,
         *,
-        timeout: float = 30.0,
+        timeout: float = 300.0,
         source_agent: str = "python-sdk",
     ):
         self._url = url.rstrip("/")
