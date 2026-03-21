@@ -55,34 +55,34 @@ rate_limit_requests_per_minute = 1000
 # Text generation LLM
 [llm.text]
 provider = "kimi"
-model = "moonshot-v1-8k"
+model = "moonshot-v1-8k"  # verified: 2026-03-21
 api_key = ""
 base_url = "https://api.moonshot.cn/v1"
 
 # Embedding LLM
 [llm.embedding]
 provider = "openai"
-model = "text-embedding-3-large"
+model = "text-embedding-3-large"  # verified: 2026-03-21
 api_key = ""
 base_url = "https://api.302.ai/v1"
 
 # Image understanding LLM
 [llm.image]
 provider = "doubao"
-model = "doubao-vision-lite"
+model = "doubao-vision-lite"  # verified: 2026-03-21
 api_key = ""
 base_url = "https://ark.cn-beijing.volces.com/api/v3"
 
 # Speech recognition LLM (Whisper)
 [llm.audio]
 provider = "openai"
-model = "whisper-1"
+model = "whisper-1"  # verified: 2026-03-21
 api_key = ""
 base_url = "https://api.openai.com/v1"
 
 # Other LLM type (fallback)
 [llm.other]
 provider = "openrouter"
-model = "anthropic/claude-3.5-sonnet"
+model = "anthropic/claude-sonnet-4-6"  # verified: 2026-03-21
 api_key = ""
 base_url = "https://openrouter.ai/api/v1"

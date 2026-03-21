@@ -140,24 +140,16 @@ async fn main() {
 
     let config = McpConfig { host: "127.0.0.1".to_string(), port: 3002, ..Default::default() };
 
-    // Debug: print embedding config
-    if let Some(embed_cfg) = llm_config.get("embedding") {
-    }
-
-    // Create embedding client
-    // Force create embedding client from env vars
-    let minimax_key = std::env::var("MINIMAX_API_KEY").unwrap_or_default();
-    let kimi_key = std::env::var("KIMI_API_KEY").unwrap_or_default();
-    let key = if !minimax_key.is_empty() { minimax_key } else { kimi_key };
-
-    let embedding_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if !key.is_empty() {
-        let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&key, cogkos_llm::ProviderType::OpenAi)
-            .with_base_url("https://api.minimax.chat/v1")
-            .with_model("embo-01");
-        match embed_builder.build()
-        {
+    // Create embedding client from config (falls back to env vars)
+    let embedding_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if llm_config.is_configured("embedding") {
+        let config = llm_config.get("embedding").unwrap();
+        let base_url = config.base_url.as_deref().unwrap_or("https://api.302.ai/v1");
+        let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&config.api_key, cogkos_llm::ProviderType::OpenAi)
+            .with_base_url(base_url)
+            .with_model(&config.model);
+        match embed_builder.build() {
             Ok(client) => {
-                println!("  ✓ Embedding: embo-01 (minimax)");
+                println!("  ✓ Embedding: {} ({})", config.model, config.provider);
                 Some(client)
             }
             Err(e) => {
@@ -166,8 +158,30 @@ async fn main() {
             }
         }
     } else {
-        println!("  ⚠ Embedding not configured (needs MINIMAX_API_KEY)");
-        None
+        // Fallback: try MINIMAX_API_KEY with embo-01
+        let minimax_key = std::env::var("MINIMAX_API_KEY").unwrap_or_default();
+        if !minimax_key.is_empty() {
+            let embed_base = env::var("EMBEDDING_BASE_URL")
+                .unwrap_or_else(|_| "https://api.minimax.chat/v1".to_string());
+            let embed_model = env::var("EMBEDDING_MODEL")
+                .unwrap_or_else(|_| "embo-01".to_string());
+            let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&minimax_key, cogkos_llm::ProviderType::OpenAi)
+                .with_base_url(&embed_base)
+                .with_model(&embed_model);
+            match embed_builder.build() {
+                Ok(client) => {
+                    println!("  ✓ Embedding: {} (minimax fallback)", embed_model);
+                    Some(client)
+                }
+                Err(e) => {
+                    println!("  ⚠ Embedding build failed: {}", e);
+                    None
+                }
+            }
+        } else {
+            println!("  ⚠ Embedding not configured (set [llm.embedding] or MINIMAX_API_KEY)");
+            None
+        }
     };
 
     println!("🚀 Starting MCP server...\n");
