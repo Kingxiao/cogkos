@@ -92,8 +92,8 @@ async fn test_full_knowledge_lifecycle() {
 
     // 1. Write 2 semantically related but conflicting claims
     let claim_a =
-        make_claim_with_confidence("Rust 的内存安全通过 borrow checker 实现", tenant, 0.9);
-    let claim_b = make_claim_with_confidence("Rust 通过垃圾回收实现内存安全", tenant, 0.7);
+        make_claim_with_confidence("Rust achieves memory safety through borrow checker", tenant, 0.9);
+    let claim_b = make_claim_with_confidence("Rust achieves memory safety through garbage collection", tenant, 0.7);
     let id_a = claim_a.id;
     let id_b = claim_b.id;
 
@@ -213,7 +213,7 @@ async fn test_full_knowledge_lifecycle() {
     );
     assert_eq!(after.access_count, before.access_count + 1);
 
-    // 8. Confidence update (回写)
+    // 8. Confidence update (writeback)
     stores
         .claims
         .update_confidence(id_b, tenant, 0.3)
