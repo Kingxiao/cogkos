@@ -23,10 +23,7 @@ pub async fn handle_submit_experience(
 ) -> Result<serde_json::Value> {
     // Convert source
     let claimant = match req.source {
-        SourceInfo::Human { user_id } => Claimant::Human {
-            user_id,
-            role: "user".to_string(),
-        },
+        SourceInfo::Human { user_id, role } => Claimant::Human { user_id, role },
         SourceInfo::Agent { agent_id, model } => Claimant::Agent { agent_id, model },
         SourceInfo::External { source_name } => Claimant::ExternalPublic { source_name },
     };
@@ -253,10 +250,7 @@ pub async fn handle_upload_document(
     let file_id = uuid::Uuid::new_v4();
 
     let claimant = match req.source {
-        SourceInfo::Human { user_id } => Claimant::Human {
-            user_id,
-            role: "user".to_string(),
-        },
+        SourceInfo::Human { user_id, role } => Claimant::Human { user_id, role },
         SourceInfo::Agent { agent_id, model } => Claimant::Agent { agent_id, model },
         SourceInfo::External { source_name } => Claimant::ExternalPublic { source_name },
     };

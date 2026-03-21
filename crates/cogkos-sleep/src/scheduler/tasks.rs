@@ -505,6 +505,7 @@ pub(crate) async fn run_confidence_boost(
 pub(crate) async fn run_prediction_validation(
     stores: &Arc<Stores>,
     config: &SchedulerConfig,
+    prediction_history: Option<&Arc<dyn cogkos_store::PredictionHistoryStore>>,
 ) -> Result<usize> {
     let start = std::time::Instant::now();
     info!("Running prediction validation");
@@ -630,7 +631,7 @@ pub(crate) async fn run_prediction_validation(
                 }
 
                 // Step 6: Record to PredictionHistoryStore if available
-                if let Some(ref pred_store) = stores.prediction_history {
+                if let Some(pred_store) = prediction_history {
                     let record = cogkos_store::PredictionErrorRecord {
                         record_id: uuid::Uuid::new_v4().to_string(),
                         tenant_id: tenant_id.clone(),

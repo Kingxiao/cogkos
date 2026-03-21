@@ -117,12 +117,25 @@ pub struct SubmitExperienceRequest {
     pub session_id: Option<String>,
 }
 
+fn default_role() -> String {
+    "user".to_string()
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SourceInfo {
-    Human { user_id: String },
-    Agent { agent_id: String, model: String },
-    External { source_name: String },
+    Human {
+        user_id: String,
+        #[serde(default = "default_role")]
+        role: String,
+    },
+    Agent {
+        agent_id: String,
+        model: String,
+    },
+    External {
+        source_name: String,
+    },
 }
 
 /// Submit feedback request

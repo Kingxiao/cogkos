@@ -271,7 +271,6 @@ pub struct Stores {
     pub audit: std::sync::Arc<dyn AuditStore>,
     pub subscription: std::sync::Arc<dyn SubscriptionStore>,
     pub memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
-    pub prediction_history: Option<std::sync::Arc<dyn PredictionHistoryStore>>,
 }
 
 impl Stores {
@@ -288,7 +287,6 @@ impl Stores {
         audit: std::sync::Arc<dyn AuditStore>,
         subscription: std::sync::Arc<dyn SubscriptionStore>,
         memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
-        prediction_history: Option<std::sync::Arc<dyn PredictionHistoryStore>>,
     ) -> Self {
         Self {
             claims,
@@ -302,7 +300,6 @@ impl Stores {
             audit,
             subscription,
             memory_layers,
-            prediction_history,
         }
     }
 }

@@ -478,7 +478,9 @@ impl Scheduler {
                     continue;
                 }
                 let start_time = std::time::Instant::now();
-                match run_prediction_validation(&s.stores, &s.config).await {
+                match run_prediction_validation(&s.stores, &s.config, s.prediction_history.as_ref())
+                    .await
+                {
                     Ok(count) => {
                         failures = 0;
                         s.record_processed(TaskType::PredictionValidation, count as u64)

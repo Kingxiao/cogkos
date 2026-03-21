@@ -122,7 +122,6 @@ async fn main() {
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
             memory_layer_store,
-            Some(Arc::new(cogkos_store::InMemoryPredictionStore::new())),
         )
     } else {
         println!("⚠️ DATABASE_URL empty, using InMemory storage");
@@ -138,7 +137,6 @@ async fn main() {
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
             Arc::new(cogkos_store::NoopMemoryLayerStore),
-            Some(Arc::new(cogkos_store::InMemoryPredictionStore::new())),
         )
     };
 

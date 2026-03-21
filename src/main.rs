@@ -521,9 +521,9 @@ async fn main() -> Result<()> {
     // Create audit store (schema already created by migrations)
     let audit_store = Arc::new(PostgresAuditStore::new(pg_pool.clone()));
 
-    // Create stores container — PostgresPredictionStore for persistence
-    let prediction_history_store: Option<std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>> =
-        Some(claim_store.clone() as std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>);
+    // PredictionHistoryStore — only used by scheduler, not by MCP handlers
+    let prediction_history_store: std::sync::Arc<dyn cogkos_store::PredictionHistoryStore> =
+        claim_store.clone() as std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>;
 
     let stores = Stores::new(
         claim_store,
@@ -537,7 +537,6 @@ async fn main() -> Result<()> {
         audit_store,
         subscription_store,
         memory_layer_store,
-        prediction_history_store,
     );
 
     let stores_arc = Arc::new(stores.clone());
@@ -545,7 +544,8 @@ async fn main() -> Result<()> {
     // Start sleep-time scheduler
     info!("Starting sleep-time scheduler...");
     let scheduler =
-        cogkos_sleep::Scheduler::new(stores_arc.clone(), cogkos_sleep::SchedulerConfig::default());
+        cogkos_sleep::Scheduler::new(stores_arc.clone(), cogkos_sleep::SchedulerConfig::default())
+            .with_prediction_history(prediction_history_store);
     let scheduler_handle = scheduler.cancellation_token();
     tokio::spawn(async move {
         scheduler.start().await;

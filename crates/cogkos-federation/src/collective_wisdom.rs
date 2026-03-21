@@ -1,10 +1,23 @@
-//! Collective Wisdom Health Check Module
+//! Collective Wisdom Health Check Module (Node-level)
 //!
-//! Implements quantitative health checks for the four conditions of collective wisdom:
-//! 1. Diversity - measured by Shannon entropy
-//! 2. Independence - measured by provenance/correlation
-//! 3. Decentralization - measured by Gini coefficient
-//! 4. Aggregation effectiveness - measured by consensus quality
+//! Evaluates the four conditions of collective wisdom at the **federated node level**:
+//! each `NodeResponse` represents a node's reply in a federated query, carrying
+//! content, expertise, response time, domain coverage, and provenance metadata.
+//!
+//! This module uses content-based correlation (Jaccard similarity) for independence,
+//! multi-dimensional Gini coefficients for decentralization, configurable thresholds
+//! via `HealthCheckConfig`, and consensus-based aggregation effectiveness scoring.
+//!
+//! For **insight/claim-level** health checks, see [`health`]. That module operates on
+//! `InsightSource` objects with simpler provenance grouping and influence-weighted
+//! aggregation, suitable for evaluating stored knowledge quality rather than query
+//! response quality.
+//!
+//! Metrics:
+//! 1. Diversity - Shannon entropy of response content distribution
+//! 2. Independence - pairwise content correlation (lower = more independent)
+//! 3. Decentralization - Gini coefficient of expertise distribution
+//! 4. Aggregation effectiveness - consensus strength and agreement quality
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

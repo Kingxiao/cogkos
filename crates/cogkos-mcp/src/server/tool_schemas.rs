@@ -64,7 +64,10 @@ pub fn build_tools() -> Vec<Tool> {
         "confidence".to_string(),
         serde_json::json!({"type": "number"}),
     );
-    input_schema.insert("source".to_string(), serde_json::json!({"type": "object"}));
+    input_schema.insert("source".to_string(), serde_json::json!({
+        "type": "object",
+        "description": "Source info. For human: {\"type\": \"human\", \"user_id\": \"...\", \"role\": \"user\"} (role defaults to \"user\")"
+    }));
     input_schema.insert("tags".to_string(), serde_json::json!({"type": "array"}));
     input_schema.insert(
         "memory_layer".to_string(),
@@ -156,7 +159,10 @@ pub fn build_tools() -> Vec<Tool> {
         "content_base64".to_string(),
         serde_json::json!({"type": "string"}),
     );
-    input_schema.insert("source".to_string(), serde_json::json!({"type": "object"}));
+    input_schema.insert("source".to_string(), serde_json::json!({
+        "type": "object",
+        "description": "Source info. For human: {\"type\": \"human\", \"user_id\": \"...\", \"role\": \"user\"} (role defaults to \"user\")"
+    }));
     input_schema.insert("tags".to_string(), serde_json::json!({"type": "array"}));
     input_schema.insert(
         "auto_process".to_string(),

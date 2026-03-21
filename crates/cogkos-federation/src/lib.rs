@@ -5,9 +5,13 @@
 //! Cross-instance modules (routing, cross_instance, protocol, node) remain frozen for V2/V3.
 
 pub mod aggregation;
+/// Node-level four-conditions checker: operates on `NodeResponse` (federated query replies).
+/// Uses content-based correlation, multi-dimensional Gini, and configurable thresholds.
 pub mod collective_wisdom;
 pub mod error;
 pub mod federation_impl;
+/// Insight/claim-level four-conditions checker: operates on `InsightSource` (knowledge assertions).
+/// Uses provenance grouping, influence-weighted aggregation, and fixed health status tiers.
 pub mod health;
 pub mod node;
 pub mod routing;

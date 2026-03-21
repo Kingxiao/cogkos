@@ -339,6 +339,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         confidence: Some(0.85),
         source: SourceInfo::Human {
             user_id: "test_user".to_string(),
+            role: "user".to_string(),
         },
         valid_from: None,
         valid_to: None,
@@ -389,6 +390,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         confidence: Some(0.9),
         source: SourceInfo::Human {
             user_id: "test_user".to_string(),
+            role: "user".to_string(),
         },
         valid_from: None,
         valid_to: None,
@@ -536,6 +538,7 @@ async fn test_submit_and_query_with_conflicts() {
         confidence: Some(0.8),
         source: SourceInfo::Human {
             user_id: "user1".to_string(),
+            role: "user".to_string(),
         },
         valid_from: None,
         valid_to: None,
@@ -565,6 +568,7 @@ async fn test_submit_and_query_with_conflicts() {
         confidence: Some(0.85),
         source: SourceInfo::Human {
             user_id: "user2".to_string(),
+            role: "user".to_string(),
         },
         valid_from: None,
         valid_to: None,

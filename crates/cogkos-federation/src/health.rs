@@ -1,6 +1,17 @@
-//! Collective Intelligence Health Check - Four Conditions
+//! Collective Intelligence Health Check - Four Conditions (Insight-level)
 //!
-//! Implements quantitative checks for federated insight quality:
+//! Evaluates the four conditions of collective wisdom at the **insight/claim level**:
+//! each `InsightSource` represents a knowledge assertion from a federated source,
+//! with provenance, influence weight, and confidence.
+//!
+//! Use this module when you have a set of knowledge claims (insights) and want to
+//! assess whether they satisfy Surowiecki's four conditions for collective intelligence.
+//!
+//! For **node-level** (federated-node response) health checks, see [`collective_wisdom`].
+//! That module operates on `NodeResponse` objects with content-based correlation,
+//! expertise weighting, and configurable thresholds.
+//!
+//! Metrics:
 //! 1. Diversity - Shannon entropy of insight source distribution
 //! 2. Independence - Provenance-based source independence
 //! 3. Decentralization - Gini coefficient of insight influence

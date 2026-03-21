@@ -20,6 +20,8 @@ pub struct Scheduler {
     pub(crate) state: Arc<RwLock<SchedulerState>>,
     pub(crate) evolution: Arc<RwLock<EvolutionEngine>>,
     pub(crate) cancel: tokio_util::sync::CancellationToken,
+    /// Prediction history store — only used by scheduler tasks, not by MCP handlers.
+    pub(crate) prediction_history: Option<Arc<dyn cogkos_store::PredictionHistoryStore>>,
 }
 
 impl Scheduler {
@@ -32,7 +34,17 @@ impl Scheduler {
                 EvolutionEngine::new(EvolutionConfig::default()),
             )),
             cancel: tokio_util::sync::CancellationToken::new(),
+            prediction_history: None,
         }
+    }
+
+    /// Set the prediction history store for recording prediction errors.
+    pub fn with_prediction_history(
+        mut self,
+        store: Arc<dyn cogkos_store::PredictionHistoryStore>,
+    ) -> Self {
+        self.prediction_history = Some(store);
+        self
     }
 
     /// Check if we have enough budget to process claims for a specific task type
@@ -127,6 +139,7 @@ impl Scheduler {
             state: self.state.clone(),
             evolution: self.evolution.clone(),
             cancel: self.cancel.clone(),
+            prediction_history: self.prediction_history.clone(),
         }
     }
 
