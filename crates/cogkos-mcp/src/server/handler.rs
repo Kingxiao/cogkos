@@ -206,10 +206,15 @@ impl ServerHandler for CogkosMcpHandler {
                                 )
                             })?;
 
+                    let agent_id = req
+                        .agent_id
+                        .clone()
+                        .unwrap_or_else(|| format!("{}/anonymous", auth_context.tenant_id));
+
                     let result = handle_submit_feedback(
                         req,
                         &auth_context.tenant_id,
-                        &auth_context.api_key_hash,
+                        &agent_id,
                         self.state.stores.feedback.as_ref(),
                         self.state.stores.cache.as_ref(),
                         self.state.stores.claims.as_ref(),

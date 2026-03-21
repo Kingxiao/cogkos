@@ -429,6 +429,7 @@ mod feedback_cache_tests {
             success: true,
             note: Some("Query results were helpful".to_string()),
             improvement_suggestion: None,
+            agent_id: None,
         };
 
         let tenant_id = "test-tenant";
@@ -482,6 +483,7 @@ mod feedback_cache_tests {
             success: false,
             note: Some("Results were not accurate".to_string()),
             improvement_suggestion: Some("Improve source quality".to_string()),
+            agent_id: None,
         };
 
         let tenant_id = "test-tenant";
@@ -517,6 +519,7 @@ mod feedback_cache_tests {
             success: true,
             note: Some("First feedback".to_string()),
             improvement_suggestion: None,
+            agent_id: None,
         };
 
         let tenant_id = "test-tenant";
@@ -606,6 +609,7 @@ mod feedback_cache_tests {
             success: false,
             note: Some("Wrong answer".to_string()),
             improvement_suggestion: None,
+            agent_id: None,
         };
 
         let result = handle_submit_feedback(
@@ -662,6 +666,7 @@ mod feedback_cache_tests {
             success: true,
             note: Some("Results were excellent!".to_string()),
             improvement_suggestion: None,
+            agent_id: None,
         };
 
         let tenant_id = "test-tenant";

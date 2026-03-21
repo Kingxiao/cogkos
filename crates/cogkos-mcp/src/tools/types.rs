@@ -134,6 +134,10 @@ pub struct SubmitFeedbackRequest {
     pub note: Option<String>,
     #[serde(default)]
     pub improvement_suggestion: Option<String>,
+    /// Agent identity for feedback attribution.
+    /// Falls back to `{tenant_id}/anonymous` when absent.
+    #[serde(default)]
+    pub agent_id: Option<String>,
 }
 
 /// Report gap request

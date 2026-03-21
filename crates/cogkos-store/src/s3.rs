@@ -288,14 +288,21 @@ impl S3StoreWithFallback {
         }
     }
 
-    /// Create from environment variables
+    /// Create from environment variables.
+    ///
+    /// Priority: `S3_*` env vars (project-specific) > `AWS_*` (standard SDK fallback).
     pub async fn from_env(bucket: &str) -> Result<Self> {
-        let region = std::env::var("AWS_REGION")
+        let region = std::env::var("S3_REGION")
+            .or_else(|_| std::env::var("AWS_REGION"))
             .or_else(|_| std::env::var("AWS_DEFAULT_REGION"))
             .unwrap_or_else(|_| "us-east-1".to_string());
 
-        let access_key = std::env::var("AWS_ACCESS_KEY_ID").unwrap_or_default();
-        let secret_key = std::env::var("AWS_SECRET_ACCESS_KEY").unwrap_or_default();
+        let access_key = std::env::var("S3_ACCESS_KEY")
+            .or_else(|_| std::env::var("AWS_ACCESS_KEY_ID"))
+            .unwrap_or_default();
+        let secret_key = std::env::var("S3_SECRET_KEY")
+            .or_else(|_| std::env::var("AWS_SECRET_ACCESS_KEY"))
+            .unwrap_or_default();
         let endpoint = std::env::var("S3_ENDPOINT").ok();
 
         Self::new(

@@ -97,6 +97,10 @@ pub fn build_tools() -> Vec<Tool> {
     );
     input_schema.insert("note".to_string(), serde_json::json!({"type": "string"}));
     input_schema.insert(
+        "agent_id".to_string(),
+        serde_json::json!({"type": "string", "description": "Agent identity for feedback attribution. Defaults to {tenant_id}/anonymous."}),
+    );
+    input_schema.insert(
         "required".to_string(),
         serde_json::json!(["query_hash", "success"]),
     );
