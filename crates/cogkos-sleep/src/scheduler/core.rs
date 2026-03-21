@@ -17,7 +17,9 @@ use super::tasks::{
     run_confidence_boost, run_consolidation, run_decay, run_health_check, run_insight_extraction,
     run_memory_gc, run_memory_promotion, run_pending_aggregation, run_prediction_validation,
 };
-use super::tasks_phase3::{run_framework_health_monitoring, run_paradigm_shift_check};
+use super::tasks_phase3::{
+    run_collective_wisdom_check, run_framework_health_monitoring, run_paradigm_shift_check,
+};
 use super::{SchedulerConfig, SchedulerState, TaskType};
 
 /// Main scheduler
@@ -720,6 +722,62 @@ impl Scheduler {
 
                     if start_time.elapsed().as_millis() > s_fh.config.max_task_duration_ms as u128 {
                         warn!("Framework health monitoring task exceeded time budget");
+                    }
+                }
+            }
+        });
+
+        // Collective wisdom check: every 6 hours
+        let s_cw = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(
+                s_cw.config.collective_wisdom_check_interval_secs,
+            ));
+            let mut consecutive_failures: u32 = 0;
+            const MAX_FAILURES: u32 = 5;
+            const BACKOFF_MULTIPLIER: u64 = 2;
+            loop {
+                tokio::select! {
+                    _ = s_cw.cancel.cancelled() => { info!("Collective wisdom check task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+
+                // Circuit breaker: back off on consecutive failures
+                if consecutive_failures >= MAX_FAILURES {
+                    let backoff = Duration::from_secs(
+                        s_cw.config.collective_wisdom_check_interval_secs
+                            * BACKOFF_MULTIPLIER.pow(consecutive_failures.min(5)),
+                    );
+                    let backoff = backoff.min(Duration::from_secs(3600));
+                    warn!(
+                        task = "collective_wisdom_check",
+                        failures = consecutive_failures,
+                        "Circuit breaker: backing off"
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+
+                if s_cw.check_budget(TaskType::CollectiveWisdomCheck, 10).await {
+                    let start_time = std::time::Instant::now();
+
+                    match run_collective_wisdom_check(&s_cw.stores, &s_cw.config).await {
+                        Ok(count) => {
+                            consecutive_failures = 0;
+                            s_cw.record_processed(TaskType::CollectiveWisdomCheck, count as u64)
+                                .await;
+                            let mut state = s_cw.state.write().await;
+                            state.last_collective_wisdom_check = Some(chrono::Utc::now());
+                        }
+                        Err(e) => {
+                            consecutive_failures += 1;
+                            error!(task = "collective_wisdom_check", error = %e, failures = consecutive_failures, "Task failed");
+                            let mut state = s_cw.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+
+                    if start_time.elapsed().as_millis() > s_cw.config.max_task_duration_ms as u128 {
+                        warn!("Collective wisdom check task exceeded time budget");
                     }
                 }
             }

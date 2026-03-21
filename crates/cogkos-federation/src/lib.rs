@@ -1,10 +1,11 @@
 //! # CogKOS Federation Layer
 //!
-//! **STATUS: FROZEN** — This module is not active in V1.
-//! Federation features are deferred to V2/V3.
-//! Code is preserved for future use but not initialized at runtime.
+//! Partially active. Single-instance modules (collective wisdom, aggregation, health)
+//! are used for multi-agent knowledge quality monitoring.
+//! Cross-instance modules (routing, cross_instance, protocol, node) remain frozen for V2/V3.
 
 pub mod aggregation;
+pub mod collective_wisdom;
 pub mod error;
 pub mod federation_impl;
 pub mod health;
@@ -14,6 +15,10 @@ pub mod routing;
 pub use aggregation::{
     AggregatedResponse, AggregationConfig, AggregationMethod, FederatedResult, NodeResult,
     ResultAggregator, SmartAggregator, WeightedAggregator,
+};
+pub use collective_wisdom::{
+    CollectiveWisdomHealth, CollectiveWisdomHealthChecker, CollectiveWisdomMetrics,
+    HealthCheckConfig, NodeResponse,
 };
 pub use error::{FederationError, Result};
 pub use federation_impl::{

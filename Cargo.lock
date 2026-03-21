@@ -1410,6 +1410,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cogkos-core",
+ "cogkos-federation",
  "cogkos-llm",
  "cogkos-store",
  "dashmap",

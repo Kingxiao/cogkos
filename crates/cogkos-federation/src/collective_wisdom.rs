@@ -135,8 +135,7 @@ impl CollectiveWisdomHealthChecker {
         let entropy_by_category = self.calculate_entropy_by_category(node_responses);
 
         // 2. Calculate independence (provenance)
-        let (independence_score, provenance_scores) =
-            self.calculate_independence(node_responses);
+        let (independence_score, provenance_scores) = self.calculate_independence(node_responses);
 
         // 3. Calculate decentralization (Gini coefficient)
         let decentralization_score = self.calculate_decentralization(node_responses);
@@ -188,11 +187,7 @@ impl CollectiveWisdomHealthChecker {
             .values()
             .map(|&count| {
                 let p = count as f64 / total;
-                if p > 0.0 {
-                    -p * p.log2()
-                } else {
-                    0.0
-                }
+                if p > 0.0 { -p * p.log2() } else { 0.0 }
             })
             .sum();
 
@@ -236,11 +231,7 @@ impl CollectiveWisdomHealthChecker {
         let mut counts = HashMap::new();
         for response in responses {
             // Use content hash or category as key
-            let key = response
-                .content
-                .chars()
-                .take(50)
-                .collect::<String>();
+            let key = response.content.chars().take(50).collect::<String>();
             *counts.entry(key).or_insert(0.0) += 1.0;
         }
         counts
@@ -281,8 +272,11 @@ impl CollectiveWisdomHealthChecker {
             });
         }
 
-        let avg_independence: f64 =
-            provenance_scores.iter().map(|p| p.independence).sum::<f64>() / n as f64;
+        let avg_independence: f64 = provenance_scores
+            .iter()
+            .map(|p| p.independence)
+            .sum::<f64>()
+            / n as f64;
 
         (avg_independence, provenance_scores)
     }
@@ -308,19 +302,15 @@ impl CollectiveWisdomHealthChecker {
     /// Calculate correlation between two responses
     fn correlate_responses(&self, a: &NodeResponse, b: &NodeResponse) -> f64 {
         // Simple content-based correlation using common tokens
-        let tokens_a: std::collections::HashSet<_> =
-            a.content.split_whitespace().collect();
-        let tokens_b: std::collections::HashSet<_> =
-            b.content.split_whitespace().collect();
+        let tokens_a: std::collections::HashSet<_> = a.content.split_whitespace().collect();
+        let tokens_b: std::collections::HashSet<_> = b.content.split_whitespace().collect();
 
         if tokens_a.is_empty() || tokens_b.is_empty() {
             return 0.0;
         }
 
-        let intersection: std::collections::HashSet<_> =
-            tokens_a.intersection(&tokens_b).collect();
-        let union: std::collections::HashSet<_> =
-            tokens_a.union(&tokens_b).collect();
+        let intersection: std::collections::HashSet<_> = tokens_a.intersection(&tokens_b).collect();
+        let union: std::collections::HashSet<_> = tokens_a.union(&tokens_b).collect();
 
         if union.is_empty() {
             0.0
@@ -384,10 +374,7 @@ impl CollectiveWisdomHealthChecker {
         gini_by_dim.insert("response_time".to_string(), self.calculate_gini(&times));
 
         // Domain coverage dimension
-        let domains: Vec<f64> = responses
-            .iter()
-            .map(|r| r.domain_coverage as f64)
-            .collect();
+        let domains: Vec<f64> = responses.iter().map(|r| r.domain_coverage as f64).collect();
         gini_by_dim.insert("domain_coverage".to_string(), self.calculate_gini(&domains));
 
         gini_by_dim
@@ -431,8 +418,8 @@ impl CollectiveWisdomHealthChecker {
         };
 
         // Calculate effectiveness score
-        let effectiveness = (consensus_strength + confidence + coverage_ratio + agreement_score)
-            / 4.0;
+        let effectiveness =
+            (consensus_strength + confidence + coverage_ratio + agreement_score) / 4.0;
 
         (
             effectiveness.clamp(0.0, 1.0),
@@ -457,18 +444,13 @@ impl CollectiveWisdomHealthChecker {
 
         for i in 0..responses.len() {
             for j in (i + 1)..responses.len() {
-                let diff = 1.0
-                    - self.correlate_responses(&responses[i], &responses[j]);
+                let diff = 1.0 - self.correlate_responses(&responses[i], &responses[j]);
                 total_diff += diff;
                 count += 1.0;
             }
         }
 
-        if count > 0.0 {
-            total_diff / count
-        } else {
-            0.0
-        }
+        if count > 0.0 { total_diff / count } else { 0.0 }
     }
 
     /// Calculate agreement score between responses
@@ -478,11 +460,8 @@ impl CollectiveWisdomHealthChecker {
         }
 
         let correlations = self.calculate_pairwise_correlations(responses);
-        let avg_correlation: f64 = correlations
-            .iter()
-            .map(|(_, _, corr)| corr)
-            .sum::<f64>()
-            / correlations.len() as f64;
+        let avg_correlation: f64 =
+            correlations.iter().map(|(_, _, corr)| corr).sum::<f64>() / correlations.len() as f64;
 
         avg_correlation.clamp(0.0, 1.0)
     }
@@ -500,7 +479,7 @@ impl CollectiveWisdomHealthChecker {
             + independence * w.independence
             + decentralization * w.decentralization
             + aggregation_effectiveness * w.aggregation_effectiveness)
-        .clamp(0.0, 1.0)
+            .clamp(0.0, 1.0)
     }
 
     /// Check if health meets minimum thresholds

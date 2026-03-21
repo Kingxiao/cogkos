@@ -29,6 +29,10 @@ fn task_type_names() {
         TaskType::FrameworkHealthMonitoring.name(),
         "framework_health_monitoring"
     );
+    assert_eq!(
+        TaskType::CollectiveWisdomCheck.name(),
+        "collective_wisdom_check"
+    );
 }
 
 #[test]
@@ -45,6 +49,7 @@ fn scheduler_config_defaults() {
     assert_eq!(cfg.prediction_validation_batch_size, 50);
     assert_eq!(cfg.paradigm_shift_check_interval_secs, 12 * 3600);
     assert_eq!(cfg.framework_health_interval_secs, 2 * 3600);
+    assert_eq!(cfg.collective_wisdom_check_interval_secs, 6 * 3600);
     assert_eq!(cfg.conflict_batch_size, 100);
     assert!(cfg.enable_periodic);
     assert_eq!(cfg.max_claims_per_hour, 10000);
@@ -52,11 +57,11 @@ fn scheduler_config_defaults() {
 }
 
 #[test]
-fn scheduler_config_budget_percentages_sum_to_90() {
-    // Budget percentages intentionally sum to 90 (leaving 10% unallocated headroom)
+fn scheduler_config_budget_percentages_sum_to_95() {
+    // Budget percentages intentionally sum to 95 (leaving 5% unallocated headroom)
     let cfg = SchedulerConfig::default();
     let total: u8 = cfg.task_budget_percentages.values().sum();
-    assert_eq!(total, 90, "Budget percentages should sum to 90");
+    assert_eq!(total, 95, "Budget percentages should sum to 95");
 }
 
 #[test]
@@ -71,6 +76,7 @@ fn scheduler_state_defaults() {
     assert!(state.last_prediction_validation.is_none());
     assert!(state.last_paradigm_shift_check.is_none());
     assert!(state.last_framework_health.is_none());
+    assert!(state.last_collective_wisdom_check.is_none());
     assert_eq!(state.tasks_processed, 0);
     assert_eq!(state.total_claims_processed, 0);
     assert_eq!(state.errors, 0);
@@ -270,8 +276,8 @@ async fn scheduler_framework_health_budget() {
 #[test]
 fn scheduler_config_budget_all_tasks_registered() {
     let cfg = SchedulerConfig::default();
-    // Verify all 13 task types have budget entries
-    assert_eq!(cfg.task_budget_percentages.len(), 13);
+    // Verify all 14 task types have budget entries
+    assert_eq!(cfg.task_budget_percentages.len(), 14);
     for task_type in [
         TaskType::ConsolidationEventDriven,
         TaskType::Consolidation,
@@ -286,6 +292,7 @@ fn scheduler_config_budget_all_tasks_registered() {
         TaskType::PredictionValidation,
         TaskType::ParadigmShiftCheck,
         TaskType::FrameworkHealthMonitoring,
+        TaskType::CollectiveWisdomCheck,
     ] {
         assert!(
             cfg.task_budget_percentages.contains_key(task_type.name()),
@@ -293,6 +300,26 @@ fn scheduler_config_budget_all_tasks_registered() {
             task_type.name()
         );
     }
+}
+
+#[tokio::test]
+async fn scheduler_collective_wisdom_check_budget() {
+    let stores = test_stores();
+    let mut cfg = SchedulerConfig::default();
+    cfg.max_claims_per_hour = 1000;
+    // CollectiveWisdomCheck gets 5% = 50
+    let scheduler = Scheduler::new(stores, cfg);
+
+    assert!(
+        scheduler
+            .check_budget(TaskType::CollectiveWisdomCheck, 50)
+            .await
+    );
+    assert!(
+        !scheduler
+            .check_budget(TaskType::CollectiveWisdomCheck, 51)
+            .await
+    );
 }
 
 #[tokio::test]
@@ -305,4 +332,149 @@ async fn scheduler_cancellation_token() {
     assert!(!token.is_cancelled());
     scheduler.stop().await;
     assert!(token.is_cancelled());
+}
+
+// -- Collective wisdom four-conditions unit tests --
+// These test the federation health module directly, validating that
+// multi-agent scenarios produce correct diversity/independence/decentralization scores.
+
+mod collective_wisdom_tests {
+    use cogkos_federation::health::{
+        HealthStatus, InsightSource, Prediction, ProvenanceInfo, calculate_collective_health,
+    };
+
+    fn make_source(agent_id: &str, influence: f64, confidence: f64) -> InsightSource {
+        InsightSource {
+            source_id: agent_id.to_string(),
+            provenance: ProvenanceInfo {
+                source_id: agent_id.to_string(),
+                source_type: "agent".to_string(),
+                upstream_sources: vec![],
+            },
+            influence,
+            confidence,
+            predictions: vec![Prediction {
+                content: format!("prediction from {}", agent_id),
+                confidence,
+            }],
+        }
+    }
+
+    #[test]
+    fn diverse_agents_high_diversity() {
+        // 3 different agents with equal distribution → high diversity
+        let sources = vec![
+            make_source("agent-alpha", 0.33, 0.8),
+            make_source("agent-beta", 0.33, 0.7),
+            make_source("agent-gamma", 0.34, 0.9),
+        ];
+
+        let health = calculate_collective_health(&sources);
+
+        assert!(
+            health.diversity_score > 0.9,
+            "3 distinct agents should yield high diversity, got {}",
+            health.diversity_score
+        );
+        assert_eq!(health.conditions.diversity.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn single_agent_low_independence() {
+        // All claims from same agent → low independence
+        let sources = vec![
+            make_source("agent-alpha", 0.5, 0.8),
+            make_source("agent-alpha", 0.3, 0.7),
+            make_source("agent-alpha", 0.2, 0.9),
+        ];
+
+        let health = calculate_collective_health(&sources);
+
+        assert_eq!(
+            health.conditions.diversity.status,
+            HealthStatus::Unhealthy,
+            "Single source should be unhealthy diversity"
+        );
+        assert_eq!(
+            health.conditions.independence.status,
+            HealthStatus::Unhealthy,
+            "Same provenance should be unhealthy independence"
+        );
+    }
+
+    #[test]
+    fn dominant_agent_centralization_risk() {
+        // One agent has 90% of influence → centralization risk
+        let sources = vec![
+            make_source("agent-alpha", 0.90, 0.8),
+            make_source("agent-beta", 0.03, 0.7),
+            make_source("agent-gamma", 0.03, 0.9),
+            make_source("agent-delta", 0.04, 0.6),
+        ];
+
+        let health = calculate_collective_health(&sources);
+
+        assert!(
+            health.conditions.decentralization.gini_coefficient > 0.5,
+            "Dominant agent should cause high Gini, got {}",
+            health.conditions.decentralization.gini_coefficient
+        );
+        assert_eq!(
+            health.conditions.decentralization.status,
+            HealthStatus::Unhealthy,
+            "Dominant agent should be unhealthy decentralization"
+        );
+    }
+
+    #[test]
+    fn balanced_agents_healthy_overall() {
+        // 4 agents with equal influence → all conditions healthy
+        let sources = vec![
+            make_source("agent-alpha", 0.25, 0.8),
+            make_source("agent-beta", 0.25, 0.7),
+            make_source("agent-gamma", 0.25, 0.9),
+            make_source("agent-delta", 0.25, 0.6),
+        ];
+
+        let health = calculate_collective_health(&sources);
+
+        assert!(
+            health.overall_health > 0.7,
+            "Balanced agents should yield high overall health, got {}",
+            health.overall_health
+        );
+        assert_eq!(health.conditions.diversity.status, HealthStatus::Healthy);
+        assert_eq!(
+            health.conditions.decentralization.status,
+            HealthStatus::Healthy
+        );
+    }
+
+    #[test]
+    fn extract_agent_id_formats() {
+        use crate::scheduler::tasks_phase3::extract_agent_id;
+        use cogkos_core::models::Claimant;
+
+        assert_eq!(
+            extract_agent_id(&Claimant::Agent {
+                agent_id: "claude-dev".to_string(),
+                model: "claude-sonnet".to_string(),
+            }),
+            "claude-dev"
+        );
+        assert_eq!(
+            extract_agent_id(&Claimant::Human {
+                user_id: "alice".to_string(),
+                role: "admin".to_string(),
+            }),
+            "human:alice"
+        );
+        assert_eq!(extract_agent_id(&Claimant::System), "system");
+        assert_eq!(
+            extract_agent_id(&Claimant::ExternalPublic {
+                source_name: "rss-feed".to_string(),
+            }),
+            "external:rss-feed"
+        );
+    }
 }

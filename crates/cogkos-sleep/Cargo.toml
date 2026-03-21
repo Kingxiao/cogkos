@@ -9,6 +9,7 @@ description = "CogKOS Sleep-Time Compute - Scheduler, Consolidation, Decay, and 
 
 [dependencies]
 cogkos-core = { path = "../cogkos-core" }
+cogkos-federation = { path = "../cogkos-federation" }
 cogkos-store = { path = "../cogkos-store" }
 cogkos-llm = { path = "../cogkos-llm" }
 tokio = { workspace = true }

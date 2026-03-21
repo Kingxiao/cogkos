@@ -47,6 +47,8 @@ pub enum TaskType {
     ParadigmShiftCheck,
     /// Periodic framework health monitoring
     FrameworkHealthMonitoring,
+    /// Collective wisdom four-conditions check (multi-agent quality)
+    CollectiveWisdomCheck,
 }
 
 impl TaskType {
@@ -65,6 +67,7 @@ impl TaskType {
             TaskType::PredictionValidation => "prediction_validation",
             TaskType::ParadigmShiftCheck => "paradigm_shift_check",
             TaskType::FrameworkHealthMonitoring => "framework_health_monitoring",
+            TaskType::CollectiveWisdomCheck => "collective_wisdom_check",
         }
     }
 }
@@ -106,6 +109,8 @@ pub struct SchedulerConfig {
     pub paradigm_shift_check_interval_secs: u64,
     /// Framework health monitoring interval in seconds
     pub framework_health_interval_secs: u64,
+    /// Collective wisdom check interval in seconds
+    pub collective_wisdom_check_interval_secs: u64,
     /// Min rehearsal count to promote working → episodic
     pub working_to_episodic_rehearsal: u64,
     /// Min rehearsal count to promote episodic → semantic
@@ -124,7 +129,7 @@ pub struct SchedulerConfig {
 impl Default for SchedulerConfig {
     fn default() -> Self {
         let mut task_budget_percentages = HashMap::new();
-        // Default budget allocation (total = 90%, leaving 10% headroom):
+        // Default budget allocation (total = 95%, leaving 5% headroom):
         // - Consolidation Event-Driven: 15% (triggered by novel knowledge)
         // - Consolidation: 10% (periodic)
         // - Decay: 10%
@@ -138,6 +143,7 @@ impl Default for SchedulerConfig {
         // - Prediction Validation: 5% (feedback→claim error writeback)
         // - Paradigm Shift Check: 5% (anomaly detection for paradigm shifts)
         // - Framework Health Monitoring: 5% (knowledge system health snapshot)
+        // - Collective Wisdom Check: 5% (multi-agent four-conditions quality)
         task_budget_percentages.insert(TaskType::ConsolidationEventDriven.name().to_string(), 15);
         task_budget_percentages.insert(TaskType::Consolidation.name().to_string(), 10);
         task_budget_percentages.insert(TaskType::Decay.name().to_string(), 10);
@@ -151,6 +157,7 @@ impl Default for SchedulerConfig {
         task_budget_percentages.insert(TaskType::PredictionValidation.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::ParadigmShiftCheck.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::FrameworkHealthMonitoring.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::CollectiveWisdomCheck.name().to_string(), 5);
 
         Self {
             consolidation_interval_secs: 6 * 3600,         // 6 hours
@@ -170,6 +177,7 @@ impl Default for SchedulerConfig {
             prediction_validation_batch_size: 50,
             paradigm_shift_check_interval_secs: 12 * 3600, // 12 hours
             framework_health_interval_secs: 2 * 3600,      // 2 hours
+            collective_wisdom_check_interval_secs: 6 * 3600, // 6 hours
             working_to_episodic_rehearsal: 3,              // 3 recalls to promote
             episodic_to_semantic_rehearsal: 5,             // 5 recalls to promote
             enable_periodic: true,
@@ -192,6 +200,7 @@ pub struct SchedulerState {
     pub last_prediction_validation: Option<chrono::DateTime<chrono::Utc>>,
     pub last_paradigm_shift_check: Option<chrono::DateTime<chrono::Utc>>,
     pub last_framework_health: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_collective_wisdom_check: Option<chrono::DateTime<chrono::Utc>>,
     pub tasks_processed: u64,
     pub total_claims_processed: u64,
     pub errors: u64,
@@ -213,6 +222,7 @@ impl Default for SchedulerState {
             last_prediction_validation: None,
             last_paradigm_shift_check: None,
             last_framework_health: None,
+            last_collective_wisdom_check: None,
             tasks_processed: 0,
             total_claims_processed: 0,
             errors: 0,

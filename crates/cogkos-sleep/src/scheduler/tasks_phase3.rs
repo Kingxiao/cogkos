@@ -252,3 +252,165 @@ pub(crate) async fn run_framework_health_monitoring(
     );
     Ok(tenants_checked)
 }
+
+/// Run collective wisdom four-conditions check for multi-agent knowledge quality
+///
+/// For each tenant, extracts distinct agent_ids from claim.claimant,
+/// builds InsightSource per agent, and runs the four-conditions health check:
+/// - Diversity: Shannon entropy of agent source distribution
+/// - Independence: provenance-based source independence
+/// - Decentralization: Gini coefficient of agent influence
+/// - Aggregation effectiveness: aggregated vs best single source
+///
+/// Logs structured metrics per tenant. Warns if any condition is unhealthy.
+pub(crate) async fn run_collective_wisdom_check(
+    stores: &Arc<Stores>,
+    _config: &SchedulerConfig,
+) -> Result<usize> {
+    use cogkos_federation::health::{
+        InsightSource, Prediction, ProvenanceInfo, calculate_collective_health,
+    };
+    use std::collections::HashMap;
+
+    let start = std::time::Instant::now();
+    info!("Running collective wisdom four-conditions check");
+
+    let tenants = match stores.claims.list_tenants().await {
+        Ok(t) if !t.is_empty() => t,
+        Ok(_) => vec!["default".to_string()],
+        Err(e) => {
+            warn!("Failed to list tenants for collective wisdom check: {}", e);
+            vec!["default".to_string()]
+        }
+    };
+
+    let mut tenants_checked = 0;
+
+    for tenant in &tenants {
+        // Fetch recent claims (FastTrack = actively used knowledge)
+        let claims = match stores
+            .claims
+            .list_claims_by_stage(
+                tenant,
+                cogkos_core::models::ConsolidationStage::FastTrack,
+                500,
+            )
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                debug!(tenant = %tenant, error = %e, "Failed to fetch claims for collective wisdom check");
+                continue;
+            }
+        };
+
+        if claims.len() < 2 {
+            debug!(tenant = %tenant, claims = claims.len(), "Too few claims for collective wisdom check");
+            continue;
+        }
+
+        // Group claims by agent_id (extracted from claimant field)
+        let mut agent_claims: HashMap<String, Vec<&cogkos_core::models::EpistemicClaim>> =
+            HashMap::new();
+        for claim in &claims {
+            let agent_id = extract_agent_id(&claim.claimant);
+            agent_claims.entry(agent_id).or_default().push(claim);
+        }
+
+        if agent_claims.len() < 2 {
+            debug!(
+                tenant = %tenant,
+                agents = agent_claims.len(),
+                "Single agent — collective wisdom check requires >= 2 agents"
+            );
+            continue;
+        }
+
+        // Build InsightSource per agent
+        let insight_sources: Vec<InsightSource> = agent_claims
+            .iter()
+            .map(|(agent_id, agent_specific_claims)| {
+                let avg_confidence = agent_specific_claims
+                    .iter()
+                    .map(|c| c.confidence)
+                    .sum::<f64>()
+                    / agent_specific_claims.len() as f64;
+
+                let influence = agent_specific_claims.len() as f64 / claims.len() as f64;
+
+                InsightSource {
+                    source_id: agent_id.clone(),
+                    provenance: ProvenanceInfo {
+                        source_id: agent_id.clone(),
+                        source_type: "agent".to_string(),
+                        upstream_sources: vec![],
+                    },
+                    influence,
+                    confidence: avg_confidence,
+                    predictions: agent_specific_claims
+                        .iter()
+                        .take(5)
+                        .map(|c| Prediction {
+                            content: c.content.chars().take(100).collect(),
+                            confidence: c.confidence,
+                        })
+                        .collect(),
+                }
+            })
+            .collect();
+
+        let health = calculate_collective_health(&insight_sources);
+
+        // Log results
+        if !health.warnings.is_empty() {
+            warn!(
+                tenant = %tenant,
+                agent_count = agent_claims.len(),
+                claim_count = claims.len(),
+                overall_health = format!("{:.3}", health.overall_health),
+                diversity = format!("{:.3}", health.diversity_score),
+                independence = format!("{:.3}", health.independence_score),
+                decentralization = format!("{:.3}", health.decentralization_score),
+                aggregation = format!("{:.3}", health.aggregation_effectiveness),
+                warnings = ?health.warnings,
+                "Collective wisdom: conditions not fully met"
+            );
+        } else {
+            info!(
+                tenant = %tenant,
+                agent_count = agent_claims.len(),
+                claim_count = claims.len(),
+                overall_health = format!("{:.3}", health.overall_health),
+                diversity = format!("{:.3}", health.diversity_score),
+                independence = format!("{:.3}", health.independence_score),
+                decentralization = format!("{:.3}", health.decentralization_score),
+                aggregation = format!("{:.3}", health.aggregation_effectiveness),
+                "Collective wisdom: all four conditions healthy"
+            );
+        }
+
+        tenants_checked += 1;
+    }
+
+    cogkos_core::monitoring::METRICS
+        .record_duration("cogkos_scheduler_task_duration_seconds", start.elapsed());
+    info!(
+        tenants_checked = tenants_checked,
+        duration_ms = start.elapsed().as_millis() as u64,
+        "Collective wisdom check complete"
+    );
+    Ok(tenants_checked)
+}
+
+/// Extract agent_id from a Claimant enum.
+///
+/// Maps each variant to a unique identifier string used for collective wisdom grouping.
+pub(crate) fn extract_agent_id(claimant: &cogkos_core::models::Claimant) -> String {
+    use cogkos_core::models::Claimant;
+    match claimant {
+        Claimant::Agent { agent_id, .. } => agent_id.clone(),
+        Claimant::Human { user_id, .. } => format!("human:{}", user_id),
+        Claimant::System => "system".to_string(),
+        Claimant::ExternalPublic { source_name } => format!("external:{}", source_name),
+    }
+}
