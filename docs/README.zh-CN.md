@@ -114,9 +114,22 @@ crates/
 |------|------|
 | `DATABASE_URL` | PostgreSQL 连接字符串 |
 | `FALKORDB_URL` | FalkorDB（Redis 协议）连接 |
-| `API_302_KEY` 或 `OPENAI_API_KEY` | 语义搜索的 Embedding 提供商 |
+| `EMBEDDING_BASE_URL` | Embedding 端点（默认 `http://localhost:8090/v1`） |
+| `EMBEDDING_MODEL` | Embedding 模型（默认 `BAAI/bge-m3`） |
 | `DEFAULT_MCP_API_KEY` | 本地开发跳过 API Key 创建 |
 | `MCP_TRANSPORT` | `http` 启用 Streamable HTTP（默认 stdio） |
+
+### Embedding 模型
+
+CogKOS 支持任何 OpenAI 兼容的 embedding API，推荐方案：
+
+| 模型 | 维度 | 成本 | 启动方式 |
+|------|------|------|---------|
+| BGE-M3（本地） | 1024 | 免费 | `docker compose -f docker-compose.bge-m3.yml up -d` |
+| BGE-M3（DeepInfra） | 1024 | ~$0.01/1M tokens | 在 `.env` 设置 `EMBEDDING_API_KEY` 和 `EMBEDDING_BASE_URL` |
+| text-embedding-3-large | 3072 | ~$0.13/1M tokens | 在 `.env` 设置 `API_302_KEY` 或 `OPENAI_API_KEY` |
+
+默认使用本地 BGE-M3，无需 API key。首次启动需下载模型（约 2GB）。
 
 ## 开发
 

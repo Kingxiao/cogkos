@@ -38,6 +38,23 @@ services:
       timeout: 3s
       retries: 5
 
+  # Uncomment to enable local BGE-M3 embedding via TEI (free, no API key needed)
+  # tei:
+  #   image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+  #   container_name: cogkos-tei
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8090:80"
+  #   volumes:
+  #     - ./data/models:/data
+  #   command: --model-id BAAI/bge-m3 --port 80 --max-client-batch-size 32
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 120s
+
   cogkos:
     build:
       context: .
@@ -60,11 +77,13 @@ services:
       # Auth — set DEFAULT_MCP_API_KEY for dev mode (bypasses DB key validation)
       DEFAULT_MCP_API_KEY: ${DEFAULT_MCP_API_KEY:-}
       DEFAULT_MCP_TENANT: ${DEFAULT_MCP_TENANT:-default}
-      # Embedding — set API_302_KEY in .env or environment
+      # Embedding — defaults to local BGE-M3 via TEI
+      # If TEI runs in this compose: set EMBEDDING_BASE_URL=http://tei:80/v1
+      # If TEI runs on host: use http://host.docker.internal:8090/v1
       API_302_KEY: ${API_302_KEY:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.302.ai/v1}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-http://localhost:8090/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
       # LLM (optional)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

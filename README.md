@@ -114,9 +114,22 @@ Key environment variables (see `.env.example` for full list):
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `FALKORDB_URL` | FalkorDB (Redis-protocol) connection |
-| `API_302_KEY` or `OPENAI_API_KEY` | Embedding provider for semantic search |
+| `EMBEDDING_BASE_URL` | Embedding endpoint (default: `http://localhost:8090/v1`) |
+| `EMBEDDING_MODEL` | Embedding model (default: `BAAI/bge-m3`) |
 | `DEFAULT_MCP_API_KEY` | Skip API key creation for local dev |
 | `MCP_TRANSPORT` | `http` for Streamable HTTP (default: stdio) |
+
+### Embedding Model
+
+CogKOS supports any OpenAI-compatible embedding API. Recommended options:
+
+| Model | Dimensions | Cost | Setup |
+|-------|-----------|------|-------|
+| BGE-M3 (local) | 1024 | Free | `docker compose -f docker-compose.bge-m3.yml up -d` |
+| BGE-M3 (DeepInfra) | 1024 | ~$0.01/1M tokens | Set `EMBEDDING_API_KEY` and `EMBEDDING_BASE_URL` in `.env` |
+| text-embedding-3-large | 3072 | ~$0.13/1M tokens | Set `API_302_KEY` or `OPENAI_API_KEY` in `.env` |
+
+Local BGE-M3 is the default — no API key needed. First startup downloads the model (~2GB).
 
 ## Development
 

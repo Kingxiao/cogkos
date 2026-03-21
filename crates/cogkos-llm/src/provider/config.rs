@@ -56,6 +56,14 @@ impl LlmProviderConfig {
             base_url,
         }
     }
+
+    /// Check if this config points to a local inference server (no API key needed).
+    /// Matches localhost, 127.0.0.1, and [::1] URLs.
+    pub fn is_local(&self) -> bool {
+        self.base_url.as_deref().map_or(false, |url| {
+            url.contains("://localhost") || url.contains("://127.0.0.1") || url.contains("://[::1]")
+        })
+    }
 }
 
 /// Multi-type LLM configuration container
@@ -136,10 +144,13 @@ impl LlmConfig {
         }
     }
 
-    /// Check if the specified type is configured (has a valid API key)
+    /// Check if the specified type is configured.
+    /// A type is configured if it has an API key, or if it has a local base_url
+    /// (localhost/127.0.0.1) which typically means a local inference server like TEI
+    /// that doesn't require authentication.
     pub fn is_configured(&self, llm_type: &str) -> bool {
         self.get(llm_type)
-            .map(|c| !c.api_key.is_empty())
+            .map(|c| !c.api_key.is_empty() || c.is_local())
             .unwrap_or(false)
     }
 }

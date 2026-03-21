@@ -33,14 +33,16 @@ export MCP_TRANSPORT="http"
 export MCP_PORT="3000"
 export HEALTH_PORT="8081"
 export RUST_LOG="info"
-export EMBEDDING_BASE_URL="https://api.302.ai/v1"
-export EMBEDDING_MODEL="text-embedding-3-large"
+export EMBEDDING_BASE_URL="${EMBEDDING_BASE_URL:-http://localhost:8090/v1}"
+export EMBEDDING_MODEL="${EMBEDDING_MODEL:-BAAI/bge-m3}"
 
-# API key inherited from environment (~/.zshrc API_302_KEY)
-if [ -z "$API_302_KEY" ]; then
-    echo "  ⚠️  API_302_KEY not set, embedding will use fallback"
+# Check embedding availability
+if [ -n "$EMBEDDING_API_KEY" ] || [ -n "$API_302_KEY" ]; then
+    echo "  ✅ Embedding API key configured"
+elif curl -sf http://localhost:8090/health >/dev/null 2>&1; then
+    echo "  ✅ Local TEI (BGE-M3) running"
 else
-    echo "  ✅ API_302_KEY configured"
+    echo "  ⚠️  No embedding available (start TEI: docker compose -f docker-compose.bge-m3.yml up -d)"
 fi
 
 # 3. Build (if needed)

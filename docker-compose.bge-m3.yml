@@ -1,0 +1,35 @@
+# BGE-M3 local embedding server via HuggingFace Text Embeddings Inference (TEI)
+# Provides OpenAI-compatible /v1/embeddings endpoint — no API key needed.
+#
+# Usage:
+#   docker compose -f docker-compose.bge-m3.yml up -d
+#   # First startup downloads ~2GB model, takes a few minutes
+#
+# Then set in .env:
+#   EMBEDDING_MODEL=BAAI/bge-m3
+#   EMBEDDING_BASE_URL=http://localhost:8090/v1
+#
+# Health check:
+#   curl http://localhost:8090/health
+#
+# Test embedding:
+#   curl http://localhost:8090/v1/embeddings \
+#     -H "Content-Type: application/json" \
+#     -d '{"model":"BAAI/bge-m3","input":"hello world"}'
+
+services:
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    container_name: cogkos-bge-m3
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./data/models:/data
+    command: --model-id BAAI/bge-m3 --port 80 --max-client-batch-size 32
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s  # Model download + load takes time

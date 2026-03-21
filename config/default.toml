@@ -60,11 +60,14 @@ api_key = ""
 base_url = "https://api.moonshot.cn/v1"  # verified: 2026-03-21
 
 # Embedding LLM
+# Options: "text-embedding-3-large" (OpenAI/302.ai, 3072d) or "BAAI/bge-m3" (local TEI/DeepInfra, 1024d)
+# For local TEI: base_url = "http://localhost:8090/v1", no api_key needed
+# For DeepInfra: base_url = "https://api.deepinfra.com/v1/openai"
 [llm.embedding]
 provider = "openai"
-model = "text-embedding-3-large"  # verified: 2026-03-21
+model = "BAAI/bge-m3"  # verified: 2026-03-22
 api_key = ""
-base_url = "https://api.302.ai/v1"  # verified: 2026-03-21
+base_url = "http://localhost:8090/v1"  # verified: 2026-03-22
 
 # Image understanding LLM
 [llm.image]

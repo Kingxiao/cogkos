@@ -580,30 +580,43 @@ async fn main() -> Result<()> {
         None
     };
 
-    let embedding_client = if let Ok(api_key) = std::env::var("EMBEDDING_API_KEY")
-        .or_else(|_| std::env::var("API_302_KEY"))
-        .or_else(|_| std::env::var("OPENAI_API_KEY"))
-    {
-        let provider = match std::env::var("EMBEDDING_PROVIDER").as_deref() {
-            Ok("anthropic") => ProviderType::Anthropic,
-            _ => ProviderType::OpenAi,
-        };
-        let mut builder = LlmClientBuilder::new(api_key, provider);
-        // Smart default: if using OPENAI_API_KEY directly (not 302.ai proxy), use OpenAI endpoint
-        let base_url = std::env::var("EMBEDDING_BASE_URL").unwrap_or_else(|_| {
-            if std::env::var("EMBEDDING_API_KEY").is_ok() || std::env::var("API_302_KEY").is_ok() {
-                "https://api.302.ai/v1".to_string() // verified: 2026-03-21
-            } else {
-                "https://api.openai.com/v1".to_string() // verified: 2026-03-21
-            }
-        });
-        builder = builder.with_base_url(base_url);
+    let embedding_client = {
+        let api_key = std::env::var("EMBEDDING_API_KEY")
+            .or_else(|_| std::env::var("API_302_KEY"))
+            .or_else(|_| std::env::var("OPENAI_API_KEY"))
+            .ok()
+            .filter(|k| !k.is_empty());
+        let base_url = std::env::var("EMBEDDING_BASE_URL")
+            .ok()
+            .filter(|u| !u.is_empty())
+            .unwrap_or_else(|| "http://localhost:8090/v1".to_string()); // verified: 2026-03-22
         let model = std::env::var("EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "text-embedding-3-large".to_string()); // verified: 2026-03-21
-        builder = builder.with_model(model);
-        Some(builder.build()?)
-    } else {
-        None
+            .ok()
+            .filter(|m| !m.is_empty())
+            .unwrap_or_else(|| "BAAI/bge-m3".to_string()); // verified: 2026-03-22
+        let is_local = base_url.contains("://localhost")
+            || base_url.contains("://127.0.0.1")
+            || base_url.contains("://[::1]");
+
+        if let Some(key) = api_key {
+            // Has API key — use it for cloud embedding providers
+            let provider = match std::env::var("EMBEDDING_PROVIDER").as_deref() {
+                Ok("anthropic") => ProviderType::Anthropic,
+                _ => ProviderType::OpenAi,
+            };
+            let mut builder = LlmClientBuilder::new(key, provider)
+                .with_base_url(&base_url)
+                .with_model(&model);
+            Some(builder.build()?)
+        } else if is_local {
+            // No API key but local URL — TEI doesn't need auth
+            let mut builder = LlmClientBuilder::new("local", ProviderType::OpenAi)
+                .with_base_url(&base_url)
+                .with_model(&model);
+            Some(builder.build()?)
+        } else {
+            None
+        }
     };
 
     // Start MCP server

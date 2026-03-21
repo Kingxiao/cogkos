@@ -143,15 +143,23 @@ async fn main() {
     let config = McpConfig { host: "127.0.0.1".to_string(), port: 3002, ..Default::default() };
 
     // Create embedding client from config (falls back to env vars)
+    // Supports local TEI servers (no API key needed for localhost)
     let embedding_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if llm_config.is_configured("embedding") {
         let config = llm_config.get("embedding").unwrap();
-        let base_url = config.base_url.as_deref().unwrap_or("https://api.302.ai/v1"); // verified: 2026-03-21
-        let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&config.api_key, cogkos_llm::ProviderType::OpenAi)
+        let base_url = config.base_url.as_deref().unwrap_or("http://localhost:8090/v1"); // verified: 2026-03-22
+        // For local TEI, use empty string as API key (no auth needed)
+        let api_key = if config.api_key.is_empty() && config.is_local() {
+            "local".to_string() // placeholder, TEI ignores Authorization header
+        } else {
+            config.api_key.clone()
+        };
+        let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&api_key, cogkos_llm::ProviderType::OpenAi)
             .with_base_url(base_url)
             .with_model(&config.model);
         match embed_builder.build() {
             Ok(client) => {
-                println!("  ✓ Embedding: {} ({})", config.model, config.provider);
+                let mode = if config.is_local() { "local" } else { &config.provider };
+                println!("  ✓ Embedding: {} ({})", config.model, mode);
                 Some(client)
             }
             Err(e) => {

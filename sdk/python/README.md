@@ -61,6 +61,22 @@ except CogKOSError as e:
     print(f"Error: {e}, code: {e.code}")
 ```
 
+## Embedding Configuration
+
+CogKOS defaults to local BGE-M3 via TEI (no API key needed):
+
+```bash
+# Start local embedding server
+docker compose -f docker-compose.bge-m3.yml up -d
+
+# Or use a cloud provider (set in .env)
+EMBEDDING_MODEL=BAAI/bge-m3
+EMBEDDING_BASE_URL=https://api.deepinfra.com/v1/openai
+EMBEDDING_API_KEY=your_key_here
+```
+
+See the main project README for all embedding options.
+
 ## Requirements
 
 - Python >= 3.10
