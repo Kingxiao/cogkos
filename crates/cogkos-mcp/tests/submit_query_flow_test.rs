@@ -149,6 +149,14 @@ impl ClaimStore for MockClaimStore {
     ) -> Result<Vec<EpistemicClaim>> {
         Ok(Vec::new())
     }
+
+    async fn list_unresolved_conflicts(
+        &self,
+        _tenant_id: &str,
+        _limit: usize,
+    ) -> Result<Vec<ConflictRecord>> {
+        Ok(Vec::new())
+    }
 }
 
 /// Mock VectorStore using shared state

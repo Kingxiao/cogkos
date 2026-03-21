@@ -8,6 +8,7 @@
 
 mod core;
 mod tasks;
+mod tasks_phase3;
 
 #[cfg(test)]
 mod tests;
@@ -38,6 +39,14 @@ pub enum TaskType {
     MemoryGc,
     /// Memory layer promotion (working → episodic → semantic)
     MemoryPromotion,
+    /// Periodic insight extraction from conflict patterns
+    InsightExtraction,
+    /// Periodic prediction validation (feedback → claim prediction_error writeback)
+    PredictionValidation,
+    /// Periodic paradigm shift anomaly check
+    ParadigmShiftCheck,
+    /// Periodic framework health monitoring
+    FrameworkHealthMonitoring,
 }
 
 impl TaskType {
@@ -52,6 +61,10 @@ impl TaskType {
             TaskType::ConfidenceBoost => "confidence_boost",
             TaskType::MemoryGc => "memory_gc",
             TaskType::MemoryPromotion => "memory_promotion",
+            TaskType::InsightExtraction => "insight_extraction",
+            TaskType::PredictionValidation => "prediction_validation",
+            TaskType::ParadigmShiftCheck => "paradigm_shift_check",
+            TaskType::FrameworkHealthMonitoring => "framework_health_monitoring",
         }
     }
 }
@@ -81,6 +94,18 @@ pub struct SchedulerConfig {
     pub memory_gc_interval_secs: u64,
     /// Memory promotion interval in seconds
     pub memory_promotion_interval_secs: u64,
+    /// Insight extraction interval in seconds
+    pub insight_extraction_interval_secs: u64,
+    /// Maximum unresolved conflicts to fetch per tenant for insight extraction
+    pub insight_extraction_batch_size: usize,
+    /// Prediction validation interval in seconds
+    pub prediction_validation_interval_secs: u64,
+    /// Maximum feedback query hashes to process per tenant per cycle
+    pub prediction_validation_batch_size: usize,
+    /// Paradigm shift check interval in seconds
+    pub paradigm_shift_check_interval_secs: u64,
+    /// Framework health monitoring interval in seconds
+    pub framework_health_interval_secs: u64,
     /// Min rehearsal count to promote working → episodic
     pub working_to_episodic_rehearsal: u64,
     /// Min rehearsal count to promote episodic → semantic
@@ -99,25 +124,33 @@ pub struct SchedulerConfig {
 impl Default for SchedulerConfig {
     fn default() -> Self {
         let mut task_budget_percentages = HashMap::new();
-        // Default budget allocation:
-        // - Consolidation Event-Driven: 20% (triggered by novel knowledge)
-        // - Consolidation: 15% (periodic)
-        // - Decay: 15%
-        // - Conflict Detection Periodic: 15%
+        // Default budget allocation (total = 90%, leaving 10% headroom):
+        // - Consolidation Event-Driven: 15% (triggered by novel knowledge)
+        // - Consolidation: 10% (periodic)
+        // - Decay: 10%
+        // - Conflict Detection Periodic: 5%
         // - Conflict Detection (event-driven): 5%
         // - Confidence Boost: 10% (for similar knowledge aggregation)
         // - Memory GC: 5% (expire working/episodic claims)
         // - Memory Promotion: 5% (promote across layers)
         // - Health Check: 5% (minimal work)
-        task_budget_percentages.insert(TaskType::ConsolidationEventDriven.name().to_string(), 20);
-        task_budget_percentages.insert(TaskType::Consolidation.name().to_string(), 15);
-        task_budget_percentages.insert(TaskType::Decay.name().to_string(), 15);
-        task_budget_percentages.insert(TaskType::ConflictDetectionPeriodic.name().to_string(), 10);
+        // - Insight Extraction: 5% (conflict→insight elevation)
+        // - Prediction Validation: 5% (feedback→claim error writeback)
+        // - Paradigm Shift Check: 5% (anomaly detection for paradigm shifts)
+        // - Framework Health Monitoring: 5% (knowledge system health snapshot)
+        task_budget_percentages.insert(TaskType::ConsolidationEventDriven.name().to_string(), 15);
+        task_budget_percentages.insert(TaskType::Consolidation.name().to_string(), 10);
+        task_budget_percentages.insert(TaskType::Decay.name().to_string(), 10);
+        task_budget_percentages.insert(TaskType::ConflictDetectionPeriodic.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::ConflictDetection.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::ConfidenceBoost.name().to_string(), 10);
         task_budget_percentages.insert(TaskType::MemoryGc.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::MemoryPromotion.name().to_string(), 5);
         task_budget_percentages.insert(TaskType::HealthCheck.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::InsightExtraction.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::PredictionValidation.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::ParadigmShiftCheck.name().to_string(), 5);
+        task_budget_percentages.insert(TaskType::FrameworkHealthMonitoring.name().to_string(), 5);
 
         Self {
             consolidation_interval_secs: 6 * 3600,         // 6 hours
@@ -129,10 +162,16 @@ impl Default for SchedulerConfig {
             conflict_batch_size: 100,
             confidence_boost_batch_size: 50,
             confidence_boost_factor: 0.05,
-            memory_gc_interval_secs: 1800,        // 30 minutes
-            memory_promotion_interval_secs: 3600, // 1 hour
-            working_to_episodic_rehearsal: 3,     // 3 recalls to promote
-            episodic_to_semantic_rehearsal: 5,    // 5 recalls to promote
+            memory_gc_interval_secs: 1800,              // 30 minutes
+            memory_promotion_interval_secs: 3600,       // 1 hour
+            insight_extraction_interval_secs: 4 * 3600, // 4 hours
+            insight_extraction_batch_size: 50,
+            prediction_validation_interval_secs: 3600, // 1 hour
+            prediction_validation_batch_size: 50,
+            paradigm_shift_check_interval_secs: 12 * 3600, // 12 hours
+            framework_health_interval_secs: 2 * 3600,      // 2 hours
+            working_to_episodic_rehearsal: 3,              // 3 recalls to promote
+            episodic_to_semantic_rehearsal: 5,             // 5 recalls to promote
             enable_periodic: true,
             max_claims_per_hour: 10000,
             max_task_duration_ms: 300_000, // 5 minutes
@@ -149,6 +188,10 @@ pub struct SchedulerState {
     pub last_decay: Option<chrono::DateTime<chrono::Utc>>,
     pub last_conflict_detection: Option<chrono::DateTime<chrono::Utc>>,
     pub last_confidence_boost: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_insight_extraction: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_prediction_validation: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_paradigm_shift_check: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_framework_health: Option<chrono::DateTime<chrono::Utc>>,
     pub tasks_processed: u64,
     pub total_claims_processed: u64,
     pub errors: u64,
@@ -166,6 +209,10 @@ impl Default for SchedulerState {
             last_decay: None,
             last_conflict_detection: None,
             last_confidence_boost: None,
+            last_insight_extraction: None,
+            last_prediction_validation: None,
+            last_paradigm_shift_check: None,
+            last_framework_health: None,
             tasks_processed: 0,
             total_claims_processed: 0,
             errors: 0,

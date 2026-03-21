@@ -305,6 +305,18 @@ mod feedback_cache_tests {
                 .cloned()
                 .collect())
         }
+
+        async fn list_recent_feedback_hashes(
+            &self,
+            _tenant_id: &str,
+            limit: usize,
+        ) -> Result<Vec<u64>> {
+            let feedbacks = self.feedbacks.read().await;
+            let mut hashes: Vec<u64> = feedbacks.iter().map(|f| f.query_hash).collect();
+            hashes.dedup();
+            hashes.truncate(limit);
+            Ok(hashes)
+        }
     }
 
     #[derive(Debug, Clone)]

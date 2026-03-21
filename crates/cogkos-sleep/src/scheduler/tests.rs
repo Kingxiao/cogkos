@@ -17,6 +17,18 @@ fn task_type_names() {
         TaskType::ConsolidationEventDriven.name(),
         "consolidation_event_driven"
     );
+    assert_eq!(TaskType::MemoryGc.name(), "memory_gc");
+    assert_eq!(TaskType::MemoryPromotion.name(), "memory_promotion");
+    assert_eq!(TaskType::InsightExtraction.name(), "insight_extraction");
+    assert_eq!(
+        TaskType::PredictionValidation.name(),
+        "prediction_validation"
+    );
+    assert_eq!(TaskType::ParadigmShiftCheck.name(), "paradigm_shift_check");
+    assert_eq!(
+        TaskType::FrameworkHealthMonitoring.name(),
+        "framework_health_monitoring"
+    );
 }
 
 #[test]
@@ -27,6 +39,12 @@ fn scheduler_config_defaults() {
     assert_eq!(cfg.health_check_interval_secs, 3600);
     assert_eq!(cfg.conflict_interval_secs, 2 * 3600);
     assert_eq!(cfg.confidence_boost_interval_secs, 1800);
+    assert_eq!(cfg.insight_extraction_interval_secs, 4 * 3600);
+    assert_eq!(cfg.insight_extraction_batch_size, 50);
+    assert_eq!(cfg.prediction_validation_interval_secs, 3600);
+    assert_eq!(cfg.prediction_validation_batch_size, 50);
+    assert_eq!(cfg.paradigm_shift_check_interval_secs, 12 * 3600);
+    assert_eq!(cfg.framework_health_interval_secs, 2 * 3600);
     assert_eq!(cfg.conflict_batch_size, 100);
     assert!(cfg.enable_periodic);
     assert_eq!(cfg.max_claims_per_hour, 10000);
@@ -49,6 +67,10 @@ fn scheduler_state_defaults() {
     assert!(state.last_decay.is_none());
     assert!(state.last_conflict_detection.is_none());
     assert!(state.last_confidence_boost.is_none());
+    assert!(state.last_insight_extraction.is_none());
+    assert!(state.last_prediction_validation.is_none());
+    assert!(state.last_paradigm_shift_check.is_none());
+    assert!(state.last_framework_health.is_none());
     assert_eq!(state.tasks_processed, 0);
     assert_eq!(state.total_claims_processed, 0);
     assert_eq!(state.errors, 0);
@@ -70,6 +92,7 @@ fn test_stores() -> Arc<Stores> {
         Arc::new(InMemoryAuditStore::new(1000)),
         Arc::new(InMemorySubscriptionStore::new()),
         Arc::new(NoopMemoryLayerStore),
+        None,
     ))
 }
 
@@ -79,7 +102,7 @@ async fn scheduler_check_budget_allows_within_limit() {
     let cfg = SchedulerConfig::default();
     let scheduler = Scheduler::new(stores, cfg);
 
-    // Consolidation gets 15% of 10000 = 1500
+    // Consolidation gets 10% of 10000 = 1000
     assert!(scheduler.check_budget(TaskType::Consolidation, 100).await);
 }
 
@@ -162,6 +185,114 @@ async fn scheduler_start_stop() {
     scheduler.stop().await;
     let state = scheduler.get_state().await;
     assert!(!state.is_running);
+}
+
+#[tokio::test]
+async fn scheduler_insight_extraction_budget() {
+    let stores = test_stores();
+    let mut cfg = SchedulerConfig::default();
+    cfg.max_claims_per_hour = 1000;
+    // InsightExtraction gets 5% = 50
+    let scheduler = Scheduler::new(stores, cfg);
+
+    assert!(
+        scheduler
+            .check_budget(TaskType::InsightExtraction, 50)
+            .await
+    );
+    assert!(
+        !scheduler
+            .check_budget(TaskType::InsightExtraction, 51)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn scheduler_prediction_validation_budget() {
+    let stores = test_stores();
+    let mut cfg = SchedulerConfig::default();
+    cfg.max_claims_per_hour = 1000;
+    // PredictionValidation gets 5% = 50
+    let scheduler = Scheduler::new(stores, cfg);
+
+    assert!(
+        scheduler
+            .check_budget(TaskType::PredictionValidation, 50)
+            .await
+    );
+    assert!(
+        !scheduler
+            .check_budget(TaskType::PredictionValidation, 51)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn scheduler_paradigm_shift_check_budget() {
+    let stores = test_stores();
+    let mut cfg = SchedulerConfig::default();
+    cfg.max_claims_per_hour = 1000;
+    // ParadigmShiftCheck gets 5% = 50
+    let scheduler = Scheduler::new(stores, cfg);
+
+    assert!(
+        scheduler
+            .check_budget(TaskType::ParadigmShiftCheck, 50)
+            .await
+    );
+    assert!(
+        !scheduler
+            .check_budget(TaskType::ParadigmShiftCheck, 51)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn scheduler_framework_health_budget() {
+    let stores = test_stores();
+    let mut cfg = SchedulerConfig::default();
+    cfg.max_claims_per_hour = 1000;
+    // FrameworkHealthMonitoring gets 5% = 50
+    let scheduler = Scheduler::new(stores, cfg);
+
+    assert!(
+        scheduler
+            .check_budget(TaskType::FrameworkHealthMonitoring, 50)
+            .await
+    );
+    assert!(
+        !scheduler
+            .check_budget(TaskType::FrameworkHealthMonitoring, 51)
+            .await
+    );
+}
+
+#[test]
+fn scheduler_config_budget_all_tasks_registered() {
+    let cfg = SchedulerConfig::default();
+    // Verify all 13 task types have budget entries
+    assert_eq!(cfg.task_budget_percentages.len(), 13);
+    for task_type in [
+        TaskType::ConsolidationEventDriven,
+        TaskType::Consolidation,
+        TaskType::Decay,
+        TaskType::ConflictDetectionPeriodic,
+        TaskType::ConflictDetection,
+        TaskType::ConfidenceBoost,
+        TaskType::MemoryGc,
+        TaskType::MemoryPromotion,
+        TaskType::HealthCheck,
+        TaskType::InsightExtraction,
+        TaskType::PredictionValidation,
+        TaskType::ParadigmShiftCheck,
+        TaskType::FrameworkHealthMonitoring,
+    ] {
+        assert!(
+            cfg.task_budget_percentages.contains_key(task_type.name()),
+            "Missing budget for task: {}",
+            task_type.name()
+        );
+    }
 }
 
 #[tokio::test]

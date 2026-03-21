@@ -33,7 +33,7 @@ async fn main() {
     let llm_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if llm_config.is_configured("text") {
         let config = llm_config.get("text").unwrap();
         let mut builder = LlmClientBuilder::new(&config.api_key, ProviderType::OpenAi)
-            .with_base_url(config.base_url.as_deref().unwrap_or("https://api.moonshot.cn/v1"))
+            .with_base_url(config.base_url.as_deref().unwrap_or("https://api.moonshot.cn/v1")) // verified: 2026-03-21
             .with_model(&config.model);
         match builder.build()
         {
@@ -108,8 +108,10 @@ async fn main() {
             .await
             .expect("Failed to connect to PostgreSQL");
         println!("✅ PostgreSQL connected!");
+        let claim_store: Arc<PostgresStore> = Arc::new(postgres_store);
+        let memory_layer_store: Arc<dyn cogkos_store::MemoryLayerStore> = claim_store.clone();
         Stores::new(
-            Arc::new(postgres_store),
+            claim_store,
             Arc::new(cogkos_store::vector::InMemoryVectorStore::new()),
             Arc::new(InMemoryGraphStore::new()),
             Arc::new(InMemoryCacheStore::new()),
@@ -119,7 +121,8 @@ async fn main() {
             Arc::new(InMemoryGapStore::new()),
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
-            Arc::new(cogkos_store::NoopMemoryLayerStore),
+            memory_layer_store,
+            Some(Arc::new(cogkos_store::InMemoryPredictionStore::new())),
         )
     } else {
         println!("⚠️ DATABASE_URL empty, using InMemory storage");
@@ -135,6 +138,7 @@ async fn main() {
             Arc::new(cogkos_core::audit::InMemoryAuditStore::with_default_capacity()),
             Arc::new(InMemorySubscriptionStore::new()),
             Arc::new(cogkos_store::NoopMemoryLayerStore),
+            Some(Arc::new(cogkos_store::InMemoryPredictionStore::new())),
         )
     };
 
@@ -143,7 +147,7 @@ async fn main() {
     // Create embedding client from config (falls back to env vars)
     let embedding_client: Option<Arc<dyn cogkos_llm::LlmClient>> = if llm_config.is_configured("embedding") {
         let config = llm_config.get("embedding").unwrap();
-        let base_url = config.base_url.as_deref().unwrap_or("https://api.302.ai/v1");
+        let base_url = config.base_url.as_deref().unwrap_or("https://api.302.ai/v1"); // verified: 2026-03-21
         let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&config.api_key, cogkos_llm::ProviderType::OpenAi)
             .with_base_url(base_url)
             .with_model(&config.model);
@@ -162,9 +166,9 @@ async fn main() {
         let minimax_key = std::env::var("MINIMAX_API_KEY").unwrap_or_default();
         if !minimax_key.is_empty() {
             let embed_base = env::var("EMBEDDING_BASE_URL")
-                .unwrap_or_else(|_| "https://api.minimax.chat/v1".to_string());
+                .unwrap_or_else(|_| "https://api.minimax.chat/v1".to_string()); // verified: 2026-03-21
             let embed_model = env::var("EMBEDDING_MODEL")
-                .unwrap_or_else(|_| "embo-01".to_string());
+                .unwrap_or_else(|_| "embo-01".to_string()); // verified: 2026-03-21
             let mut embed_builder = cogkos_llm::LlmClientBuilder::new(&minimax_key, cogkos_llm::ProviderType::OpenAi)
                 .with_base_url(&embed_base)
                 .with_model(&embed_model);

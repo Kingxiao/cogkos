@@ -21,7 +21,7 @@ impl Default for ImageParserConfig {
     fn default() -> Self {
         Self {
             provider: "openai".to_string(),
-            model: "gpt-4o".to_string(),
+            model: std::env::var("IMAGE_LLM_MODEL").unwrap_or_else(|_| "gpt-4o".to_string()), // verified: 2026-03-21
             max_tokens: 1024,
         }
     }

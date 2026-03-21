@@ -14,9 +14,10 @@ use tokio::time::interval;
 use tracing::{error, info, warn};
 
 use super::tasks::{
-    run_confidence_boost, run_consolidation, run_decay, run_health_check, run_memory_gc,
-    run_memory_promotion, run_pending_aggregation,
+    run_confidence_boost, run_consolidation, run_decay, run_health_check, run_insight_extraction,
+    run_memory_gc, run_memory_promotion, run_pending_aggregation, run_prediction_validation,
 };
+use super::tasks_phase3::{run_framework_health_monitoring, run_paradigm_shift_check};
 use super::{SchedulerConfig, SchedulerState, TaskType};
 
 /// Main scheduler
@@ -432,6 +433,140 @@ impl Scheduler {
             }
         });
 
+        // Insight extraction: extract insights from conflict patterns (every 4 hours)
+        let s_insight = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(
+                s_insight.config.insight_extraction_interval_secs,
+            ));
+            let mut consecutive_failures: u32 = 0;
+            const MAX_FAILURES: u32 = 5;
+            const BACKOFF_MULTIPLIER: u64 = 2;
+            loop {
+                tokio::select! {
+                    _ = s_insight.cancel.cancelled() => { info!("Insight extraction task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+
+                // Circuit breaker: back off on consecutive failures
+                if consecutive_failures >= MAX_FAILURES {
+                    let backoff = Duration::from_secs(
+                        s_insight.config.insight_extraction_interval_secs
+                            * BACKOFF_MULTIPLIER.pow(consecutive_failures.min(5)),
+                    );
+                    let backoff = backoff.min(Duration::from_secs(3600));
+                    warn!(
+                        task = "insight_extraction",
+                        failures = consecutive_failures,
+                        "Circuit breaker: backing off"
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+
+                if s_insight
+                    .check_budget(
+                        TaskType::InsightExtraction,
+                        s_insight.config.insight_extraction_batch_size as u64,
+                    )
+                    .await
+                {
+                    let start_time = std::time::Instant::now();
+
+                    match run_insight_extraction(
+                        &s_insight.stores,
+                        s_insight.config.insight_extraction_batch_size,
+                    )
+                    .await
+                    {
+                        Ok(count) => {
+                            consecutive_failures = 0;
+                            s_insight
+                                .record_processed(TaskType::InsightExtraction, count as u64)
+                                .await;
+                            let mut state = s_insight.state.write().await;
+                            state.last_insight_extraction = Some(chrono::Utc::now());
+                        }
+                        Err(e) => {
+                            consecutive_failures += 1;
+                            error!(task = "insight_extraction", error = %e, failures = consecutive_failures, "Task failed");
+                            let mut state = s_insight.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+
+                    if start_time.elapsed().as_millis()
+                        > s_insight.config.max_task_duration_ms as u128
+                    {
+                        warn!("Insight extraction task exceeded time budget");
+                    }
+                }
+            }
+        });
+
+        // Prediction validation: feedback → claim prediction_error writeback (every 1 hour)
+        let s_pred = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(
+                s_pred.config.prediction_validation_interval_secs,
+            ));
+            let mut consecutive_failures: u32 = 0;
+            const MAX_FAILURES: u32 = 5;
+            const BACKOFF_MULTIPLIER: u64 = 2;
+            loop {
+                tokio::select! {
+                    _ = s_pred.cancel.cancelled() => { info!("Prediction validation task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+
+                // Circuit breaker: back off on consecutive failures
+                if consecutive_failures >= MAX_FAILURES {
+                    let backoff = Duration::from_secs(
+                        s_pred.config.prediction_validation_interval_secs
+                            * BACKOFF_MULTIPLIER.pow(consecutive_failures.min(5)),
+                    );
+                    let backoff = backoff.min(Duration::from_secs(3600));
+                    warn!(
+                        task = "prediction_validation",
+                        failures = consecutive_failures,
+                        "Circuit breaker: backing off"
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+
+                if s_pred
+                    .check_budget(
+                        TaskType::PredictionValidation,
+                        s_pred.config.prediction_validation_batch_size as u64,
+                    )
+                    .await
+                {
+                    let start_time = std::time::Instant::now();
+
+                    match run_prediction_validation(&s_pred.stores, &s_pred.config).await {
+                        Ok(count) => {
+                            consecutive_failures = 0;
+                            s_pred
+                                .record_processed(TaskType::PredictionValidation, count as u64)
+                                .await;
+                            let mut state = s_pred.state.write().await;
+                            state.last_prediction_validation = Some(chrono::Utc::now());
+                        }
+                        Err(e) => {
+                            consecutive_failures += 1;
+                            error!(task = "prediction_validation", error = %e, failures = consecutive_failures, "Task failed");
+                            let mut state = s_pred.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+
+                    if start_time.elapsed().as_millis() > s_pred.config.max_task_duration_ms as u128
+                    {
+                        warn!("Prediction validation task exceeded time budget");
+                    }
+                }
+            }
+        });
+
         // Memory promotion: working → episodic → semantic
         let s_promo = self.clone_instance();
         tokio::spawn(async move {
@@ -461,6 +596,130 @@ impl Scheduler {
                             let mut state = s_promo.state.write().await;
                             state.errors += 1;
                         }
+                    }
+                }
+            }
+        });
+
+        // Paradigm shift check: every 12 hours
+        let s_paradigm = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(
+                s_paradigm.config.paradigm_shift_check_interval_secs,
+            ));
+            let mut consecutive_failures: u32 = 0;
+            const MAX_FAILURES: u32 = 5;
+            const BACKOFF_MULTIPLIER: u64 = 2;
+            loop {
+                tokio::select! {
+                    _ = s_paradigm.cancel.cancelled() => { info!("Paradigm shift check task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+
+                // Circuit breaker: back off on consecutive failures
+                if consecutive_failures >= MAX_FAILURES {
+                    let backoff = Duration::from_secs(
+                        s_paradigm.config.paradigm_shift_check_interval_secs
+                            * BACKOFF_MULTIPLIER.pow(consecutive_failures.min(5)),
+                    );
+                    let backoff = backoff.min(Duration::from_secs(3600));
+                    warn!(
+                        task = "paradigm_shift_check",
+                        failures = consecutive_failures,
+                        "Circuit breaker: backing off"
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+
+                if s_paradigm
+                    .check_budget(TaskType::ParadigmShiftCheck, 10)
+                    .await
+                {
+                    let start_time = std::time::Instant::now();
+
+                    match run_paradigm_shift_check(&s_paradigm.stores, &s_paradigm.config).await {
+                        Ok(count) => {
+                            consecutive_failures = 0;
+                            s_paradigm
+                                .record_processed(TaskType::ParadigmShiftCheck, count as u64)
+                                .await;
+                            let mut state = s_paradigm.state.write().await;
+                            state.last_paradigm_shift_check = Some(chrono::Utc::now());
+                        }
+                        Err(e) => {
+                            consecutive_failures += 1;
+                            error!(task = "paradigm_shift_check", error = %e, failures = consecutive_failures, "Task failed");
+                            let mut state = s_paradigm.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+
+                    if start_time.elapsed().as_millis()
+                        > s_paradigm.config.max_task_duration_ms as u128
+                    {
+                        warn!("Paradigm shift check task exceeded time budget");
+                    }
+                }
+            }
+        });
+
+        // Framework health monitoring: every 2 hours
+        let s_fh = self.clone_instance();
+        tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(
+                s_fh.config.framework_health_interval_secs,
+            ));
+            let mut consecutive_failures: u32 = 0;
+            const MAX_FAILURES: u32 = 5;
+            const BACKOFF_MULTIPLIER: u64 = 2;
+            loop {
+                tokio::select! {
+                    _ = s_fh.cancel.cancelled() => { info!("Framework health monitoring task shutting down"); break; }
+                    _ = ticker.tick() => {}
+                }
+
+                // Circuit breaker: back off on consecutive failures
+                if consecutive_failures >= MAX_FAILURES {
+                    let backoff = Duration::from_secs(
+                        s_fh.config.framework_health_interval_secs
+                            * BACKOFF_MULTIPLIER.pow(consecutive_failures.min(5)),
+                    );
+                    let backoff = backoff.min(Duration::from_secs(3600));
+                    warn!(
+                        task = "framework_health",
+                        failures = consecutive_failures,
+                        "Circuit breaker: backing off"
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+
+                if s_fh
+                    .check_budget(TaskType::FrameworkHealthMonitoring, 10)
+                    .await
+                {
+                    let start_time = std::time::Instant::now();
+
+                    match run_framework_health_monitoring(&s_fh.stores, &s_fh.config).await {
+                        Ok(count) => {
+                            consecutive_failures = 0;
+                            s_fh.record_processed(
+                                TaskType::FrameworkHealthMonitoring,
+                                count as u64,
+                            )
+                            .await;
+                            let mut state = s_fh.state.write().await;
+                            state.last_framework_health = Some(chrono::Utc::now());
+                        }
+                        Err(e) => {
+                            consecutive_failures += 1;
+                            error!(task = "framework_health", error = %e, failures = consecutive_failures, "Task failed");
+                            let mut state = s_fh.state.write().await;
+                            state.errors += 1;
+                        }
+                    }
+
+                    if start_time.elapsed().as_millis() > s_fh.config.max_task_duration_ms as u128 {
+                        warn!("Framework health monitoring task exceeded time budget");
                     }
                 }
             }

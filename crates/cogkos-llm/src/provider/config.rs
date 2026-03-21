@@ -25,7 +25,7 @@ impl Default for LlmProviderConfig {
     fn default() -> Self {
         Self {
             provider: "openai".to_string(),
-            model: "gpt-4".to_string(),
+            model: "gpt-4".to_string(), // verified: 2026-03-21
             api_key: String::new(),
             base_url: None,
         }

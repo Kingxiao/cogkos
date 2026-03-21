@@ -72,7 +72,7 @@ pub struct OpenAiLlmClient {
 
 impl OpenAiLlmClient {
     pub fn new(api_key: String) -> super::Result<Self> {
-        Self::with_base_url(api_key, "https://api.openai.com/v1".to_string())
+        Self::with_base_url(api_key, "https://api.openai.com/v1".to_string()) // verified: 2026-03-21
     }
 
     pub fn with_base_url(api_key: String, base_url: String) -> super::Result<Self> {
@@ -85,7 +85,7 @@ impl OpenAiLlmClient {
             client,
             api_key,
             base_url,
-            default_model: "gpt-4".to_string(),
+            default_model: "gpt-4".to_string(), // verified: 2026-03-21
         })
     }
 

@@ -66,7 +66,7 @@ fn _init_prediction_service() -> Option<Arc<PredictionService>> {
     let client = builder.build().ok()?;
     let service = PredictionService::new(
         client,
-        std::env::var("LLM_MODEL").unwrap_or_else(|_| "gpt-4".to_string()),
+        std::env::var("LLM_MODEL").unwrap_or_else(|_| "gpt-4".to_string()), // verified: 2026-03-21
     );
     Some(Arc::new(service))
 }

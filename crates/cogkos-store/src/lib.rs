@@ -111,6 +111,13 @@ pub trait ClaimStore: Send + Sync {
         status: ResolutionStatus,
         note: Option<String>,
     ) -> Result<()>;
+
+    /// List unresolved conflicts for a tenant (resolution_status = Open)
+    async fn list_unresolved_conflicts(
+        &self,
+        tenant_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ConflictRecord>>;
 }
 
 /// Memory layer store trait — separated from ClaimStore for explicit opt-in
@@ -229,6 +236,8 @@ pub trait FeedbackStore: Send + Sync {
         tenant_id: &str,
         query_hash: u64,
     ) -> Result<Vec<AgentFeedback>>;
+    /// List distinct query hashes that have received feedback (most recent first)
+    async fn list_recent_feedback_hashes(&self, tenant_id: &str, limit: usize) -> Result<Vec<u64>>;
 }
 
 /// Object store trait
@@ -262,6 +271,7 @@ pub struct Stores {
     pub audit: std::sync::Arc<dyn AuditStore>,
     pub subscription: std::sync::Arc<dyn SubscriptionStore>,
     pub memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
+    pub prediction_history: Option<std::sync::Arc<dyn PredictionHistoryStore>>,
 }
 
 impl Stores {
@@ -278,6 +288,7 @@ impl Stores {
         audit: std::sync::Arc<dyn AuditStore>,
         subscription: std::sync::Arc<dyn SubscriptionStore>,
         memory_layers: std::sync::Arc<dyn MemoryLayerStore>,
+        prediction_history: Option<std::sync::Arc<dyn PredictionHistoryStore>>,
     ) -> Self {
         Self {
             claims,
@@ -291,6 +302,7 @@ impl Stores {
             audit,
             subscription,
             memory_layers,
+            prediction_history,
         }
     }
 }
@@ -336,6 +348,17 @@ impl FeedbackStore for InMemoryFeedbackStore {
     ) -> Result<Vec<AgentFeedback>> {
         let store = self.feedback.read().await;
         Ok(store.get(&query_hash).cloned().unwrap_or_default())
+    }
+
+    async fn list_recent_feedback_hashes(
+        &self,
+        _tenant_id: &str,
+        limit: usize,
+    ) -> Result<Vec<u64>> {
+        let store = self.feedback.read().await;
+        let mut hashes: Vec<u64> = store.keys().copied().collect();
+        hashes.truncate(limit);
+        Ok(hashes)
     }
 }
 
@@ -537,6 +560,30 @@ impl ClaimStore for InMemoryClaimStore {
             .cloned()
             .collect();
         result.truncate(limit);
+        Ok(result)
+    }
+
+    async fn list_unresolved_conflicts(
+        &self,
+        tenant_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ConflictRecord>> {
+        let conflicts = self.conflicts.read().await;
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for records in conflicts.values() {
+            for record in records {
+                if record.tenant_id == tenant_id
+                    && record.resolution_status == ResolutionStatus::Open
+                    && seen.insert(record.id)
+                {
+                    result.push(record.clone());
+                    if result.len() >= limit {
+                        return Ok(result);
+                    }
+                }
+            }
+        }
         Ok(result)
     }
 }

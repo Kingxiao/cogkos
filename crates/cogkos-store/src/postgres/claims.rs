@@ -581,6 +581,42 @@ impl crate::ClaimStore for PostgresStore {
 
         Ok(())
     }
+
+    #[tracing::instrument(skip(self))]
+    async fn list_unresolved_conflicts(
+        &self,
+        tenant_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ConflictRecord>> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT id, tenant_id, claim_a_id, claim_b_id, conflict_type, severity,
+                description, detected_at, resolved_at, resolution, resolution_status, elevated_insight_id
+            FROM conflict_records
+            WHERE tenant_id = $1 AND resolution_status = 'open'
+            ORDER BY detected_at DESC
+            LIMIT $2
+        "#,
+        )
+        .bind(tenant_id)
+        .bind(limit as i64)
+        .fetch_all(tx.as_mut())
+        .await
+        .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        rows.iter().map(row_to_conflict).collect()
+    }
 }
 
 pub(crate) fn row_to_claim(row: &PgRow) -> Result<EpistemicClaim> {

@@ -84,4 +84,37 @@ impl crate::FeedbackStore for PostgresStore {
             })
             .collect()
     }
+
+    async fn list_recent_feedback_hashes(&self, tenant_id: &str, limit: usize) -> Result<Vec<u64>> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT DISTINCT query_hash
+            FROM agent_feedbacks
+            WHERE tenant_id = $1
+            ORDER BY query_hash DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(limit as i64)
+        .fetch_all(tx.as_mut())
+        .await
+        .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        Ok(rows
+            .iter()
+            .map(|row| row.try_get::<i64, _>("query_hash").unwrap_or(0) as u64)
+            .collect())
+    }
 }

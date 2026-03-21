@@ -89,6 +89,7 @@ fn create_stores() -> Stores {
         Arc::new(InMemoryAuditStore::new(1000)),
         Arc::new(InMemorySubscriptionStore::new()),
         Arc::new(NoopMemoryLayerStore),
+        None,
     )
 }
 

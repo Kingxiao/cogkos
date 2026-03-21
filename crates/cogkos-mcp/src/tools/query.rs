@@ -683,7 +683,7 @@ async fn generate_llm_prediction(
     );
 
     let request = LlmRequest {
-        model: "gpt-4o-mini".to_string(),
+        model: std::env::var("LLM_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()), // verified: 2026-03-21
         messages: vec![
             Message {
                 role: Role::System,

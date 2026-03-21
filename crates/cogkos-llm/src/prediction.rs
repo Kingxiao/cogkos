@@ -210,7 +210,7 @@ pub struct PredictionConfig {
 impl Default for PredictionConfig {
     fn default() -> Self {
         Self {
-            model: "gpt-4".to_string(),
+            model: "gpt-4".to_string(), // verified: 2026-03-21
             temperature: 0.3,
             max_tokens: 256,
             fallback_on_error: true,

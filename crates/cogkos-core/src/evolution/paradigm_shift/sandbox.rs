@@ -308,7 +308,7 @@ impl LlmSandbox {
             results: Vec::new(),
             isolation_config: IsolationConfig::default(),
             llm_client: None,
-            llm_model: "gpt-4".to_string(),
+            llm_model: "gpt-4".to_string(), // verified: 2026-03-21
             generation_history: Vec::new(),
         }
     }

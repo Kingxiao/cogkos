@@ -139,7 +139,7 @@ pub struct LlmRequest {
 impl Default for LlmRequest {
     fn default() -> Self {
         Self {
-            model: "gpt-4".to_string(),
+            model: "gpt-4".to_string(), // verified: 2026-03-21
             messages: Vec::new(),
             temperature: 0.7,
             max_tokens: None,

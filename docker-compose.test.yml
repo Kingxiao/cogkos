@@ -14,3 +14,15 @@ services:
       interval: 2s
       timeout: 3s
       retries: 10
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6380:6379"
+    tmpfs:
+      - /var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10

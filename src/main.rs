@@ -522,6 +522,11 @@ async fn main() -> Result<()> {
     let audit_store = Arc::new(PostgresAuditStore::new(pg_pool.clone()));
 
     // Create stores container
+    let prediction_history_store: Option<std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>> =
+        Some(std::sync::Arc::new(
+            cogkos_store::InMemoryPredictionStore::new(),
+        ));
+
     let stores = Stores::new(
         claim_store,
         vector_store,
@@ -534,6 +539,7 @@ async fn main() -> Result<()> {
         audit_store,
         subscription_store,
         memory_layer_store,
+        prediction_history_store,
     );
 
     let stores_arc = Arc::new(stores.clone());
@@ -588,14 +594,14 @@ async fn main() -> Result<()> {
         // Smart default: if using OPENAI_API_KEY directly (not 302.ai proxy), use OpenAI endpoint
         let base_url = std::env::var("EMBEDDING_BASE_URL").unwrap_or_else(|_| {
             if std::env::var("EMBEDDING_API_KEY").is_ok() || std::env::var("API_302_KEY").is_ok() {
-                "https://api.302.ai/v1".to_string()
+                "https://api.302.ai/v1".to_string() // verified: 2026-03-21
             } else {
-                "https://api.openai.com/v1".to_string()
+                "https://api.openai.com/v1".to_string() // verified: 2026-03-21
             }
         });
         builder = builder.with_base_url(base_url);
         let model = std::env::var("EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "text-embedding-3-large".to_string());
+            .unwrap_or_else(|_| "text-embedding-3-large".to_string()); // verified: 2026-03-21
         builder = builder.with_model(model);
         Some(builder.build()?)
     } else {
