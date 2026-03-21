@@ -521,11 +521,9 @@ async fn main() -> Result<()> {
     // Create audit store (schema already created by migrations)
     let audit_store = Arc::new(PostgresAuditStore::new(pg_pool.clone()));
 
-    // Create stores container
+    // Create stores container — PostgresPredictionStore for persistence
     let prediction_history_store: Option<std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>> =
-        Some(std::sync::Arc::new(
-            cogkos_store::InMemoryPredictionStore::new(),
-        ));
+        Some(claim_store.clone() as std::sync::Arc<dyn cogkos_store::PredictionHistoryStore>);
 
     let stores = Stores::new(
         claim_store,

@@ -6,6 +6,7 @@ pub mod claims;
 pub mod feedback;
 pub mod gaps;
 pub mod memory_layers;
+pub mod prediction_history;
 pub mod subscriptions;
 
 use cogkos_core::{CogKosError, Result};

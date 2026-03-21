@@ -397,3 +397,85 @@ async fn test_activation_diffusion_tenant_id_param_accepted() {
         .unwrap();
     assert_eq!(result.len(), 1);
 }
+
+// ── 7. FalkorDB real-connection tests (requires running FalkorDB) ─
+// Run with: cargo test --test test_graph falkor -- --ignored
+// CI runs these in the integration job with FalkorDB service container.
+
+#[tokio::test]
+#[ignore = "requires running FalkorDB instance (FALKORDB_URL env var)"]
+async fn test_falkordb_add_node_and_find_related() {
+    let url = std::env::var("FALKORDB_URL").unwrap_or_else(|_| "redis://localhost:6381".into());
+    let graph = std::env::var("FALKORDB_GRAPH").unwrap_or_else(|_| "cogkos_test".into());
+
+    let cfg = deadpool_redis::Config::from_url(&url);
+    let pool = cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .expect("Failed to create Redis pool");
+
+    // Verify connectivity
+    let mut conn = pool.get().await.expect("Failed to connect to FalkorDB");
+    let _: String = deadpool_redis::redis::cmd("PING")
+        .query_async(&mut conn)
+        .await
+        .expect("FalkorDB PING failed");
+    drop(conn);
+
+    let store = cogkos_store::FalkorStore::new(pool, &graph);
+
+    let a = make_claim("FalkorDB node A", "t-falkor");
+    let b = make_claim("FalkorDB node B", "t-falkor");
+
+    store.add_node(&a).await.unwrap();
+    store.add_node(&b).await.unwrap();
+    store
+        .add_edge(a.id, b.id, "SIMILAR_TO", 0.85)
+        .await
+        .unwrap();
+
+    let related = store.find_related(a.id, "t-falkor", 1, 0.0).await.unwrap();
+    assert!(
+        !related.is_empty(),
+        "FalkorDB find_related should return results"
+    );
+    assert!(
+        related.iter().any(|n| n.id == b.id),
+        "Related nodes should include B"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires running FalkorDB instance (FALKORDB_URL env var)"]
+async fn test_falkordb_activation_diffusion() {
+    let url = std::env::var("FALKORDB_URL").unwrap_or_else(|_| "redis://localhost:6381".into());
+    let graph = std::env::var("FALKORDB_GRAPH").unwrap_or_else(|_| "cogkos_test_diffusion".into());
+
+    let cfg = deadpool_redis::Config::from_url(&url);
+    let pool = cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .expect("Failed to create Redis pool");
+
+    let store = cogkos_store::FalkorStore::new(pool, &graph);
+
+    let a = make_claim("Diffusion A", "t-diff");
+    let b = make_claim("Diffusion B", "t-diff");
+    let c = make_claim("Diffusion C", "t-diff");
+
+    for n in [&a, &b, &c] {
+        store.add_node(n).await.unwrap();
+    }
+
+    store.add_edge(a.id, b.id, "CAUSES", 0.8).await.unwrap();
+    store.add_edge(b.id, c.id, "SIMILAR_TO", 0.6).await.unwrap();
+
+    let result = store
+        .activation_diffusion(a.id, "t-diff", 1.0, 2, 0.8, 0.01)
+        .await
+        .unwrap();
+
+    // B and C should appear in diffusion results
+    assert!(
+        result.iter().any(|n| n.id == b.id),
+        "Diffusion should reach B"
+    );
+}

@@ -7,6 +7,8 @@
 //! - Periodic: Consolidation (every 6h), Decay (daily), Health check (hourly)
 
 mod core;
+mod spawn_periodic;
+mod spawn_periodic_p3;
 mod tasks;
 mod tasks_phase3;
 
