@@ -91,9 +91,16 @@ async fn test_full_knowledge_lifecycle() {
     let tenant = "lifecycle-tenant";
 
     // 1. Write 2 semantically related but conflicting claims
-    let claim_a =
-        make_claim_with_confidence("Rust achieves memory safety through borrow checker", tenant, 0.9);
-    let claim_b = make_claim_with_confidence("Rust achieves memory safety through garbage collection", tenant, 0.7);
+    let claim_a = make_claim_with_confidence(
+        "Rust achieves memory safety through borrow checker",
+        tenant,
+        0.9,
+    );
+    let claim_b = make_claim_with_confidence(
+        "Rust achieves memory safety through garbage collection",
+        tenant,
+        0.7,
+    );
     let id_a = claim_a.id;
     let id_b = claim_b.id;
 
