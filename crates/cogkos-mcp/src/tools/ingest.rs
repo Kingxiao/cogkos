@@ -1,5 +1,6 @@
 //! Ingest handlers: submit_experience, upload_document, get_meta_directory
 
+use cogkos_core::authority::AuthorityTier;
 use cogkos_core::models::*;
 use cogkos_core::{CogKosError, Result};
 use cogkos_ingest::{EmbeddingService, IngestionPipeline, UploadedFile};
@@ -59,6 +60,22 @@ pub async fn handle_submit_experience(
     claim.t_valid_start = req.valid_from.unwrap_or(claim.t_valid_start);
     claim.t_valid_end = req.valid_to;
     claim.derived_from = req.related_to;
+
+    // Consume knowledge_type from request
+    if let Some(ref kt) = req.knowledge_type {
+        match kt.to_lowercase().as_str() {
+            "business" => claim.knowledge_type = KnowledgeType::Business,
+            _ => claim.knowledge_type = KnowledgeType::Experiential,
+        }
+    }
+
+    // Resolve authority tier and set durability + metadata
+    let tier = AuthorityTier::resolve(&claim);
+    claim.durability = tier.recommended_durability();
+    claim.metadata.insert(
+        "authority_tier".to_string(),
+        serde_json::Value::String(tier.as_str().to_string()),
+    );
 
     // Save domain to metadata
     claim

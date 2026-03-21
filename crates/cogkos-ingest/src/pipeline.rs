@@ -1,4 +1,5 @@
 use cogkos_core::Result;
+use cogkos_core::authority::AuthorityTier;
 use cogkos_core::models::*;
 use cogkos_llm::client::LlmClient;
 use cogkos_store::{ClaimStore, GraphStore, ObjectStore, VectorStore};
@@ -139,6 +140,19 @@ impl IngestionPipeline {
             provenance,
         );
 
+        // Human uploaders default to Business knowledge type
+        if matches!(&file.source, Claimant::Human { .. }) {
+            file_claim.knowledge_type = KnowledgeType::Business;
+        }
+
+        // Resolve authority tier and set durability
+        let authority_tier = AuthorityTier::resolve(&file_claim);
+        file_claim.durability = authority_tier.recommended_durability();
+        file_claim.metadata.insert(
+            "authority_tier".to_string(),
+            serde_json::Value::String(authority_tier.as_str().to_string()),
+        );
+
         // 3. Classify document
         let classification = coarse_classify(&file.filename, "");
         file_claim.content = format!(
@@ -226,7 +240,13 @@ impl IngestionPipeline {
 
         for chunk in &chunks {
             // Always create the raw text chunk claim (for provenance/traceability)
-            let chunk_claim = self.chunk_to_claim(chunk, &file, &access_envelope, file_claim_id);
+            let chunk_claim = self.chunk_to_claim(
+                chunk,
+                &file,
+                &access_envelope,
+                file_claim_id,
+                file_claim.knowledge_type,
+            );
             let raw_chunk_id = chunk_claim.id;
 
             chunk_claim_ids.push(chunk_claim.id);
@@ -459,13 +479,14 @@ impl IngestionPipeline {
         })
     }
 
-    /// Convert text chunk to claim
+    /// Convert text chunk to claim, inheriting knowledge_type from parent document
     fn chunk_to_claim(
         &self,
         chunk: &TextChunk,
         file: &UploadedFile,
         access_envelope: &AccessEnvelope,
         parent_id: Uuid,
+        parent_knowledge_type: KnowledgeType,
     ) -> EpistemicClaim {
         let provenance = ProvenanceRecord {
             source_id: format!("doc:{}", file.filename),
@@ -484,8 +505,17 @@ impl IngestionPipeline {
             provenance,
         );
 
+        claim.knowledge_type = parent_knowledge_type;
         claim.derived_from = vec![parent_id];
         claim.consolidation_stage = ConsolidationStage::FastTrack;
+
+        // Resolve authority tier and set durability
+        let tier = AuthorityTier::resolve(&claim);
+        claim.durability = tier.recommended_durability();
+        claim.metadata.insert(
+            "authority_tier".to_string(),
+            serde_json::Value::String(tier.as_str().to_string()),
+        );
 
         // Extract domain from chunk content and store in metadata
         let domain = extract_domain(&chunk.content);

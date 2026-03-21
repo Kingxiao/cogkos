@@ -800,8 +800,8 @@ async fn test_submit_experience_with_knowledge_type() {
     let stored_claims = stores.claims.lock().unwrap();
     assert_eq!(stored_claims.len(), 1, "Should have 1 claim stored");
 
-    // Verify knowledge_type is set (default should be Experiential)
-    assert_eq!(stored_claims[0].knowledge_type, KnowledgeType::Experiential);
+    // Verify knowledge_type is set — request passed "Business" so it should be consumed
+    assert_eq!(stored_claims[0].knowledge_type, KnowledgeType::Business);
 
     println!("✅ Knowledge type test passed!");
 }

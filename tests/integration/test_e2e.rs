@@ -482,3 +482,106 @@ async fn test_knowledge_decay() {
         decayed,
     );
 }
+
+// ---------------------------------------------------------------------------
+// Test 5: Authority tier resolution and integration
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_authority_tier_claim_lifecycle() {
+    use cogkos_core::authority::AuthorityTier;
+
+    let stores = create_stores().await;
+    let tenant = "authority-tenant";
+
+    // 1. Business + admin claim → Canonical
+    let mut canonical =
+        make_claim_with_confidence("Company policy: all data encrypted at rest", tenant, 0.95);
+    canonical.knowledge_type = KnowledgeType::Business;
+    canonical.claimant = Claimant::Human {
+        user_id: "admin-1".into(),
+        role: "admin".into(),
+    };
+    let tier = AuthorityTier::resolve(&canonical);
+    assert_eq!(tier, AuthorityTier::Canonical);
+    canonical.durability = tier.recommended_durability();
+    canonical.metadata.insert(
+        "authority_tier".into(),
+        serde_json::Value::String(tier.as_str().to_string()),
+    );
+    stores.claims.insert_claim(&canonical).await.unwrap();
+
+    // 2. Agent claim with default fields → Observed
+    let agent_claim = make_claim_with_confidence("User prefers dark mode", tenant, 0.6);
+    let agent_tier = AuthorityTier::resolve(&agent_claim);
+    assert_eq!(agent_tier, AuthorityTier::Observed);
+    stores.claims.insert_claim(&agent_claim).await.unwrap();
+
+    // 3. Verify stored canonical claim retains metadata
+    let stored = stores.claims.get_claim(canonical.id, tenant).await.unwrap();
+    assert_eq!(
+        stored
+            .metadata
+            .get("authority_tier")
+            .and_then(|v| v.as_str()),
+        Some("canonical"),
+    );
+    assert!((stored.durability - 2.0).abs() < f64::EPSILON);
+
+    // 4. Canonical claim should not decay (multiplier = 0.0)
+    assert_eq!(AuthorityTier::Canonical.decay_multiplier(), 0.0);
+
+    // 5. Ephemeral claim decays faster
+    let mut ephemeral = make_claim_with_confidence("temp working memory", tenant, 0.5);
+    ephemeral.metadata.insert(
+        "memory_layer".into(),
+        serde_json::Value::String("working".into()),
+    );
+    let eph_tier = AuthorityTier::resolve(&ephemeral);
+    assert_eq!(eph_tier, AuthorityTier::Ephemeral);
+    assert!(eph_tier.decay_multiplier() > AuthorityTier::Observed.decay_multiplier());
+
+    // 6. Score boost ordering in query ranking
+    assert!(AuthorityTier::Canonical.score_boost() > AuthorityTier::Observed.score_boost(),);
+    assert!(AuthorityTier::Observed.score_boost() > AuthorityTier::Ephemeral.score_boost(),);
+}
+
+#[tokio::test]
+async fn test_authority_tier_conflict_suggestion() {
+    use cogkos_core::authority::AuthorityTier;
+    use cogkos_core::evolution::conflict::detect_conflict;
+
+    let tenant = "conflict-authority";
+
+    // High-authority Business claim
+    let mut business_claim =
+        make_claim_with_confidence("The product price is not 200 dollars", tenant, 0.9);
+    business_claim.knowledge_type = KnowledgeType::Business;
+    business_claim.claimant = Claimant::Human {
+        user_id: "admin-1".into(),
+        role: "admin".into(),
+    };
+    business_claim.provenance =
+        ProvenanceRecord::new("admin".into(), "policy".into(), "manual".into());
+
+    // Low-authority Agent claim (conflicting)
+    let agent_claim = make_claim_with_confidence("The product price is 200 dollars", tenant, 0.7);
+
+    // Verify tiers differ
+    let tier_biz = AuthorityTier::resolve(&business_claim);
+    let tier_agent = AuthorityTier::resolve(&agent_claim);
+    assert!(tier_biz > tier_agent);
+
+    // Detect conflict — should include authority suggestion
+    let conflict = detect_conflict(&business_claim, &agent_claim);
+    assert!(conflict.is_some(), "Should detect contradiction");
+
+    let record = conflict.unwrap();
+    assert!(
+        record.resolution.is_some(),
+        "Should have authority suggestion"
+    );
+    let resolution = record.resolution.unwrap();
+    let suggestion = &resolution["authority_suggestion"];
+    assert_eq!(suggestion["preferred_tier"].as_str().unwrap(), "canonical",);
+}

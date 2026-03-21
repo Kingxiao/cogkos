@@ -1,6 +1,7 @@
 //! CogKOS Core - Data models and domain logic
 
 pub mod audit;
+pub mod authority;
 pub mod benchmark;
 pub mod config_reload;
 pub mod encryption;
@@ -14,6 +15,7 @@ pub mod retry;
 pub mod transactional_memory;
 
 // Explicitly handle Result to avoid ambiguity
+pub use authority::*;
 pub use benchmark::*;
 pub use config_reload::*;
 pub use encryption::*;

@@ -9,6 +9,7 @@
 //! - Experiential/Learned knowledge: ExponentialDecay
 
 use cogkos_core::Result;
+use cogkos_core::authority::AuthorityTier;
 use cogkos_core::evolution::decay::{
     calculate_decay, calculate_decay_with_revalidation, calculate_effective_durability,
     needs_revalidation,
@@ -105,6 +106,16 @@ pub async fn decay_claims(
     let mut decayed_count = 0;
 
     for claim in claims {
+        // Resolve authority tier for decay modulation
+        let tier = AuthorityTier::resolve(&claim);
+
+        // Canonical knowledge never decays
+        if tier == AuthorityTier::Canonical {
+            debug!(claim_id = %claim.id, "Skipping decay for canonical claim");
+            decayed_count += 1;
+            continue;
+        }
+
         // Calculate hours since last access (or creation if never accessed)
         let hours_since_access = claim
             .last_accessed
@@ -119,8 +130,10 @@ pub async fn decay_claims(
         );
 
         // Use memory-layer-specific λ (working=0.5, episodic=0.05, semantic=0.01)
+        // Then modulate by authority tier decay multiplier
         let base_lambda = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata).lambda();
-        let adjusted_lambda = base_lambda * (1.0 - effective_durability * 0.5);
+        let adjusted_lambda =
+            base_lambda * tier.decay_multiplier() * (1.0 - effective_durability * 0.5);
 
         // Ensure minimum activation weight
         let activation = claim.activation_weight.max(config.min_activation_weight);

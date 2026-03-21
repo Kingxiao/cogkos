@@ -1,5 +1,6 @@
 //! Result merger for combining vector search and graph activation diffusion results
 
+use cogkos_core::authority::AuthorityTier;
 use cogkos_core::models::{EpistemicClaim, GraphNode, GraphRelation, Id, VectorMatch};
 
 /// Configuration for the merge algorithm
@@ -9,6 +10,8 @@ pub struct MergeConfig {
     pub vector_weight: f64,
     /// Weight for graph activation value (0.0-1.0)
     pub graph_weight: f64,
+    /// Weight for authority tier boost (0.0-1.0)
+    pub authority_weight: f64,
     /// Minimum combined score to include in results
     pub min_score: f64,
     /// Maximum results to return
@@ -17,9 +20,14 @@ pub struct MergeConfig {
 
 impl Default for MergeConfig {
     fn default() -> Self {
+        let authority_weight: f64 = std::env::var("MERGE_AUTHORITY_WEIGHT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.2);
         Self {
             vector_weight: 0.6,
             graph_weight: 0.4,
+            authority_weight,
             min_score: 0.1,
             max_results: 20,
         }
@@ -72,7 +80,11 @@ pub fn merge_results(
     // Process vector search results
     for vm in vector_matches {
         if let Some(claim) = claims.iter().find(|(_, c)| c.id == vm.id).map(|(_, c)| c) {
-            let combined = vm.score * config.vector_weight + claim.confidence * config.graph_weight;
+            let authority_boost = AuthorityTier::resolve(claim).score_boost();
+            let remaining_weight = 1.0 - config.authority_weight;
+            let combined = vm.score * config.vector_weight * remaining_weight
+                + claim.confidence * config.graph_weight * remaining_weight
+                + authority_boost * config.authority_weight;
 
             results.insert(
                 vm.id,
@@ -104,17 +116,22 @@ pub fn merge_results(
             .map(|(_, c)| c.confidence)
             .unwrap_or(0.5);
 
-        // Calculate combined score using activation and confidence
-        let combined = gn.activation * config.graph_weight + confidence * config.vector_weight;
+        // Calculate combined score using activation, confidence, and authority
+        let authority_boost = claims
+            .iter()
+            .find(|(_, c)| c.id == gn.id)
+            .map(|(_, c)| AuthorityTier::resolve(c).score_boost())
+            .unwrap_or(0.0);
+        let remaining_weight = 1.0 - config.authority_weight;
+        let combined = gn.activation * config.graph_weight * remaining_weight
+            + confidence * config.vector_weight * remaining_weight
+            + authority_boost * config.authority_weight;
 
         if let Some(existing) = results.get_mut(&gn.id) {
             // Already exists - update to Both and combine scores
             existing.source = ResultSource::Both;
             existing.graph_activation = Some(gn.activation);
-            existing.combined_score = (existing.combined_score
-                + gn.activation * config.graph_weight
-                + confidence * config.vector_weight)
-                / 2.0; // Average the scores
+            existing.combined_score = (existing.combined_score + combined) / 2.0;
         } else {
             results.insert(
                 gn.id,

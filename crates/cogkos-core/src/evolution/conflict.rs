@@ -1,3 +1,4 @@
+use crate::authority::AuthorityTier;
 use crate::models::{
     ConflictRecord, ConflictType, EpistemicClaim, EpistemicStatus, ResolutionStatus,
 };
@@ -32,6 +33,29 @@ pub fn detect_conflict(
             ct, summary_a, summary_b
         ));
         record.resolution_status = ResolutionStatus::Open;
+
+        // Add authority tier suggestion when tiers differ
+        let tier_a = AuthorityTier::resolve(claim_a);
+        let tier_b = AuthorityTier::resolve(claim_b);
+        if tier_a != tier_b {
+            let (preferred_id, preferred_tier, other_tier) = if tier_a > tier_b {
+                (claim_a.id, tier_a, tier_b)
+            } else {
+                (claim_b.id, tier_b, tier_a)
+            };
+            record.resolution = Some(serde_json::json!({
+                "authority_suggestion": {
+                    "preferred_claim_id": preferred_id.to_string(),
+                    "preferred_tier": preferred_tier.as_str(),
+                    "other_tier": other_tier.as_str(),
+                    "reason": format!(
+                        "Claim {} has higher authority ({}) vs ({})",
+                        preferred_id, preferred_tier, other_tier
+                    ),
+                }
+            }));
+        }
+
         record
     })
 }

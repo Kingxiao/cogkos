@@ -232,10 +232,8 @@ pub async fn handle_query_knowledge(
 
     // 5. Merge vector search results with graph diffusion results
     let merge_config = MergeConfig {
-        vector_weight: 0.6,
-        graph_weight: 0.4,
-        min_score: 0.1,
         max_results: req.context.max_results as usize,
+        ..MergeConfig::default()
     };
 
     let claim_tuples: Vec<(uuid::Uuid, EpistemicClaim)> =
