@@ -159,7 +159,7 @@ pub async fn handle_query_knowledge(
         }
     }
 
-    // 3b. Post-filter by session_id if requested (for working/episodic scoping)
+    // 3b. Post-filter by session_id if requested (for working memory scoping)
     if let Some(ref sid) = req.session_id {
         claims.retain(|c| {
             c.metadata
@@ -168,6 +168,19 @@ pub async fn handle_query_knowledge(
                 .is_some_and(|s| s == sid)
         });
         claim_ids = claims.iter().map(|c| c.id).collect();
+    }
+
+    // 3c. Episodic memory isolation: filter by agent_id
+    // Episodic memories belong to individual agents — Agent A's experiences
+    // should not appear in Agent B's results unless explicitly shared (semantic layer).
+    if effective_layer == Some("episodic") {
+        if let Some(ref agent) = req.agent_id {
+            claims.retain(|c| match &c.claimant {
+                cogkos_core::models::Claimant::Agent { agent_id, .. } => agent_id == agent,
+                _ => false,
+            });
+            claim_ids = claims.iter().map(|c| c.id).collect();
+        }
     }
 
     // 3c. Record rehearsal for retrieved claims (S3: read equals write)

@@ -436,6 +436,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         delegate_to_sampling: false,
         memory_layer: None,
         session_id: None,
+        agent_id: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -601,6 +602,7 @@ async fn test_submit_and_query_with_conflicts() {
         delegate_to_sampling: false,
         memory_layer: None,
         session_id: None,
+        agent_id: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -660,6 +662,7 @@ async fn test_query_returns_cached_result() {
         delegate_to_sampling: false,
         memory_layer: None,
         session_id: None,
+        agent_id: None,
     };
 
     let result1 = handle_query_knowledge(

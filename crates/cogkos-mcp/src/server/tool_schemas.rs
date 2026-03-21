@@ -41,6 +41,10 @@ pub fn build_tools() -> Vec<Tool> {
         "session_id".to_string(),
         serde_json::json!({"type": "string", "description": "Filter by session ID"}),
     );
+    input_schema.insert(
+        "agent_id".to_string(),
+        serde_json::json!({"type": "string", "description": "Agent ID for episodic memory scoping — only returns this agent's experiences"}),
+    );
     input_schema.insert("required".to_string(), serde_json::json!(["query"]));
     inject_api_key(&mut input_schema);
     tools.push(Tool::new(

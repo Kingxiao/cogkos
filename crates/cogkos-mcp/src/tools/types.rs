@@ -42,6 +42,9 @@ pub struct QueryKnowledgeRequest {
     /// Filter results by session ID (for working/episodic memory)
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Agent ID for episodic memory scoping — episodic results filtered to this agent only
+    #[serde(default)]
+    pub agent_id: Option<String>,
 }
 
 pub fn default_activation_threshold() -> f64 {
