@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use cogkos_llm::{LlmClient, LlmClientBuilder, PredictionService, ProviderType};
 use cogkos_store::Stores;
+use cogkos_workflow::WorkflowPlanner;
 use rmcp::service::ServiceExt;
 use tracing::info;
 
@@ -36,6 +37,14 @@ fn build_state(
         RateLimiter::new(rate_limit)
     };
 
+    // Workflow planner: enabled via ENABLE_WORKFLOW_ENGINE=true
+    let workflow_planner = if std::env::var("ENABLE_WORKFLOW_ENGINE").as_deref() == Ok("true") {
+        info!("Workflow engine enabled (template matching, no LLM planner wired yet)");
+        Some(Arc::new(WorkflowPlanner::new(None)))
+    } else {
+        None
+    };
+
     McpServerState {
         stores,
         auth,
@@ -44,6 +53,7 @@ fn build_state(
         llm_client,
         embedding_client,
         rate_limiter,
+        workflow_planner,
     }
 }
 

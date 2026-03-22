@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use cogkos_llm::LlmClient;
 use cogkos_store::Stores;
+use cogkos_workflow::WorkflowPlanner;
 use serde::{Deserialize, Serialize};
 
 use crate::{AuthMiddleware, McpConfig, QueryCache};
@@ -53,6 +54,7 @@ pub struct McpServerState {
     pub llm_client: Option<Arc<dyn LlmClient>>,
     pub embedding_client: Option<Arc<dyn LlmClient>>,
     pub rate_limiter: RateLimiter,
+    pub workflow_planner: Option<Arc<WorkflowPlanner>>,
 }
 
 /// Sampling request types (MCP Sampling Protocol)

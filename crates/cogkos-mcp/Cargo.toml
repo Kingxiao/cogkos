@@ -12,6 +12,7 @@ cogkos-core = { path = "../cogkos-core" }
 cogkos-store = { path = "../cogkos-store" }
 cogkos-llm = { path = "../cogkos-llm" }
 cogkos-ingest = { path = "../cogkos-ingest", features = ["whisper"] }
+cogkos-workflow = { path = "../cogkos-workflow" }
 
 serde.workspace = true
 serde_json.workspace = true

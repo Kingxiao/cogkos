@@ -1378,6 +1378,7 @@ dependencies = [
  "cogkos-ingest",
  "cogkos-llm",
  "cogkos-store",
+ "cogkos-workflow",
  "config",
  "deadpool-redis",
  "fastembed",

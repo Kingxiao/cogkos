@@ -1,23 +1,28 @@
 //! CogKOS Workflow Orchestration
 //!
-//! **STATUS: FROZEN** - This crate is not active in V1.
-//! Workflow engine and A/B testing are deferred to V2/V3.
-//! Code is preserved for future use but not initialized at runtime.
+//! **STATUS: ACTIVE** — Workflow engine with LLM-powered auto-planning.
+//! Template matching for common patterns, LLM generation for custom workflows.
 //!
 //! This crate provides:
 //! - Workflow Engine: Execute and manage complex workflows
 //! - A/B Testing Framework: Compare different strategies and approaches
 //! - Workflow DSL: Define workflows in a declarative way
+//! - Workflow Planner: LLM-powered auto-generation of workflow plans
 
 pub mod ab_testing;
 pub mod dsl;
 pub mod engine;
+pub mod planner;
 
 pub use ab_testing::{AbTestFramework, TestResult, TestVariant};
 pub use dsl::{EdgeDefinition, NodeDefinition, WorkflowDefinition, WorkflowParser};
 pub use engine::{
     EdgeType, ExecutionContext, NodeType, WorkflowEngine, WorkflowExecutor, WorkflowNode,
     WorkflowState,
+};
+pub use planner::{
+    PlanGenerationMethod, PlannerLlmClient, StepAction, WorkflowPlan, WorkflowPlanner,
+    WorkflowStep, WorkflowTrigger,
 };
 
 use thiserror::Error;
