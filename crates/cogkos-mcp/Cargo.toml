@@ -35,7 +35,6 @@ base64 = "0.22"
 tokio-util.workspace = true
 rand = "0.8"
 deadpool-redis = "0.23"
-async-trait = "0.1"
 
 [features]
 default = []
@@ -44,3 +43,4 @@ default = []
 tokio-test.workspace = true
 mockall.workspace = true
 reqwest.workspace = true
+async-trait = "0.1"

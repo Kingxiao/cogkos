@@ -4,7 +4,6 @@ mod handler;
 mod rate_limiter;
 mod startup;
 mod tool_schemas;
-pub(crate) mod workflow_adapter;
 
 use std::sync::Arc;
 
