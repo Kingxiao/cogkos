@@ -178,6 +178,37 @@ EpistemicClaim 在 FalkorDB 中的组织：
 - **Consolidated**：系统聚合的当前最佳理解
 - **Insight**：跨来源/跨领域模式发现
 
+#### Knowledge Authority Tiers
+
+EpistemicClaim 根据来源、类型和状态被动态分级为五层权威等级（`AuthorityTier`），用于查询排序加权、衰减调制和冲突解决优先级。权威等级从 claim 的已有字段实时推导，不引入新数据库列。
+
+| Tier | Name | Resolution Rule | Score Boost | Decay Multiplier |
+|------|------|----------------|-------------|-----------------|
+| T1 | Canonical | Business + admin/policy source | +0.3 | 0.0 (no decay) |
+| T2 | Curated | Business knowledge, or Human + document upload | +0.2 | 0.2 |
+| T3 | Verified | Corroborated, or high confidence (≥0.8) + frequent access (≥10) | +0.1 | 0.5 |
+| T4 | Observed | Default for new claims | 0.0 | 1.0 |
+| T5 | Ephemeral | Working/episodic memory, or external RSS feeds | -0.1 | 2.0 |
+
+#### Three-Layer Memory Model
+
+Claims are organized into three memory layers based on the Atkinson-Shiffrin cognitive model. Stored in `metadata.memory_layer`.
+
+| Layer | Decay λ | Half-life | Scope | Use Case |
+|-------|---------|-----------|-------|----------|
+| Working | 0.5 | ~1.4h | Session-scoped | Active task context |
+| Episodic | 0.05 | ~14h | Session summaries | Event memories |
+| Semantic | 0.01 | ~3d | Long-term (default) | Consolidated knowledge |
+
+Query filtering: `memory_layer` and `session_id` parameters scope results. Working/episodic require explicit layer + session_id to access.
+
+#### Knowledge Types
+
+| Type | Semantics | Authority |
+|------|-----------|-----------|
+| Business | Admin-maintained, version-replace updates, shared across all Agents | Higher (T1-T2) |
+| Experiential | Agent-contributed, progressively aggregated, partitioned by role/customer | Default (T3-T5) |
+
 ---
 
 ### L6: 查询层（MCP Server）
@@ -191,8 +222,10 @@ Agent MCP请求 → 查询缓存查找（System 1）
   ├── 命中且置信度高 → 直接返回（更新缓存命中统计）
   └── 未命中或置信度低 → 完整推理（System 2）
         → 权限过滤（AccessEnvelope）
+        → memory_layer 过滤（默认 semantic；working/episodic 需显式指定）
         → 语义检索（pgvector）
         → 图上激活扩散（FalkorDB）
+        → AuthorityTier 加权排序（score_boost × MERGE_AUTHORITY_WEIGHT）
         → 结果合并排序
         → 冲突检测
         → LLM 轻量预测
@@ -329,8 +362,13 @@ Agent 使用 CogKOS 的预测做决策 → 决策结果发生
 | `query_knowledge` | Agent → CogKOS | 带上下文的结构化查询，返回 McpQueryResponse |
 | `submit_experience` | Agent → CogKOS | Agent 推送经验/观察，作为 Assertion 写入 |
 | `submit_feedback` | Agent → CogKOS | 对之前查询结果的成功/失败反馈 |
+| `upload_document` | Agent → CogKOS | 上传文档触发摄入管道（PDF/Word/Markdown/PPTX 等） |
 | `report_gap` | Agent → CogKOS | Agent 主动报告发现的知识空洞 |
 | `get_meta_directory` | Agent → CogKOS | 查询元知识目录（谁擅长什么） |
+| `subscribe_rss` | Agent → CogKOS | 订阅 RSS Feed 持续摄入 |
+| `subscribe_webhook` | Agent → CogKOS | 注册 Webhook 接收外部知识更新 |
+| `subscribe_api` | Agent → CogKOS | 订阅 API 端点周期轮询 |
+| `list_subscriptions` | Agent → CogKOS | 列出活跃的知识订阅 |
 
 ### MCP Sampling（CogKOS → Agent，MCP 2026 新增）
 
@@ -389,6 +427,8 @@ MCP 2026 规范支持 **Server → Host LLM** 的反向请求（Sampling）。Co
 | E7 MCP | | | | | | ✅ | |
 | E8 分离 | | | | | | ✅ | |
 | E9 预算 | | | ✅ | ✅ | | | |
+| E10 权威分级 | | | ✅ | | ✅ | ✅ | ✅ |
+| E11 分层记忆 | | | ✅ | | ✅ | ✅ | |
 
 ---
 

@@ -98,6 +98,7 @@ pub async fn handle_submit_experience(
 
     let t0 = std::time::Instant::now();
     let claim_id = claim_store.insert_claim(&claim).await?;
+    cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
     tracing::info!(claim_id = %claim_id, pg_ms = t0.elapsed().as_millis() as u64, "Fast-track: claim persisted");
 
     // S2: Fast capture / slow consolidation
@@ -373,6 +374,7 @@ pub async fn handle_upload_document(
         );
 
         let _claim_id = claim_store.insert_claim(&claim).await?;
+        cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
 
         ("uploaded", None, "0s".to_string())
     };

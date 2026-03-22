@@ -118,6 +118,11 @@ pub trait ClaimStore: Send + Sync {
         tenant_id: &str,
         limit: usize,
     ) -> Result<Vec<ConflictRecord>>;
+
+    /// Supersede an old claim with a new one.
+    /// Sets old claim's status to Superseded, confidence to 0.1,
+    /// and records new_id as the successor.
+    async fn supersede_claim(&self, old_id: Id, new_id: Id, tenant_id: &str) -> Result<()>;
 }
 
 /// Memory layer store trait — separated from ClaimStore for explicit opt-in
@@ -582,6 +587,37 @@ impl ClaimStore for InMemoryClaimStore {
             }
         }
         Ok(result)
+    }
+
+    async fn supersede_claim(&self, old_id: Id, new_id: Id, tenant_id: &str) -> Result<()> {
+        let mut claims = self.claims.write().await;
+
+        // Verify new_id exists and belongs to tenant
+        if !claims
+            .get(&new_id)
+            .is_some_and(|c| c.tenant_id == tenant_id)
+        {
+            return Err(cogkos_core::CogKosError::NotFound(format!(
+                "New claim {} not found for tenant {}",
+                new_id, tenant_id
+            )));
+        }
+
+        // Update old claim
+        let old = claims.get_mut(&old_id).ok_or_else(|| {
+            cogkos_core::CogKosError::NotFound(format!("Old claim {} not found", old_id))
+        })?;
+        if old.tenant_id != tenant_id {
+            return Err(cogkos_core::CogKosError::AccessDenied(
+                "Tenant mismatch".to_string(),
+            ));
+        }
+        old.superseded_by = Some(new_id);
+        old.epistemic_status = EpistemicStatus::Superseded;
+        old.confidence = 0.1;
+        old.updated_at = chrono::Utc::now();
+
+        Ok(())
     }
 }
 

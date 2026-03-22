@@ -182,6 +182,14 @@ EpistemicClaim + ConflictRecord。通过 `consolidation_stage` 区分阶段。
 
 CogKOS 不运行 Agent，不做即时决策。Agent 拥有自己的操作记忆、决策引擎和结果缓存。MCP 是唯一边界。
 
+### E10. Authority Tiers — Knowledge is Not Equal
+
+Not all knowledge carries equal weight. Authority is derived from source, type, and epistemic status — not assigned manually. Five tiers (Canonical → Ephemeral) modulate query ranking, decay rates, and conflict resolution priority. Canonical knowledge (business policy, admin-maintained) never decays; ephemeral knowledge (working memory, RSS feeds) decays at 2x the base rate.
+
+### E11. Layered Memory — Atkinson-Shiffrin for Agents
+
+Three memory layers with distinct decay profiles: Working (session context, λ=0.5), Episodic (event memories, λ=0.05), Semantic (long-term knowledge, λ=0.01). Each layer has hard TTL boundaries. Working/episodic memories require explicit session scoping to access. Semantic is the default and the only layer that feeds into consolidation and evolution.
+
 ### E9. 计算预算分配
 
 Sleep-time 任务有不同优先级和预算上限：

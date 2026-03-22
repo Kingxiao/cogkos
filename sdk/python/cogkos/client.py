@@ -83,6 +83,7 @@ class CogKOS:
         *,
         confidence: float = 0.8,
         node_type: str = "Insight",
+        knowledge_type: str | None = None,
         tags: list[str] | None = None,
         source_agent: str | None = None,
         memory_layer: str | None = None,
@@ -94,6 +95,7 @@ class CogKOS:
             content: The knowledge content to store.
             confidence: Confidence level 0.0-1.0 (default 0.8).
             node_type: Type of knowledge node (Entity, Relation, Event, Attribute, Prediction, Insight, File).
+            knowledge_type: Knowledge authority tier — "Business" or "Experiential".
             tags: Optional tags for categorization.
             source_agent: Override the default source agent name.
             memory_layer: Memory layer (working/episodic/semantic).
@@ -110,6 +112,8 @@ class CogKOS:
             "source": {"type": "agent", "agent_id": agent, "model": agent},
             "tags": tags or [],
         }
+        if knowledge_type:
+            args["knowledge_type"] = knowledge_type
         if memory_layer:
             args["memory_layer"] = memory_layer
         if session_id:

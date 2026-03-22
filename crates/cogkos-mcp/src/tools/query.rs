@@ -90,6 +90,7 @@ pub async fn handle_query_knowledge(
                 response.cognitive_path = Some(CognitivePath::System1);
                 response.metadata.execution_time_ms = start_time.elapsed().as_millis() as u64;
                 response.metadata.cache_hit_rate = hit_rate;
+                cogkos_core::monitoring::METRICS.inc_counter("cogkos_cache_hit_total", 1);
 
                 tracing::debug!(
                     query_hash = query_hash,

@@ -20,6 +20,9 @@ brain = CogKOS("http://localhost:3000/mcp", api_key="xxx", tenant_id="my-project
 # Store
 brain.learn("RLS requires explicit WHERE tenant_id", confidence=0.9, tags=["security"])
 
+# Store with knowledge type (authority tier)
+brain.learn("Q2 revenue target: $2M ARR", confidence=0.95, knowledge_type="Business")
+
 # Query
 result = brain.recall("multi-tenant isolation")
 print(result.best_belief)

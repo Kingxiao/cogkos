@@ -582,6 +582,64 @@ impl crate::ClaimStore for PostgresStore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), fields(%old_id, %new_id, %tenant_id))]
+    async fn supersede_claim(&self, old_id: Id, new_id: Id, tenant_id: &str) -> Result<()> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
+        // Verify both claims belong to this tenant
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM epistemic_claims WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(new_id)
+        .bind(tenant_id)
+        .fetch_one(tx.as_mut())
+        .await
+        .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        if count.0 == 0 {
+            return Err(CogKosError::NotFound(format!(
+                "New claim {} not found for tenant {}",
+                new_id, tenant_id
+            )));
+        }
+
+        let rows_affected = sqlx::query(
+            r#"
+            UPDATE epistemic_claims
+            SET superseded_by = $1,
+                epistemic_status = 'superseded',
+                confidence = 0.1,
+                updated_at = NOW()
+            WHERE id = $2 AND tenant_id = $3
+            "#,
+        )
+        .bind(new_id)
+        .bind(old_id)
+        .bind(tenant_id)
+        .execute(tx.as_mut())
+        .await
+        .map_err(|e| CogKosError::Database(e.to_string()))?
+        .rows_affected();
+
+        if rows_affected == 0 {
+            return Err(CogKosError::NotFound(format!(
+                "Old claim {} not found for tenant {}",
+                old_id, tenant_id
+            )));
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        Ok(())
+    }
+
     #[tracing::instrument(skip(self))]
     async fn list_unresolved_conflicts(
         &self,

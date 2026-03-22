@@ -82,6 +82,12 @@ X-API-Key: <api_key>
 | `include_predictions` | bool | ❌ | `true` | 是否基于已有知识生成预测 |
 | `include_conflicts` | bool | ❌ | `true` | 是否返回知识冲突 |
 | `include_gaps` | bool | ❌ | `true` | 是否识别知识空洞 |
+| `memory_layer` | enum | ❌ | null | `"working"` / `"episodic"` / `"semantic"` — 过滤记忆层级，null 返回全部 |
+| `session_id` | string | ❌ | null | 会话 ID，配合 working/episodic 层使用 |
+| `agent_id` | string | ❌ | null | Agent ID — episodic 结果限定到该 Agent |
+| `knowledge_types` | string[] | ❌ | null | 过滤知识类型（如 `["Business"]`） |
+| `activation_threshold` | float | ❌ | `0.3` | 图扩散最小激活阈值（0.0-1.0） |
+| `delegate_to_sampling` | bool | ❌ | `false` | 委托 MCP Sampling 协议进行高级分析 |
 
 ### 响应成功
 
@@ -228,16 +234,22 @@ Agent 推送经验/观察，作为 Assertion 写入 CogKOS。
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `content` | string | ✅ | - | 知识内容（建议 50-500 字） |
-| `node_type` | enum | ✅ | - | `"Entity"` / `"Relation"` / `"Event"` / `"Attribute"` / `"Prediction"` |
+| `node_type` | enum | ✅ | - | `"Entity"` / `"Relation"` / `"Event"` / `"Attribute"` / `"Prediction"` / `"Insight"` / `"File"` |
+| `knowledge_type` | string | ❌ | null | `"Business"` or `"Experiential"`（影响 AuthorityTier） |
 | `confidence` | float | ❌ | `0.5` | 置信度 0.0-1.0 |
 | `source.type` | enum | ✅ | - | `"human"` / `"agent"` / `"external"` |
 | `source.agent_id` | string | 条件 | - | source.type = `"agent"` 时必填 |
 | `source.model` | string | 条件 | - | source.type = `"agent"` 时建议填写 |
 | `source.user_id` | string | 条件 | - | source.type = `"human"` 时必填 |
+| `source.role` | string | ❌ | `"user"` | source.type = `"human"` 时的角色（影响 AuthorityTier） |
 | `valid_from` | datetime | ❌ | `now()` | 知识生效开始时间（ISO 8601） |
 | `valid_to` | datetime | ❌ | `null` | 知识生效结束时间（可选） |
 | `tags` | string[] | ❌ | `[]` | 标签（辅助分类和检索） |
 | `related_to` | uuid[] | ❌ | `[]` | 关联已有 Claim 的 ID |
+| `memory_layer` | enum | ❌ | `"semantic"` | `"working"` / `"episodic"` / `"semantic"` — 记忆层级 |
+| `session_id` | string | ❌ | null | 会话 ID，working/episodic 记忆必须提供 |
+| `structured_content` | object | ❌ | null | 结构化内容（JSON 格式的补充数据） |
+| `entity_refs` | object[] | ❌ | `[]` | 关联实体引用（`{entity_type, entity_id}`） |
 
 ### 响应成功
 
@@ -327,6 +339,7 @@ Agent 推送经验/观察，作为 Assertion 写入 CogKOS。
 | `success` | bool | ✅ | - | 决策是否成功 |
 | `note` | string | ❌ | `""` | 反馈说明 |
 | `improvement_suggestion` | string | ❌ | `""` | 改进建议 |
+| `agent_id` | string | ❌ | `"{tenant_id}/anonymous"` | Agent 身份标识，用于反馈归因 |
 
 ### 响应成功
 
@@ -451,7 +464,136 @@ Agent 主动报告发现的知识空洞。
 
 ---
 
-## 工具 6: upload_document
+## 工具 6: subscribe_rss
+
+订阅 RSS Feed 持续摄入外部知识。
+
+### 请求
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "subscribe_rss",
+    "arguments": {
+      "url": "https://example.com/feed.xml",
+      "poll_interval_secs": 3600,
+      "max_items": 20,
+      "fetch_full_content": false
+    }
+  },
+  "id": "req-006"
+}
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `url` | string | ✅ | - | RSS Feed URL |
+| `poll_interval_secs` | u64 | ❌ | `3600` | 轮询间隔（秒） |
+| `max_items` | usize | ❌ | `20` | 每次轮询最大条目数 |
+| `fetch_full_content` | bool | ❌ | `false` | 是否抓取全文内容 |
+
+---
+
+## 工具 7: subscribe_webhook
+
+注册 Webhook 端点接收外部知识更新。
+
+### 请求
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "subscribe_webhook",
+    "arguments": {
+      "url": "https://example.com/webhook",
+      "secret": "webhook-secret",
+      "events": ["knowledge_update", "conflict_detected"]
+    }
+  },
+  "id": "req-007"
+}
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `url` | string | ✅ | - | Webhook 端点 URL |
+| `secret` | string | ❌ | null | 签名验证密钥 |
+| `events` | string[] | ❌ | `[]` | 订阅的事件类型 |
+
+---
+
+## 工具 8: subscribe_api
+
+订阅 API 端点进行周期轮询。
+
+### 请求
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "subscribe_api",
+    "arguments": {
+      "url": "https://api.example.com/data",
+      "poll_interval_secs": 3600,
+      "method": "GET",
+      "headers": {"Authorization": "Bearer token"}
+    }
+  },
+  "id": "req-008"
+}
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `url` | string | ✅ | - | API 端点 URL |
+| `poll_interval_secs` | u64 | ❌ | `3600` | 轮询间隔（秒） |
+| `method` | string | ❌ | `"GET"` | HTTP 方法 |
+| `headers` | object | ❌ | `{}` | 请求头 |
+| `body` | string | ❌ | null | POST 请求体 |
+
+---
+
+## 工具 9: list_subscriptions
+
+列出活跃的知识订阅。
+
+### 请求
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "list_subscriptions",
+    "arguments": {
+      "type": "rss"
+    }
+  },
+  "id": "req-009"
+}
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `type` | enum | ✅ | - | `"rss"` / `"webhook"` / `"api"` |
+
+---
+
+## 工具 10: upload_document
 
 上传文档到 CogKOS（触发摄入管道）。
 
@@ -507,7 +649,7 @@ Agent 主动报告发现的知识空洞。
 | `.txt` | `text/plain` | ✅ 完整支持 |
 | `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | ✅ 表格解析 |
 | `.csv` | `text/csv` | ✅ 表格解析 |
-| `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | 🚧 开发中 |
+| `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | ✅ 完整支持 |
 
 ### 响应
 
@@ -748,10 +890,19 @@ const result = await client.queryKnowledge({
 
 ## 更新日志
 
+### v0.2.0 (2026-03-22)
+
+- Authority tier system for query ranking and decay modulation
+- Three-layer memory model (working/episodic/semantic)
+- BGE-M3 as default embedding model (local TEI + DeepInfra + OpenAI supported)
+- Subscription management tools (subscribe_rss, subscribe_webhook, subscribe_api, list_subscriptions)
+- PPTX ingestion support
+- Agent ID for feedback attribution and episodic memory scoping
+
 ### v0.1.0 (2026-03-08)
 
 - 初始版本发布
-- 支持 6 个 MCP 工具
+- 支持 6 个 MCP 工具（query_knowledge, submit_experience, submit_feedback, upload_document, report_gap, get_meta_directory）
 - 完整的多租户支持
 - 实现 Sleep-time 计算
 - 联邦路由功能

@@ -17,6 +17,15 @@ result = brain.learn(
 )
 print(f"Stored claim: {result.claim_id}")
 
+# 1b. Store with knowledge type (authority tier)
+result = brain.learn(
+    "Q2 revenue target: $2M ARR",
+    confidence=0.95,
+    knowledge_type="Business",
+    tags=["strategy", "revenue"],
+)
+print(f"Business knowledge: {result.claim_id}")
+
 # 2. Query knowledge
 result = brain.recall("multi-tenant data isolation best practices")
 print(f"Best belief: {result.best_belief}")

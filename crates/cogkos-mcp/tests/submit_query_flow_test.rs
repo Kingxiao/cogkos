@@ -157,6 +157,15 @@ impl ClaimStore for MockClaimStore {
     ) -> Result<Vec<ConflictRecord>> {
         Ok(Vec::new())
     }
+
+    async fn supersede_claim(
+        &self,
+        _old_id: cogkos_core::models::Id,
+        _new_id: cogkos_core::models::Id,
+        _tenant_id: &str,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Mock VectorStore using shared state
