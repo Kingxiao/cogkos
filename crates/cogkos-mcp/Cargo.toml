@@ -12,7 +12,6 @@ cogkos-core = { path = "../cogkos-core" }
 cogkos-store = { path = "../cogkos-store" }
 cogkos-llm = { path = "../cogkos-llm" }
 cogkos-ingest = { path = "../cogkos-ingest", features = ["whisper"] }
-cogkos-workflow = { path = "../cogkos-workflow" }
 
 serde.workspace = true
 serde_json.workspace = true
@@ -36,6 +35,7 @@ base64 = "0.22"
 tokio-util.workspace = true
 rand = "0.8"
 deadpool-redis = "0.23"
+async-trait = "0.1"
 
 [features]
 default = []
@@ -44,4 +44,3 @@ default = []
 tokio-test.workspace = true
 mockall.workspace = true
 reqwest.workspace = true
-async-trait = "0.1"

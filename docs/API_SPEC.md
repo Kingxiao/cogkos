@@ -650,6 +650,11 @@ Agent 主动报告发现的知识空洞。
 | `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | ✅ 表格解析 |
 | `.csv` | `text/csv` | ✅ 表格解析 |
 | `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | ✅ 完整支持 |
+| `.json` | `text/plain` | ✅ 文本解析 |
+| `.xml` | `text/plain` | ✅ 文本解析 |
+| `.yaml` / `.yml` | `text/plain` | ✅ 文本解析 |
+| `.html` / `.htm` | `text/plain` | ✅ 文本解析 |
+| `.jpg` / `.jpeg` / `.png` / `.gif` / `.webp` / `.bmp` | `image/*` | ✅ Vision 模型理解 |
 
 ### 响应
 

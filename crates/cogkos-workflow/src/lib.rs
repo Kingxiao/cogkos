@@ -1,13 +1,14 @@
 //! CogKOS Workflow Orchestration
 //!
-//! **STATUS: ACTIVE** — Workflow engine with LLM-powered auto-planning.
-//! Template matching for common patterns, LLM generation for custom workflows.
+//! **STATUS: FROZEN** — Reserved for V2/V3 when CogKOS becomes a platform.
+//! Knowledge backend pipelines are deterministic — workflow orchestration adds
+//! complexity without solving a real problem at this stage. All competitive
+//! knowledge backends (Mem0, Zep, Letta) use fixed pipelines.
 //!
-//! This crate provides:
+//! This crate provides (for future use):
 //! - Workflow Engine: Execute and manage complex workflows
 //! - A/B Testing Framework: Compare different strategies and approaches
 //! - Workflow DSL: Define workflows in a declarative way
-//! - Workflow Planner: LLM-powered auto-generation of workflow plans
 
 pub mod ab_testing;
 pub mod dsl;
@@ -19,10 +20,6 @@ pub use dsl::{EdgeDefinition, NodeDefinition, WorkflowDefinition, WorkflowParser
 pub use engine::{
     EdgeType, ExecutionContext, NodeType, WorkflowEngine, WorkflowExecutor, WorkflowNode,
     WorkflowState,
-};
-pub use planner::{
-    PlanGenerationMethod, PlannerLlmClient, StepAction, WorkflowPlan, WorkflowPlanner,
-    WorkflowStep, WorkflowTrigger,
 };
 
 use thiserror::Error;

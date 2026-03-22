@@ -306,7 +306,7 @@ CREATE TABLE epistemic_claims (
     access_envelope JSONB NOT NULL,
     provenance JSONB NOT NULL,
     vector_id UUID,
-    embedding vector(512),   -- pgvector 语义向量（替代 Qdrant）
+    embedding vector,        -- pgvector 语义向量，维度运行时自动检测（1024 for BGE-M3, 3072 for text-embedding-3-large）
     last_prediction_error FLOAT,
     derived_from UUID[] DEFAULT '{}',
     needs_revalidation BOOLEAN DEFAULT FALSE,

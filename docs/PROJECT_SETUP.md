@@ -52,14 +52,30 @@ cogkos/
 │   │       ├── classifier.rs   # 粗分类
 │   │       └── pipeline.rs     # 摄入管道编排
 │   │
-│   └── cogkos-sleep/           # Sleep-time 异步任务
+│   ├── cogkos-sleep/           # Sleep-time 异步任务
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── scheduler.rs    # 任务调度
+│   │       ├── consolidate.rs  # 贝叶斯聚合
+│   │       ├── decay.rs        # 知识衰减
+│   │       └── conflict.rs     # 冲突检测
+│   │
+│   ├── cogkos-llm/             # 多供应商 LLM 客户端（Anthropic/OpenAI 兼容）
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │
+│   ├── cogkos-external/        # 外部知识源（RSS/Webhook/API 轮询）
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │
+│   ├── cogkos-workflow/        # 工作流引擎（LLM 自动规划 + 模板匹配 + A/B 测试）
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │
+│   └── cogkos-federation/      # 联邦层（群体智慧健康检查已激活，跨实例路由冻结）
 │       ├── Cargo.toml
 │       └── src/
-│           ├── lib.rs
-│           ├── scheduler.rs    # 任务调度
-│           ├── consolidate.rs  # 贝叶斯聚合
-│           ├── decay.rs        # 知识衰减
-│           └── conflict.rs     # 冲突检测
 │
 ├── src/
 │   └── main.rs                 # 二进制入口（启动 MCP Server + Sleep-time）
@@ -83,6 +99,10 @@ members = [
     "crates/cogkos-mcp",
     "crates/cogkos-ingest",
     "crates/cogkos-sleep",
+    "crates/cogkos-llm",
+    "crates/cogkos-external",
+    "crates/cogkos-workflow",
+    "crates/cogkos-federation",
 ]
 
 [workspace.dependencies]
@@ -125,8 +145,8 @@ config = "0.14"
 thiserror = "2"
 anyhow = "1"
 
-# 嵌入向量
-fastembed = "4"
+# 嵌入向量（BGE-M3 默认，支持本地 TEI / DeepInfra / OpenAI 兼容端点）
+fastembed = "5"
 
 # 测试
 tokio-test = "0.4"
@@ -193,9 +213,8 @@ S3_REGION=us-east-1
 MCP_HOST=0.0.0.0
 MCP_PORT=3000
 
-# 嵌入模型
-EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
-EMBEDDING_DIM=512
+# 嵌入模型（维度运行时自动检测，无需手动指定）
+EMBEDDING_MODEL=BAAI/bge-m3  # 1024d, or text-embedding-3-large for 3072d
 
 # 日志
 RUST_LOG=cogkos=debug,tower=info
