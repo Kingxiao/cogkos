@@ -1,7 +1,7 @@
 # CogKOS 运维手册
 
-**版本**: 1.0
-**更新时间**: 2026-03-11
+**版本**: 1.1
+**更新时间**: 2026-03-24
 
 ---
 
@@ -11,9 +11,13 @@
 2. [环境变量](#环境变量)
 3. [监控配置](#监控配置)
 4. [日志配置](#日志配置)
-5. [备份恢复](#备份恢复)
-6. [故障排查](#故障排查)
-7. [性能调优](#性能调优)
+5. [BGE-M3 Embedding 部署](#bge-m3-embedding-部署)
+6. [备份恢复](#备份恢复)
+7. [批量导入](#批量导入)
+8. [审计日志](#审计日志)
+9. [高可用部署](#高可用部署)
+10. [故障排查](#故障排查)
+11. [性能调优](#性能调优)
 
 ---
 
@@ -181,6 +185,70 @@ scrape_configs:
 
 ---
 
+## BGE-M3 Embedding 部署
+
+CogKOS 支持两种 Embedding 后端：本地 BGE-M3（通过 TEI）和远程 API（302.ai / OpenAI）。
+
+### GPU 模式（推荐）
+
+使用 Hugging Face Text Embeddings Inference (TEI) 部署 BGE-M3：
+
+```bash
+# 拉取模型（首次约 2.4GB）
+docker run --gpus all -p 8080:80 \
+  -v $HOME/.cache/huggingface:/data \
+  ghcr.io/huggingface/text-embeddings-inference:latest \
+  --model-id BAAI/bge-m3 \
+  --max-client-batch-size 128
+```
+
+GPU 模式下单请求延迟约 5-15ms，吞吐量 500+ req/s。
+
+### CPU 模式（降级方案）
+
+无 GPU 时使用 CPU profile：
+
+```bash
+docker run -p 8080:80 \
+  -v $HOME/.cache/huggingface:/data \
+  ghcr.io/huggingface/text-embeddings-inference:cpu-latest \
+  --model-id BAAI/bge-m3 \
+  --max-client-batch-size 32
+```
+
+CPU 模式延迟约 50-200ms，适合开发/低流量环境。
+
+### 模型下载和缓存
+
+- 模型文件缓存在 `$HOME/.cache/huggingface/hub/models--BAAI--bge-m3/`
+- 首次启动自动下载，后续使用缓存
+- 离线部署时可预先下载：`huggingface-cli download BAAI/bge-m3`
+- 向量维度：1024d（CogKOS 默认配置）
+
+### 健康检查
+
+```bash
+# TEI 健康检查
+curl http://localhost:8080/health
+
+# 测试 Embedding 生成
+curl -X POST http://localhost:8080/embed \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs": "test embedding"}'
+```
+
+### CogKOS 对接配置
+
+```bash
+# .env
+EMBEDDING_PROVIDER=local
+EMBEDDING_BASE_URL=http://localhost:8080
+EMBEDDING_MODEL=BAAI/bge-m3
+EMBEDDING_DIMENSION=1024
+```
+
+---
+
 ## 备份恢复
 
 ### PostgreSQL 备份
@@ -210,6 +278,226 @@ redis-cli -h falkordb SAVE
 ### pgvector 备份
 
 pgvector 数据随 PostgreSQL 一起备份，无需单独操作。
+
+### 自动化备份脚本
+
+项目提供一键备份和恢复脚本：
+
+```bash
+# 完整备份（PostgreSQL + FalkorDB + 本地文件）
+bash scripts/backup.sh ./backups
+
+# 从备份恢复
+bash scripts/restore.sh ./backups/cogkos_backup_20260324_120000.tar.gz
+```
+
+### 定时备份（cron）
+
+```bash
+# 每天凌晨 3 点备份，保留最近 30 天
+0 3 * * * cd /opt/cogkos && bash scripts/backup.sh ./backups && find ./backups -name '*.tar.gz' -mtime +30 -delete
+```
+
+建议同时配置远程备份（rsync/rclone 到 S3）防止单点存储故障。
+
+---
+
+## 批量导入
+
+### 使用方法
+
+```bash
+# 扫描目录并导入所有支持的文件
+python scripts/batch-import.py /path/to/docs/ \
+  --url http://localhost:3000/mcp \
+  --api-key your-key \
+  --tenant-id your-tenant
+
+# 预览模式（不实际导入）
+python scripts/batch-import.py /path/to/docs/ --dry-run
+```
+
+### 支持的格式
+
+| 类别 | 格式 |
+|------|------|
+| 文档 | PDF, DOCX, MD, TXT, HTML |
+| 数据 | XLSX, CSV, JSON, XML, YAML |
+| 图片 | PNG, JPG/JPEG |
+
+### 特性
+
+- 按文件大小排序导入（小文件优先，避免超时阻塞）
+- 通过 content hash 去重，重复文件自动跳过
+- 超过 50MB 的文件自动跳过
+- 失败不中断，最后输出汇总统计
+- 支持通过环境变量配置（`COGKOS_URL`, `COGKOS_API_KEY`, `COGKOS_TENANT_ID`）
+
+---
+
+## 审计日志
+
+### 导出方法
+
+```bash
+# 导出为 CSV（默认）
+bash scripts/export-audit.sh --since 2026-01-01 audit.csv
+
+# 导出为 JSON
+bash scripts/export-audit.sh --format json --tenant cogkos-dev audit.json
+
+# 输出到 stdout
+bash scripts/export-audit.sh --since 2026-03-01
+```
+
+### 数据来源
+
+脚本优先查询 `audit_logs` 表（结构化审计日志），若该表不存在则回退到 `epistemic_claims` + `agent_feedbacks` 的操作记录合并视图。
+
+### 导出字段
+
+| 字段 | 说明 |
+|------|------|
+| id | 记录唯一 ID |
+| timestamp | 操作时间 (ISO 8601) |
+| action | 操作类型 |
+| category | 分类（Knowledge/Feedback/System） |
+| severity | 级别（Info/Warning/Error） |
+| tenant_id | 租户 ID |
+| actor | 操作者（用户/服务/Agent） |
+| target | 操作目标（资源类型:ID） |
+| outcome | 结果（Success/Failure） |
+
+### 合规建议
+
+- 审计日志应至少保留 90 天（金融/医疗行业可能要求更长）
+- 定期导出并归档到不可变存储（S3 Object Lock / WORM）
+- 配合 `audit_logs` 表的 RLS 策略，确保跨租户隔离
+- 建议每月生成合规报告并存档
+
+---
+
+## 高可用部署
+
+### 架构概述
+
+CogKOS 本身无状态（所有状态存于 PostgreSQL + FalkorDB），天然支持横向扩展。多实例部署只需负载均衡即可。
+
+### 部署拓扑
+
+```
+Production HA Topology:
+                    ┌─ Load Balancer ─┐
+                    │  (nginx/traefik) │
+                    └──┬─────────┬────┘
+                       │         │
+              ┌────────┤         ├────────┐
+              │        │         │        │
+         CogKOS-1  CogKOS-2  CogKOS-3
+              │        │         │
+              └────────┤         ├────────┘
+                       │         │
+              ┌────────┴─────────┴────────┐
+              │   PostgreSQL Primary      │
+              │   ↓ streaming replication │
+              │   PostgreSQL Replica      │
+              └───────────────────────────┘
+              ┌───────────────────────────┐
+              │   FalkorDB (Sentinel)     │
+              └───────────────────────────┘
+              ┌───────────────────────────┐
+              │   TEI-1  TEI-2 (BGE-M3)  │
+              └───────────────────────────┘
+```
+
+### CogKOS 实例
+
+- 无状态，可随时启停
+- 建议至少 3 实例保证可用性
+- 负载均衡器推荐：Traefik（自动服务发现）或 nginx（简单稳定）
+- 健康检查端点：`GET /health`，返回各组件状态
+
+### PostgreSQL 高可用
+
+| 方案 | 复杂度 | 适用场景 |
+|------|--------|----------|
+| Streaming Replication | 低 | 中小规模，手动故障切换 |
+| Patroni + etcd | 中 | 生产环境，自动故障切换 |
+| Citus | 高 | 大规模分布式，需要水平分片 |
+
+推荐配置：
+
+```yaml
+# Patroni 最小配置
+scope: cogkos-cluster
+namespace: /cogkos
+name: pg-node-1
+restapi:
+  listen: 0.0.0.0:8008
+bootstrap:
+  dcs:
+    postgresql:
+      parameters:
+        max_connections: 200
+        shared_buffers: 2GB
+        wal_level: replica
+        max_wal_senders: 5
+```
+
+pgvector 索引在 Replica 上可用于只读查询（语义搜索分流）。
+
+### FalkorDB 高可用
+
+使用 Redis Sentinel 或 Cluster 模式：
+
+```bash
+# Sentinel 模式（推荐，简单可靠）
+# sentinel.conf
+sentinel monitor cogkos-falkordb falkordb-primary 6379 2
+sentinel down-after-milliseconds cogkos-falkordb 5000
+sentinel failover-timeout cogkos-falkordb 10000
+```
+
+CogKOS 通过 `FALKORDB_URL` 连接，Sentinel 模式下指向 Sentinel 地址即可。
+
+### BGE-M3 TEI 高可用
+
+- 部署多个 TEI 实例，CogKOS 通过 round-robin 负载均衡访问
+- GPU 实例和 CPU 实例可混合部署（GPU 优先，CPU 降级）
+- 建议至少 2 个实例，避免 Embedding 服务单点故障
+
+```yaml
+# docker-compose HA 配置示例
+services:
+  tei-1:
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    ports:
+      - "8080:80"
+  tei-2:
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    ports:
+      - "8081:80"
+```
+
+### 容量规划
+
+| 组件 | 单实例推荐 | 备注 |
+|------|-----------|------|
+| CogKOS | 2 CPU / 2GB RAM | 无状态，受限于下游连接数 |
+| PostgreSQL | 4 CPU / 8GB RAM / SSD | 主要瓶颈在 pgvector 索引 |
+| FalkorDB | 2 CPU / 4GB RAM | 内存受图规模影响 |
+| TEI (GPU) | 1 GPU / 4GB VRAM | 单实例即可支撑 500+ req/s |
+| TEI (CPU) | 4 CPU / 4GB RAM | 延迟高，仅作降级方案 |
 
 ---
 
@@ -272,6 +560,66 @@ pgvector 数据随 PostgreSQL 一起备份，无需单独操作。
    ```bash
    curl -X POST http://localhost:3000/admin/reindex
    ```
+
+### Embedding 服务不可用
+
+1. 检查 TEI 实例状态：
+   ```bash
+   curl http://localhost:8080/health
+   ```
+
+2. 检查 GPU 驱动：
+   ```bash
+   nvidia-smi  # 确认 GPU 可用
+   ```
+
+3. 降级到远程 API：
+   ```bash
+   # 切换到 302.ai 远程 Embedding
+   export EMBEDDING_PROVIDER=openai
+   export EMBEDDING_BASE_URL=https://api.302.ai/v1
+   export EMBEDDING_MODEL=text-embedding-3-large
+   ```
+
+### MCP 会话超时
+
+1. 检查 MCP 端口是否正常监听：
+   ```bash
+   ss -tlnp | grep 3000
+   ```
+
+2. 验证 MCP 初始化：
+   ```bash
+   curl -X POST http://localhost:3000/mcp \
+     -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"debug","version":"0.1"}}}'
+   ```
+
+3. 检查日志中的认证错误：
+   ```bash
+   RUST_LOG=cogkos_mcp=debug ./target/release/cogkos 2>&1 | grep -i auth
+   ```
+
+### 日志位置和级别调整
+
+| 部署方式 | 日志位置 |
+|----------|---------|
+| systemd user service | `journalctl --user -u cogkos` |
+| Docker | `docker logs cogkos` |
+| 直接运行 | stdout/stderr |
+
+运行时调整日志级别（不需要重启）：
+
+```bash
+# 全局 debug
+RUST_LOG=debug
+
+# 模块级别控制
+RUST_LOG=cogkos_mcp=debug,cogkos_store=info,cogkos_sleep=warn
+
+# 仅看 SQL 查询
+RUST_LOG=sqlx=debug
+```
 
 ---
 
