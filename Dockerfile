@@ -24,12 +24,11 @@ COPY crates/cogkos-sleep/Cargo.toml crates/cogkos-sleep/Cargo.toml
 COPY crates/cogkos-llm/Cargo.toml crates/cogkos-llm/Cargo.toml
 COPY crates/cogkos-federation/Cargo.toml crates/cogkos-federation/Cargo.toml
 COPY crates/cogkos-external/Cargo.toml crates/cogkos-external/Cargo.toml
-COPY crates/cogkos-workflow/Cargo.toml crates/cogkos-workflow/Cargo.toml
 
 # Create dummy source files to cache dependency builds
 RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && \
     for crate in cogkos-core cogkos-store cogkos-mcp cogkos-ingest cogkos-sleep \
-                 cogkos-llm cogkos-federation cogkos-external cogkos-workflow; do \
+                 cogkos-llm cogkos-federation cogkos-external; do \
         mkdir -p "crates/$crate/src" && echo '' > "crates/$crate/src/lib.rs"; \
     done && \
     cargo build --release 2>/dev/null || true
@@ -40,7 +39,7 @@ COPY . .
 # Trigger full rebuild (dummy source timestamps are stale)
 RUN touch src/main.rs && \
     for crate in cogkos-core cogkos-store cogkos-mcp cogkos-ingest cogkos-sleep \
-                 cogkos-llm cogkos-federation cogkos-external cogkos-workflow; do \
+                 cogkos-llm cogkos-federation cogkos-external; do \
         touch "crates/$crate/src/lib.rs"; \
     done
 
