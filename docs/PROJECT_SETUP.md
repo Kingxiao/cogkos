@@ -69,10 +69,6 @@ cogkos/
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │
-│   ├── cogkos-workflow/        # 工作流引擎（LLM 自动规划 + 模板匹配 + A/B 测试）
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │
 │   └── cogkos-federation/      # 联邦层（群体智慧健康检查已激活，跨实例路由冻结）
 │       ├── Cargo.toml
 │       └── src/
@@ -101,7 +97,6 @@ members = [
     "crates/cogkos-sleep",
     "crates/cogkos-llm",
     "crates/cogkos-external",
-    "crates/cogkos-workflow",
     "crates/cogkos-federation",
 ]
 
