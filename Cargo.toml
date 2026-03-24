@@ -56,7 +56,6 @@ members = [
     "crates/cogkos-store",
     "crates/cogkos-ingest",
     "crates/cogkos-mcp",
-    "crates/cogkos-workflow",
     "crates/cogkos-sleep",
 ]
 resolver = "2"

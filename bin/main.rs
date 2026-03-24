@@ -21,7 +21,6 @@ async fn main() {
     println!("  - cogkos-core: Core functionality");
     println!("  - cogkos-ingest: File ingestion");
     println!("  - cogkos-llm: LLM integration");
-    println!("  - cogkos-workflow: Workflow engine");
     println!("  - cogkos-store: Storage layer");
     println!();
 

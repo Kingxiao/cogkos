@@ -13,7 +13,6 @@ path = "main.rs"
 cogkos-core = { path = "../crates/cogkos-core" }
 cogkos-ingest = { path = "../crates/cogkos-ingest", features = ["whisper"] }
 cogkos-llm = { path = "../crates/cogkos-llm" }
-cogkos-workflow = { path = "../crates/cogkos-workflow" }
 cogkos-store = { path = "../crates/cogkos-store" }
 cogkos-federation = { path = "../crates/cogkos-federation" }
 cogkos-external = { path = "../crates/cogkos-external" }
