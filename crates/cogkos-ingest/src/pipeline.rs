@@ -174,6 +174,14 @@ impl IngestionPipeline {
             serde_json::Value::String(content_hash),
         );
 
+        // Namespace isolation — propagate to file claim and all child claims
+        if let Some(ref ns) = file.namespace {
+            file_claim.metadata.insert(
+                "namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+        }
+
         let file_claim_id = claim_store.insert_claim(&file_claim).await?;
 
         // 4. Parse document into chunks
@@ -523,6 +531,14 @@ impl IngestionPipeline {
             .metadata
             .insert("domain".to_string(), serde_json::Value::String(domain));
 
+        // Propagate namespace from parent file
+        if let Some(ref ns) = file.namespace {
+            claim.metadata.insert(
+                "namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+        }
+
         claim
     }
 
@@ -568,6 +584,14 @@ impl IngestionPipeline {
             "source_chunk_id".to_string(),
             serde_json::Value::String(parent_chunk_id.to_string()),
         );
+
+        // Propagate namespace from parent file
+        if let Some(ref ns) = file.namespace {
+            claim.metadata.insert(
+                "namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+        }
 
         claim
     }

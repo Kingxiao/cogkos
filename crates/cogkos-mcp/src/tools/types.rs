@@ -45,6 +45,10 @@ pub struct QueryKnowledgeRequest {
     /// Agent ID for episodic memory scoping — episodic results filtered to this agent only
     #[serde(default)]
     pub agent_id: Option<String>,
+    /// Optional namespace filter — only return knowledge from this namespace.
+    /// Claims without a namespace are always visible (public knowledge).
+    #[serde(default)]
+    pub namespace: Option<String>,
 }
 
 pub fn default_activation_threshold() -> f64 {
@@ -115,6 +119,10 @@ pub struct SubmitExperienceRequest {
     /// Session ID for working/episodic memory scoping
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Optional namespace for intra-tenant isolation (e.g. client projects).
+    /// Claims with a namespace are only visible within that namespace.
+    #[serde(default)]
+    pub namespace: Option<String>,
 }
 
 fn default_role() -> String {
@@ -318,6 +326,9 @@ pub struct UploadDocumentRequest {
     pub tags: Vec<String>,
     #[serde(default = "default_true")]
     pub auto_process: bool,
+    /// Optional namespace for intra-tenant isolation.
+    #[serde(default)]
+    pub namespace: Option<String>,
 }
 
 /// Document upload response
@@ -329,6 +340,44 @@ pub struct DocumentUploadResponse {
     pub pipeline_id: Option<String>,
     #[serde(default)]
     pub is_duplicate: bool,
+}
+
+/// Manage claim request (promote/demote/set confidence/retract)
+#[derive(Debug, Deserialize)]
+pub struct ManageClaimRequest {
+    pub claim_id: String,
+    pub action: ManageAction,
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+/// Action to perform on a claim
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum ManageAction {
+    #[serde(rename = "promote")]
+    Promote { knowledge_type: String },
+    #[serde(rename = "demote")]
+    Demote { knowledge_type: String },
+    #[serde(rename = "set_confidence")]
+    SetConfidence { confidence: f64 },
+    #[serde(rename = "retract")]
+    Retract { reason: Option<String> },
+}
+
+/// Batch invalidate request
+#[derive(Debug, Deserialize)]
+pub struct BatchInvalidateRequest {
+    #[serde(default)]
+    pub domain: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub created_before: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(default)]
+    pub knowledge_type: Option<String>,
+    #[serde(default)]
+    pub api_key: Option<String>,
 }
 
 /// Knowledge gap record (for report_gap)

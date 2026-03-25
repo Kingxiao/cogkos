@@ -279,12 +279,18 @@ impl Scheduler {
                 {
                     Ok(conflicts) => {
                         failures = 0;
+                        let conflict_count = conflicts.len();
                         s.record_processed(
                             TaskType::ConflictDetectionPeriodic,
-                            conflicts.len() as u64,
+                            conflict_count as u64,
                         )
                         .await;
                         s.state.write().await.last_conflict_detection = Some(chrono::Utc::now());
+
+                        // Batch webhook notification — single summary to avoid flooding
+                        if conflict_count > 0 {
+                            notify_conflicts_batch("default", conflict_count);
+                        }
                     }
                     Err(e) => {
                         failures += 1;
@@ -557,5 +563,31 @@ pub(crate) fn compute_backoff(base_interval_secs: u64, failures: u32) -> Duratio
 pub(crate) fn check_time_budget(start: std::time::Instant, max_ms: u64, task_name: &str) {
     if start.elapsed().as_millis() > max_ms as u128 {
         warn!("{} task exceeded time budget", task_name);
+    }
+}
+
+/// Fire-and-forget batch webhook notification for periodic conflict detection.
+/// Sends a single summary instead of per-conflict notifications to avoid webhook flooding.
+fn notify_conflicts_batch(tenant_id: &str, count: usize) {
+    if let Ok(url) = std::env::var("CONFLICT_WEBHOOK_URL") {
+        let payload = serde_json::json!({
+            "event": "conflicts_batch_detected",
+            "count": count,
+            "tenant_id": tenant_id,
+            "detected_at": chrono::Utc::now().to_rfc3339(),
+        });
+
+        tokio::spawn(async move {
+            let client = reqwest::Client::new();
+            if let Err(e) = client
+                .post(&url)
+                .json(&payload)
+                .timeout(std::time::Duration::from_secs(5))
+                .send()
+                .await
+            {
+                warn!(error = %e, "Failed to send batch conflict webhook");
+            }
+        });
     }
 }

@@ -431,6 +431,68 @@ impl ServerHandler for CogkosMcpHandler {
                         serde_json::to_string(&response).unwrap_or_default(),
                     )]))
                 }
+                "manage_claim" => {
+                    if !auth_context.can_write() {
+                        return Err(rmcp::ErrorData::new(
+                            ErrorCode(-32001),
+                            "Permission denied: write access required",
+                            None,
+                        ));
+                    }
+
+                    let req: ManageClaimRequest =
+                        serde_json::from_value(serde_json::Value::Object(arguments.clone()))
+                            .map_err(|e| {
+                                rmcp::ErrorData::new(
+                                    ErrorCode::INVALID_PARAMS,
+                                    format!("Invalid arguments: {}", e),
+                                    None,
+                                )
+                            })?;
+
+                    let result = handle_manage_claim(
+                        req,
+                        &auth_context.tenant_id,
+                        self.state.stores.claims.as_ref(),
+                    )
+                    .await
+                    .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;
+
+                    Ok(CallToolResult::success(vec![Content::text(
+                        result.to_string(),
+                    )]))
+                }
+                "batch_invalidate" => {
+                    if !auth_context.can_write() {
+                        return Err(rmcp::ErrorData::new(
+                            ErrorCode(-32001),
+                            "Permission denied: write access required",
+                            None,
+                        ));
+                    }
+
+                    let req: BatchInvalidateRequest =
+                        serde_json::from_value(serde_json::Value::Object(arguments.clone()))
+                            .map_err(|e| {
+                                rmcp::ErrorData::new(
+                                    ErrorCode::INVALID_PARAMS,
+                                    format!("Invalid arguments: {}", e),
+                                    None,
+                                )
+                            })?;
+
+                    let result = handle_batch_invalidate(
+                        req,
+                        &auth_context.tenant_id,
+                        self.state.stores.claims.as_ref(),
+                    )
+                    .await
+                    .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;
+
+                    Ok(CallToolResult::success(vec![Content::text(
+                        result.to_string(),
+                    )]))
+                }
                 "list_subscriptions" => {
                     if !auth_context.can_read() {
                         return Err(rmcp::ErrorData::new(
@@ -552,7 +614,9 @@ mod tests {
         assert!(names.contains(&"subscribe_webhook"));
         assert!(names.contains(&"subscribe_api"));
         assert!(names.contains(&"list_subscriptions"));
-        assert_eq!(tools.len(), 10);
+        assert!(names.contains(&"manage_claim"));
+        assert!(names.contains(&"batch_invalidate"));
+        assert_eq!(tools.len(), 12);
     }
 
     #[test]

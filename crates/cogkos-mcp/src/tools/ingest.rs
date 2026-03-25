@@ -96,6 +96,14 @@ pub async fn handle_submit_experience(
         );
     }
 
+    // Namespace isolation — write namespace to metadata for intra-tenant scoping
+    if let Some(ref ns) = req.namespace {
+        claim.metadata.insert(
+            "namespace".to_string(),
+            serde_json::Value::String(ns.clone()),
+        );
+    }
+
     let t0 = std::time::Instant::now();
     let claim_id = claim_store.insert_claim(&claim).await?;
     cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
@@ -190,6 +198,7 @@ pub async fn handle_submit_experience(
                 );
                 for conflict in &conflicts {
                     claim_store.insert_conflict(conflict).await.ok();
+                    notify_conflict_webhook(conflict, &bg_claim.content);
                 }
 
                 tracing::debug!(
@@ -290,6 +299,7 @@ pub async fn handle_upload_document(
                 data: file_data,
                 source: claimant,
                 tenant_id: tenant_id.to_string(),
+                namespace: req.namespace.clone(),
             };
 
             let pipeline = IngestionPipeline::with_llm(embedding_svc.clone(), llm_client.clone());
@@ -304,11 +314,17 @@ pub async fn handle_upload_document(
                 )
                 .await
             {
-                Ok(result) => (
-                    "completed",
-                    Some(format!("pipe-{}", &file_id.to_string()[..8])),
-                    format!("{}ms", result.chunk_claim_ids.len() * 100),
-                ),
+                Ok(result) => {
+                    // Webhook notification for pipeline-detected conflicts
+                    for conflict in &result.conflicts_detected {
+                        notify_conflict_webhook(conflict, &req.filename);
+                    }
+                    (
+                        "completed",
+                        Some(format!("pipe-{}", &file_id.to_string()[..8])),
+                        format!("{}ms", result.chunk_claim_ids.len() * 100),
+                    )
+                }
                 Err(e) => {
                     tracing::error!("Ingestion pipeline error: {}", e);
                     (
@@ -372,6 +388,14 @@ pub async fn handle_upload_document(
             "content_hash".to_string(),
             serde_json::Value::String(content_hash),
         );
+
+        // Namespace isolation for uploaded document
+        if let Some(ref ns) = req.namespace {
+            claim.metadata.insert(
+                "namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+        }
 
         let _claim_id = claim_store.insert_claim(&claim).await?;
         cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
@@ -490,4 +514,20 @@ pub async fn handle_get_meta_directory(
         "total_domains": total_domains,
         "total_claims": total_claims
     }))
+}
+
+/// Log conflict detection event.
+/// When CONFLICT_WEBHOOK_URL is set, logs at info level for external monitoring integration.
+fn notify_conflict_webhook(conflict: &cogkos_core::models::ConflictRecord, context_hint: &str) {
+    if std::env::var("CONFLICT_WEBHOOK_URL").is_ok() {
+        tracing::info!(
+            conflict_id = %conflict.id,
+            conflict_type = ?conflict.conflict_type,
+            severity = conflict.severity,
+            claim_a = %conflict.claim_a_id,
+            claim_b = %conflict.claim_b_id,
+            context = context_hint,
+            "Conflict detected — external webhook dispatch pending"
+        );
+    }
 }

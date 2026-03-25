@@ -123,6 +123,24 @@ pub trait ClaimStore: Send + Sync {
     /// Sets old claim's status to Superseded, confidence to 0.1,
     /// and records new_id as the successor.
     async fn supersede_claim(&self, old_id: Id, new_id: Id, tenant_id: &str) -> Result<()>;
+
+    /// Batch invalidate claims matching the given filter.
+    /// Sets epistemic_status to 'retracted' and confidence to 0.0.
+    /// Returns the number of affected claims.
+    async fn batch_invalidate(
+        &self,
+        tenant_id: &str,
+        filter: BatchInvalidateFilter,
+    ) -> Result<usize>;
+}
+
+/// Filter for batch invalidation of claims
+#[derive(Debug, Default)]
+pub struct BatchInvalidateFilter {
+    pub domain: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub created_before: Option<chrono::DateTime<chrono::Utc>>,
+    pub knowledge_type: Option<String>,
 }
 
 /// Memory layer store trait — separated from ClaimStore for explicit opt-in
@@ -618,6 +636,52 @@ impl ClaimStore for InMemoryClaimStore {
         old.updated_at = chrono::Utc::now();
 
         Ok(())
+    }
+
+    async fn batch_invalidate(
+        &self,
+        tenant_id: &str,
+        filter: BatchInvalidateFilter,
+    ) -> Result<usize> {
+        let mut claims = self.claims.write().await;
+        let mut count = 0;
+        for claim in claims.values_mut() {
+            if claim.tenant_id != tenant_id {
+                continue;
+            }
+            if claim.epistemic_status == EpistemicStatus::Retracted {
+                continue;
+            }
+            let mut matches = true;
+            if let Some(ref domain) = filter.domain {
+                let claim_domain = claim
+                    .metadata
+                    .get("domain")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if claim_domain != domain {
+                    matches = false;
+                }
+            }
+            if let Some(ref created_before) = filter.created_before {
+                if claim.created_at >= *created_before {
+                    matches = false;
+                }
+            }
+            if let Some(ref kt) = filter.knowledge_type {
+                let claim_kt = format!("{}", claim.knowledge_type);
+                if claim_kt != *kt {
+                    matches = false;
+                }
+            }
+            if matches {
+                claim.epistemic_status = EpistemicStatus::Retracted;
+                claim.confidence = 0.0;
+                claim.updated_at = chrono::Utc::now();
+                count += 1;
+            }
+        }
+        Ok(count)
     }
 }
 

@@ -160,6 +160,10 @@ pub async fn handle_query_knowledge(
         }
     }
 
+    // 3a-post. Filter out expired claims (cache hit may bypass SQL filter)
+    claims.retain(|c| c.t_valid_end.map_or(true, |end| end > chrono::Utc::now()));
+    claim_ids = claims.iter().map(|c| c.id).collect();
+
     // 3b. Post-filter by session_id if requested (for working memory scoping)
     if let Some(ref sid) = req.session_id {
         claims.retain(|c| {
@@ -184,7 +188,20 @@ pub async fn handle_query_knowledge(
         }
     }
 
-    // 3c. Record rehearsal for retrieved claims (S3: read equals write)
+    // 3d. Namespace isolation — filter claims by namespace if requested.
+    // Claims without a namespace are always visible (public knowledge).
+    // Claims with a namespace must match the requested namespace exactly.
+    if let Some(ref ns) = req.namespace {
+        claims.retain(|c| {
+            c.metadata
+                .get("namespace")
+                .and_then(|v| v.as_str())
+                .map_or(true, |claim_ns| claim_ns == ns)
+        });
+        claim_ids = claims.iter().map(|c| c.id).collect();
+    }
+
+    // 3e. Record rehearsal for retrieved claims (S3: read equals write)
     for claim in &claims {
         let layer = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata);
         let delta = layer.lambda() * 0.4;

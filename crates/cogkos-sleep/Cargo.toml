@@ -24,6 +24,7 @@ tracing = { workspace = true }
 async-trait = { workspace = true }
 dashmap = { workspace = true }
 parking_lot = { workspace = true }
+reqwest = { workspace = true }
 futures = { workspace = true }
 tokio-util = { workspace = true }
 statrs = { workspace = true }

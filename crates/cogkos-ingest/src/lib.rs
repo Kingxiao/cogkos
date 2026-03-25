@@ -109,6 +109,8 @@ pub struct UploadedFile {
     pub data: Vec<u8>,
     pub source: Claimant,
     pub tenant_id: String,
+    /// Optional namespace for intra-tenant isolation
+    pub namespace: Option<String>,
 }
 
 /// Ingestion result

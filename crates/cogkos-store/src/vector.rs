@@ -153,6 +153,7 @@ impl super::VectorStore for PgVectorStore {
                 "SELECT id, 1 - (embedding <=> $1::vector) as score
                  FROM epistemic_claims
                  WHERE tenant_id = $2 AND embedding IS NOT NULL
+                   AND (t_valid_end IS NULL OR t_valid_end > NOW())
                    AND COALESCE(metadata->>'memory_layer', 'semantic') = $4
                  ORDER BY embedding <=> $1::vector
                  LIMIT $3",
@@ -168,6 +169,7 @@ impl super::VectorStore for PgVectorStore {
                 "SELECT id, 1 - (embedding <=> $1::vector) as score
                  FROM epistemic_claims
                  WHERE tenant_id = $2 AND embedding IS NOT NULL
+                   AND (t_valid_end IS NULL OR t_valid_end > NOW())
                  ORDER BY embedding <=> $1::vector
                  LIMIT $3",
             )

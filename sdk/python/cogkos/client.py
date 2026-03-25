@@ -88,6 +88,7 @@ class CogKOS:
         source_agent: str | None = None,
         memory_layer: str | None = None,
         session_id: str | None = None,
+        namespace: str | None = None,
     ) -> LearnResult:
         """Submit knowledge to CogKOS.
 
@@ -100,6 +101,7 @@ class CogKOS:
             source_agent: Override the default source agent name.
             memory_layer: Memory layer (working/episodic/semantic).
             session_id: Session ID for working/episodic scoping.
+            namespace: Namespace for intra-tenant isolation (e.g. client project scoping).
 
         Returns:
             LearnResult with claim_id and status.
@@ -118,6 +120,8 @@ class CogKOS:
             args["memory_layer"] = memory_layer
         if session_id:
             args["session_id"] = session_id
+        if namespace:
+            args["namespace"] = namespace
 
         data = self._call_tool("submit_experience", args)
         return LearnResult.from_response(data)
@@ -133,6 +137,7 @@ class CogKOS:
         include_gaps: bool = True,
         memory_layer: str | None = None,
         session_id: str | None = None,
+        namespace: str | None = None,
     ) -> RecallResult:
         """Query the knowledge base.
 
@@ -145,6 +150,7 @@ class CogKOS:
             include_gaps: Include knowledge gaps.
             memory_layer: Filter by memory layer.
             session_id: Filter by session ID.
+            namespace: Namespace for intra-tenant isolation.
 
         Returns:
             RecallResult with beliefs, conflicts, predictions, etc.
@@ -162,6 +168,8 @@ class CogKOS:
             args["memory_layer"] = memory_layer
         if session_id:
             args["session_id"] = session_id
+        if namespace:
+            args["namespace"] = namespace
 
         data = self._call_tool("query_knowledge", args)
         return RecallResult.from_response(data)

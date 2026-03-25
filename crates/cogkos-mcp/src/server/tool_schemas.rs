@@ -45,6 +45,10 @@ pub fn build_tools() -> Vec<Tool> {
         "agent_id".to_string(),
         serde_json::json!({"type": "string", "description": "Agent ID for episodic memory scoping — only returns this agent's experiences"}),
     );
+    input_schema.insert(
+        "namespace".to_string(),
+        serde_json::json!({"type": "string", "description": "Namespace filter for intra-tenant isolation. Claims without namespace are always visible."}),
+    );
     input_schema.insert("required".to_string(), serde_json::json!(["query"]));
     inject_api_key(&mut input_schema);
     tools.push(Tool::new(
@@ -76,6 +80,10 @@ pub fn build_tools() -> Vec<Tool> {
     input_schema.insert(
         "session_id".to_string(),
         serde_json::json!({"type": "string", "description": "Session ID for working/episodic memory scoping"}),
+    );
+    input_schema.insert(
+        "namespace".to_string(),
+        serde_json::json!({"type": "string", "description": "Namespace for intra-tenant isolation (e.g. client project scoping)"}),
     );
     input_schema.insert(
         "required".to_string(),
@@ -169,6 +177,10 @@ pub fn build_tools() -> Vec<Tool> {
         serde_json::json!({"type": "boolean"}),
     );
     input_schema.insert(
+        "namespace".to_string(),
+        serde_json::json!({"type": "string", "description": "Namespace for intra-tenant isolation"}),
+    );
+    input_schema.insert(
         "required".to_string(),
         serde_json::json!(["filename", "content_base64", "source"]),
     );
@@ -254,6 +266,55 @@ pub fn build_tools() -> Vec<Tool> {
     tools.push(Tool::new(
         "subscribe_api",
         "Subscribe to an API endpoint for periodic polling",
+        input_schema,
+    ));
+
+    // manage_claim
+    let mut input_schema = JsonObject::new();
+    input_schema.insert(
+        "claim_id".to_string(),
+        serde_json::json!({"type": "string", "description": "UUID of the claim to manage"}),
+    );
+    input_schema.insert(
+        "action".to_string(),
+        serde_json::json!({
+            "type": "object",
+            "description": "Action to perform: {\"type\": \"promote\", \"knowledge_type\": \"Business\"}, {\"type\": \"demote\", \"knowledge_type\": \"Experiential\"}, {\"type\": \"set_confidence\", \"confidence\": 0.8}, or {\"type\": \"retract\", \"reason\": \"...\"}"
+        }),
+    );
+    input_schema.insert(
+        "required".to_string(),
+        serde_json::json!(["claim_id", "action"]),
+    );
+    inject_api_key(&mut input_schema);
+    tools.push(Tool::new(
+        "manage_claim",
+        "Manage a claim: promote, demote, set confidence, or retract",
+        input_schema,
+    ));
+
+    // batch_invalidate
+    let mut input_schema = JsonObject::new();
+    input_schema.insert(
+        "domain".to_string(),
+        serde_json::json!({"type": "string", "description": "Filter by domain"}),
+    );
+    input_schema.insert(
+        "tags".to_string(),
+        serde_json::json!({"type": "array", "items": {"type": "string"}, "description": "Filter by tags"}),
+    );
+    input_schema.insert(
+        "created_before".to_string(),
+        serde_json::json!({"type": "string", "format": "date-time", "description": "Filter claims created before this timestamp"}),
+    );
+    input_schema.insert(
+        "knowledge_type".to_string(),
+        serde_json::json!({"type": "string", "enum": ["Business", "Experiential"], "description": "Filter by knowledge type"}),
+    );
+    inject_api_key(&mut input_schema);
+    tools.push(Tool::new(
+        "batch_invalidate",
+        "Batch invalidate (retract) claims matching filter criteria",
         input_schema,
     ));
 

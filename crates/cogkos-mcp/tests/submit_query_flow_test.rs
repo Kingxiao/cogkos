@@ -166,6 +166,14 @@ impl ClaimStore for MockClaimStore {
     ) -> Result<()> {
         Ok(())
     }
+
+    async fn batch_invalidate(
+        &self,
+        _tenant_id: &str,
+        _filter: cogkos_store::BatchInvalidateFilter,
+    ) -> Result<usize> {
+        Ok(0)
+    }
 }
 
 /// Mock VectorStore using shared state
@@ -356,6 +364,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let submit_result = handle_submit_experience(
@@ -411,6 +420,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let _submit_result2 = handle_submit_experience(
@@ -448,6 +458,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         memory_layer: None,
         session_id: None,
         agent_id: None,
+        namespace: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -555,6 +566,7 @@ async fn test_submit_and_query_with_conflicts() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let _result1 = handle_submit_experience(
@@ -585,6 +597,7 @@ async fn test_submit_and_query_with_conflicts() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let _result2 = handle_submit_experience(
@@ -616,6 +629,7 @@ async fn test_submit_and_query_with_conflicts() {
         memory_layer: None,
         session_id: None,
         agent_id: None,
+        namespace: None,
     };
 
     let query_result = handle_query_knowledge(
@@ -676,6 +690,7 @@ async fn test_query_returns_cached_result() {
         memory_layer: None,
         session_id: None,
         agent_id: None,
+        namespace: None,
     };
 
     let result1 = handle_query_knowledge(
@@ -728,6 +743,7 @@ async fn test_submit_experience_with_all_fields() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let result = handle_submit_experience(
@@ -792,6 +808,7 @@ async fn test_submit_experience_with_knowledge_type() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        namespace: None,
     };
 
     let _submit_result = handle_submit_experience(

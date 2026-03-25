@@ -107,6 +107,7 @@ async fn test_pipeline_ingest_text_document() {
             .to_vec(),
         source: Claimant::System,
         tenant_id: "test-tenant".to_string(),
+        namespace: None,
     };
 
     let result = pipeline
@@ -161,6 +162,7 @@ async fn test_pipeline_rejects_oversized_file() {
         data: vec![0u8; 256 * 1024 * 1024 + 1], // 256MB + 1 byte
         source: Claimant::System,
         tenant_id: "test-tenant".to_string(),
+        namespace: None,
     };
 
     let result = pipeline
@@ -194,6 +196,7 @@ async fn test_pipeline_ingest_markdown() {
             role: "researcher".to_string(),
         },
         tenant_id: "research-org".to_string(),
+        namespace: None,
     };
 
     let result = pipeline

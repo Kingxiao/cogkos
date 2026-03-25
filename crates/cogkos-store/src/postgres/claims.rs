@@ -582,6 +582,78 @@ impl crate::ClaimStore for PostgresStore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, filter), fields(%tenant_id))]
+    async fn batch_invalidate(
+        &self,
+        tenant_id: &str,
+        filter: crate::BatchInvalidateFilter,
+    ) -> Result<usize> {
+        let mut conditions = vec!["tenant_id = $1".to_string()];
+        let mut param_idx = 2u32;
+
+        // Build dynamic WHERE clauses — we bind values positionally below
+        if filter.domain.is_some() {
+            conditions.push(format!("metadata->>'domain' = ${}", param_idx));
+            param_idx += 1;
+        }
+        if filter.created_before.is_some() {
+            conditions.push(format!("created_at < ${}", param_idx));
+            param_idx += 1;
+        }
+        if filter.knowledge_type.is_some() {
+            conditions.push(format!("metadata->>'knowledge_type' = ${}", param_idx));
+            param_idx += 1;
+        }
+        if let Some(ref tags) = filter.tags {
+            // Match claims where metadata->'tags' array overlaps with any of the given tags
+            for _tag in tags {
+                conditions.push(format!("metadata->'tags' @> ${}::jsonb", param_idx));
+                param_idx += 1;
+            }
+        }
+
+        let sql = format!(
+            "UPDATE epistemic_claims SET epistemic_status = 'retracted', confidence = 0.0, updated_at = NOW() WHERE {} AND epistemic_status != 'retracted'",
+            conditions.join(" AND ")
+        );
+
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+        Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
+
+        let mut query = sqlx::query(&sql).bind(tenant_id);
+
+        if let Some(ref domain) = filter.domain {
+            query = query.bind(domain);
+        }
+        if let Some(ref created_before) = filter.created_before {
+            query = query.bind(created_before);
+        }
+        if let Some(ref knowledge_type) = filter.knowledge_type {
+            query = query.bind(knowledge_type);
+        }
+        if let Some(ref tags) = filter.tags {
+            for tag in tags {
+                let json_val = format!("[\"{}\"]", tag);
+                query = query.bind(json_val);
+            }
+        }
+
+        let result = query
+            .execute(tx.as_mut())
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| CogKosError::Database(e.to_string()))?;
+
+        Ok(result.rows_affected() as usize)
+    }
+
     #[tracing::instrument(skip(self), fields(%old_id, %new_id, %tenant_id))]
     async fn supersede_claim(&self, old_id: Id, new_id: Id, tenant_id: &str) -> Result<()> {
         let mut tx = self
