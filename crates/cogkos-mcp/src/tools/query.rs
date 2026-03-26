@@ -219,11 +219,58 @@ pub async fn handle_query_knowledge(
         )
         .await?;
 
-    // 3. Get claims from vector matches with comprehensive permission filtering
+    // 2a. Similarity threshold gate — filter out irrelevant nearest neighbors
+    let min_similarity: f64 = std::env::var("MIN_SIMILARITY_THRESHOLD")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.5);
+
+    let vector_matches: Vec<_> = vector_matches
+        .into_iter()
+        .filter(|m| m.score >= min_similarity)
+        .collect();
+
+    // 2b. Full-text keyword search — catches exact term matches that vectors miss
+    let text_matches = claim_store
+        .search_claims(tenant_id, &req.query, req.context.max_results as usize)
+        .await
+        .unwrap_or_default();
+
+    // 2c. Merge via RRF (Reciprocal Rank Fusion) — k=60 is the standard constant
+    let rrf_k = 60.0_f64;
+    let mut rrf_scores: std::collections::HashMap<uuid::Uuid, f64> =
+        std::collections::HashMap::new();
+
+    for (rank, m) in vector_matches.iter().enumerate() {
+        *rrf_scores.entry(m.id).or_default() += 1.0 / (rrf_k + rank as f64);
+    }
+    for (rank, c) in text_matches.iter().enumerate() {
+        *rrf_scores.entry(c.id).or_default() += 1.0 / (rrf_k + rank as f64);
+    }
+
+    // Build a quick lookup of text-matched claims to avoid redundant DB round-trips
+    let text_claim_map: std::collections::HashMap<uuid::Uuid, &EpistemicClaim> =
+        text_matches.iter().map(|c| (c.id, c)).collect();
+
+    // 3. Get claims from merged results with comprehensive permission filtering
     let mut claims = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
     let mut claim_ids: Vec<uuid::Uuid> = Vec::new();
-    for m in &vector_matches {
-        if let Ok(claim) = claim_store.get_claim(m.id, tenant_id).await {
+
+    // Sort merged IDs by descending RRF score, take top max_results
+    let mut merged_ids: Vec<_> = rrf_scores.into_iter().collect();
+    merged_ids.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    merged_ids.truncate(req.context.max_results as usize);
+
+    for (id, _score) in &merged_ids {
+        if !seen_ids.insert(*id) {
+            continue;
+        }
+        // Prefer already-fetched text matches to avoid extra DB call
+        if let Some(claim) = text_claim_map.get(id) {
+            claim_ids.push(claim.id);
+            claims.push((*claim).clone());
+        } else if let Ok(claim) = claim_store.get_claim(*id, tenant_id).await {
             claim_ids.push(claim.id);
             claims.push(claim);
         }

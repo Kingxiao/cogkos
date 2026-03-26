@@ -369,6 +369,8 @@ impl crate::ClaimStore for PostgresStore {
             .map_err(|e| CogKosError::Database(e.to_string()))?;
         Self::set_tenant_context(tx.as_mut(), tenant_id).await?;
 
+        // Hybrid: try full-text search first, fall back to ILIKE if tsquery yields nothing.
+        // 'simple' config tokenizes on whitespace/punctuation — works for CJK + English mixed content.
         let rows = sqlx::query(
             r#"
             SELECT id, tenant_id, content, node_type, epistemic_status, confidence,
@@ -377,11 +379,19 @@ impl crate::ClaimStore for PostgresStore {
                 t_known, vector_id, last_prediction_error, derived_from, needs_revalidation,
                 durability, created_at, updated_at, metadata
             FROM epistemic_claims
-            WHERE tenant_id = $1 AND content LIKE $2
-            ORDER BY confidence DESC LIMIT $3
+            WHERE tenant_id = $1
+              AND (t_valid_end IS NULL OR t_valid_end > NOW())
+              AND (
+                  to_tsvector('simple', content) @@ plainto_tsquery('simple', $2)
+                  OR content ILIKE $3
+              )
+            ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', $2)) DESC,
+                     confidence DESC
+            LIMIT $4
         "#,
         )
         .bind(tenant_id)
+        .bind(query)
         .bind(format!("%{}%", query))
         .bind(limit as i64)
         .fetch_all(tx.as_mut())
