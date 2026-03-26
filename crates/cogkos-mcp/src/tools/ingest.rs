@@ -104,6 +104,55 @@ pub async fn handle_submit_experience(
         );
     }
 
+    // === Write consistency check: only for semantic layer ===
+    // Skip conflict check for working/episodic layers — they are ephemeral.
+    let is_semantic = req
+        .memory_layer
+        .as_deref()
+        .map_or(true, |l| l == "semantic");
+
+    if is_semantic {
+        if let Ok(similar_claims) = claim_store
+            .search_claims(tenant_id, &claim.content, 5)
+            .await
+        {
+            for existing in &similar_claims {
+                let existing_tier = AuthorityTier::resolve(existing);
+                if matches!(
+                    existing_tier,
+                    AuthorityTier::Canonical | AuthorityTier::Curated
+                ) {
+                    // T1/T2 authority: reject if conflict detected
+                    if cogkos_core::evolution::conflict::detect_conflict(&claim, existing).is_some()
+                    {
+                        return Ok(serde_json::json!({
+                            "status": "rejected",
+                            "reason": "conflicts_with_authority",
+                            "conflicting_claim_id": existing.id.to_string(),
+                            "conflicting_content": existing.content.chars().take(200).collect::<String>()
+                        }));
+                    }
+                }
+            }
+
+            // T3/T4 conflict check: accept but mark as contested
+            let t3t4_conflicts: usize = similar_claims
+                .iter()
+                .filter(|existing| {
+                    let et = AuthorityTier::resolve(existing);
+                    matches!(et, AuthorityTier::Verified | AuthorityTier::Observed)
+                        && cogkos_core::evolution::conflict::detect_conflict(&claim, existing)
+                            .is_some()
+                })
+                .count();
+
+            if t3t4_conflicts > 0 {
+                claim.epistemic_status = EpistemicStatus::Contested;
+                claim.confidence *= 0.5;
+            }
+        }
+    }
+
     let t0 = std::time::Instant::now();
     let claim_id = claim_store.insert_claim(&claim).await?;
     cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
@@ -218,12 +267,25 @@ pub async fn handle_submit_experience(
         );
     });
 
-    let resp = serde_json::json!({
+    let status = if matches!(claim.epistemic_status, EpistemicStatus::Contested) {
+        "accepted_contested"
+    } else {
+        "accepted"
+    };
+
+    let mut resp = serde_json::json!({
         "claim_id": claim_id.to_string(),
-        "status": "accepted",
+        "status": status,
         "consolidation": "async",
         "estimated_consolidation_time": "5s"
     });
+
+    if status == "accepted_contested" {
+        resp.as_object_mut()
+            .unwrap()
+            .insert("conflicts_detected".to_string(), serde_json::json!(true));
+    }
+
     Ok(resp)
 }
 

@@ -143,6 +143,7 @@ impl EvolutionEngine {
             based_on: claims.len(),
             consolidation_stage: stage,
             claim_ids,
+            reliability: None,
         }
     }
 

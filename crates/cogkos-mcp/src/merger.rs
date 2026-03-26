@@ -12,6 +12,8 @@ pub struct MergeConfig {
     pub graph_weight: f64,
     /// Weight for authority tier boost (0.0-1.0)
     pub authority_weight: f64,
+    /// Weight for feedback quality signal (0.0-1.0)
+    pub feedback_weight: f64,
     /// Minimum combined score to include in results
     pub min_score: f64,
     /// Maximum results to return
@@ -24,10 +26,15 @@ impl Default for MergeConfig {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.2);
+        let feedback_weight: f64 = std::env::var("MERGE_FEEDBACK_WEIGHT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.25);
         Self {
-            vector_weight: 0.6,
-            graph_weight: 0.4,
+            vector_weight: 0.35,
+            graph_weight: 0.2,
             authority_weight,
+            feedback_weight,
             min_score: 0.1,
             max_results: 20,
         }
@@ -81,10 +88,14 @@ pub fn merge_results(
     for vm in vector_matches {
         if let Some(claim) = claims.iter().find(|(_, c)| c.id == vm.id).map(|(_, c)| c) {
             let authority_boost = AuthorityTier::resolve(claim).score_boost();
-            let remaining_weight = 1.0 - config.authority_weight;
+            let feedback_quality = (claim.confidence
+                * (claim.activation_weight / 0.5_f64.max(claim.activation_weight)))
+            .clamp(0.0, 1.0);
+            let remaining_weight = 1.0 - config.authority_weight - config.feedback_weight;
             let combined = vm.score * config.vector_weight * remaining_weight
                 + claim.confidence * config.graph_weight * remaining_weight
-                + authority_boost * config.authority_weight;
+                + authority_boost * config.authority_weight
+                + feedback_quality * config.feedback_weight;
 
             results.insert(
                 vm.id,
@@ -116,16 +127,22 @@ pub fn merge_results(
             .map(|(_, c)| c.confidence)
             .unwrap_or(0.5);
 
-        // Calculate combined score using activation, confidence, and authority
-        let authority_boost = claims
+        // Calculate combined score using activation, confidence, authority, and feedback quality
+        let (authority_boost, feedback_quality) = claims
             .iter()
             .find(|(_, c)| c.id == gn.id)
-            .map(|(_, c)| AuthorityTier::resolve(c).score_boost())
-            .unwrap_or(0.0);
-        let remaining_weight = 1.0 - config.authority_weight;
+            .map(|(_, c)| {
+                let ab = AuthorityTier::resolve(c).score_boost();
+                let fq = (c.confidence * (c.activation_weight / 0.5_f64.max(c.activation_weight)))
+                    .clamp(0.0, 1.0);
+                (ab, fq)
+            })
+            .unwrap_or((0.0, 0.0));
+        let remaining_weight = 1.0 - config.authority_weight - config.feedback_weight;
         let combined = gn.activation * config.graph_weight * remaining_weight
             + confidence * config.vector_weight * remaining_weight
-            + authority_boost * config.authority_weight;
+            + authority_boost * config.authority_weight
+            + feedback_quality * config.feedback_weight;
 
         if let Some(existing) = results.get_mut(&gn.id) {
             // Already exists - update to Both and combine scores

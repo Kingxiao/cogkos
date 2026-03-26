@@ -128,9 +128,9 @@ pub async fn handle_submit_feedback(
         };
 
         let adjustment = if req.success {
-            (success_rate - 0.5) * 0.1
+            (success_rate - 0.5) * 0.1 // Positive feedback: gentle adjustment
         } else {
-            -0.15
+            -0.3 // Negative feedback: 3x amplified force
         };
 
         new_confidence = Some((cached.confidence + adjustment).clamp(0.0, 1.0));
@@ -157,11 +157,23 @@ pub async fn handle_submit_feedback(
             && !claim_ids.is_empty()
         {
             for claim_id in &claim_ids {
-                if let Ok(claim) = claim_store.get_claim(*claim_id, tenant_id).await {
+                if let Ok(mut claim) = claim_store.get_claim(*claim_id, tenant_id).await {
                     // Blend: 70% original claim confidence + 30% feedback-derived confidence
                     let blended = claim.confidence * 0.7 + conf * 0.3;
                     let clamped = blended.clamp(0.0, 1.0);
-                    if let Ok(()) = claim_store
+
+                    // Auto-retract: accumulated negative feedback drove confidence near zero
+                    if clamped < 0.1 {
+                        claim.epistemic_status = EpistemicStatus::Retracted;
+                        claim.confidence = clamped;
+                        if let Ok(()) = claim_store.update_claim(&claim).await {
+                            claims_updated += 1;
+                            tracing::warn!(
+                                claim_id = %claim_id,
+                                "Claim auto-retracted due to accumulated negative feedback"
+                            );
+                        }
+                    } else if let Ok(()) = claim_store
                         .update_confidence(*claim_id, tenant_id, clamped)
                         .await
                     {
@@ -391,6 +403,7 @@ mod feedback_cache_tests {
                 based_on: 3,
                 consolidation_stage: ConsolidationStage::Consolidated,
                 claim_ids: vec![],
+                reliability: None,
             }),
             related_by_graph: vec![],
             conflicts: vec![],
@@ -583,6 +596,7 @@ mod feedback_cache_tests {
                 based_on: 1,
                 consolidation_stage: ConsolidationStage::Consolidated,
                 claim_ids: vec![],
+                reliability: None,
             }),
             related_by_graph: vec![],
             conflicts: vec![],

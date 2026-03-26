@@ -312,6 +312,7 @@ mod tests {
                 based_on: 3,
                 consolidation_stage: cogkos_core::ConsolidationStage::Consolidated,
                 claim_ids: vec![],
+                reliability: None,
             },
             BeliefSummary {
                 claim_id: None,
@@ -320,6 +321,7 @@ mod tests {
                 based_on: 2,
                 consolidation_stage: cogkos_core::ConsolidationStage::FastTrack,
                 claim_ids: vec![],
+                reliability: None,
             },
         ];
 

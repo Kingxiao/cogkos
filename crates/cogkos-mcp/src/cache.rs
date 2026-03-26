@@ -198,6 +198,7 @@ mod tests {
             based_on: 1,
             consolidation_stage: ConsolidationStage::FastTrack,
             claim_ids: vec![claim_id],
+            reliability: None,
         });
         let entry = QueryCacheEntry::new(10, response);
         cache.set(entry).await.unwrap();

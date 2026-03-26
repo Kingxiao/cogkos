@@ -269,6 +269,32 @@ pub async fn handle_query_knowledge(
         let best = merged_results.first();
         best.map(|r| {
             let claim = claims.iter().find(|c| c.id == r.claim_id);
+            let reliability = claim.map(|c| {
+                let tier = cogkos_core::authority::AuthorityTier::resolve(c);
+                let has_positive_feedback = c.access_count >= 3 && c.confidence >= 0.7;
+                let has_negative_feedback = c.confidence < 0.4;
+                let is_contested = matches!(c.epistemic_status, EpistemicStatus::Contested);
+
+                if has_positive_feedback
+                    && matches!(
+                        tier,
+                        cogkos_core::authority::AuthorityTier::Canonical
+                            | cogkos_core::authority::AuthorityTier::Curated
+                            | cogkos_core::authority::AuthorityTier::Verified
+                    )
+                {
+                    "high".to_string()
+                } else if has_positive_feedback
+                    || matches!(tier, cogkos_core::authority::AuthorityTier::Curated)
+                {
+                    "medium".to_string()
+                } else if has_negative_feedback || is_contested {
+                    "low".to_string()
+                } else {
+                    "unverified".to_string()
+                }
+            });
+
             BeliefSummary {
                 claim_id: Some(r.claim_id),
                 content: strip_yaml_frontmatter(&r.content),
@@ -278,6 +304,7 @@ pub async fn handle_query_knowledge(
                     .map(|c| c.consolidation_stage)
                     .unwrap_or(ConsolidationStage::FastTrack),
                 claim_ids: merged_results.iter().map(|r| r.claim_id).collect(),
+                reliability,
             }
         })
     } else {

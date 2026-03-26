@@ -150,9 +150,10 @@ pub(crate) async fn run_decay(stores: &Arc<Stores>, config: &DecayConfig) -> Res
     Ok(total_processed)
 }
 
-/// Run memory GC — delete expired working and episodic claims
+/// Run memory GC — delete expired working/episodic claims + hard-delete dead semantic claims
 pub(crate) async fn run_memory_gc(stores: &Arc<Stores>) -> Result<usize> {
-    use cogkos_core::models::MemoryLayer;
+    use cogkos_core::authority::AuthorityTier;
+    use cogkos_core::models::{EpistemicStatus, MemoryLayer};
 
     info!("Running memory GC");
 
@@ -186,7 +187,33 @@ pub(crate) async fn run_memory_gc(stores: &Arc<Stores>) -> Result<usize> {
             info!(tenant = %tenant, deleted = episodic_gc, "GC'd expired episodic memory claims");
         }
 
-        total_gc += working_gc + episodic_gc;
+        // Hard GC: physically delete dead semantic claims
+        // Criteria: Retracted status, confidence < 0.05, not accessed for 30+ days,
+        //           and NOT T1/T2 authority (never delete canonical/curated).
+        let mut hard_deleted = 0usize;
+        let now = chrono::Utc::now();
+        if let Ok(all_claims) = stores.claims.query_claims(tenant, &[]).await {
+            for claim in &all_claims {
+                let tier = AuthorityTier::resolve(claim);
+                let not_accessed_30d = claim
+                    .last_accessed
+                    .map_or(true, |t| (now - t).num_days() > 30);
+                let should_hard_delete = claim.confidence < 0.05
+                    && not_accessed_30d
+                    && !matches!(tier, AuthorityTier::Canonical | AuthorityTier::Curated)
+                    && matches!(claim.epistemic_status, EpistemicStatus::Retracted);
+
+                if should_hard_delete {
+                    stores.claims.delete_claim(claim.id, tenant).await.ok();
+                    hard_deleted += 1;
+                }
+            }
+        }
+        if hard_deleted > 0 {
+            info!(tenant = %tenant, deleted = hard_deleted, "Hard-deleted dead semantic claims");
+        }
+
+        total_gc += working_gc + episodic_gc + hard_deleted;
     }
 
     info!(total_gc = total_gc, "Memory GC complete");

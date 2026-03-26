@@ -340,6 +340,7 @@ async fn test_feedback_confidence_writeback() {
         based_on: 1,
         consolidation_stage: ConsolidationStage::FastTrack,
         claim_ids: vec![claim_id],
+        reliability: None,
     };
     let response = McpQueryResponse {
         query_hash: 55555,

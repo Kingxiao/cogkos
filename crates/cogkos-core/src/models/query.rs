@@ -134,6 +134,9 @@ pub struct BeliefSummary {
     pub consolidation_stage: ConsolidationStage,
     #[serde(default)]
     pub claim_ids: Vec<Uuid>,
+    /// Reliability label: "high", "medium", "low", "unverified"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reliability: Option<String>,
 }
 
 /// Graph relation from activation diffusion
