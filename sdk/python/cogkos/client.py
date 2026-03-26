@@ -45,13 +45,18 @@ class SessionExpiredError(CogKOSError):
 
 
 class CogKOS:
-    """Synchronous CogKOS client over MCP Streamable HTTP.
+    """Synchronous CogKOS client over MCP Streamable HTTP or native REST.
 
-    Usage::
+    Usage (MCP mode, default)::
 
         brain = CogKOS("http://localhost:3000/mcp", api_key="xxx", tenant_id="dev")
         result = brain.recall("multi-tenant isolation")
         print(result.best_belief)
+
+    Usage (REST mode — lower latency, bypasses MCP protocol layer)::
+
+        brain = CogKOS("http://localhost:3000", api_key="xxx", tenant_id="dev", use_rest=True)
+        result = brain.recall("multi-tenant isolation")
     """
 
     def __init__(
@@ -62,12 +67,14 @@ class CogKOS:
         *,
         timeout: float = 300.0,
         source_agent: str = "python-sdk",
+        use_rest: bool = False,
     ):
         self._url = url.rstrip("/")
         self._api_key = api_key
         self._tenant_id = tenant_id
         self._timeout = timeout
         self._source_agent = source_agent
+        self._use_rest = use_rest
 
         self._session_id: str | None = None
         self._request_id = 0
@@ -123,7 +130,10 @@ class CogKOS:
         if namespace:
             args["namespace"] = namespace
 
-        data = self._call_tool("submit_experience", args)
+        if self._use_rest:
+            data = self._rest_post("/api/v1/learn", args)
+        else:
+            data = self._call_tool("submit_experience", args)
         return LearnResult.from_response(data)
 
     def recall(
@@ -171,7 +181,26 @@ class CogKOS:
         if namespace:
             args["namespace"] = namespace
 
-        data = self._call_tool("query_knowledge", args)
+        if self._use_rest:
+            # REST API uses flat query params instead of nested MCP args
+            rest_args: dict[str, Any] = {
+                "query": query,
+                "max_results": max_results,
+                "include_predictions": include_predictions,
+                "include_conflicts": include_conflicts,
+                "include_gaps": include_gaps,
+            }
+            if domain:
+                rest_args["domain"] = domain
+            if memory_layer:
+                rest_args["memory_layer"] = memory_layer
+            if session_id:
+                rest_args["session_id"] = session_id
+            if namespace:
+                rest_args["namespace"] = namespace
+            data = self._rest_post("/api/v1/query", rest_args)
+        else:
+            data = self._call_tool("query_knowledge", args)
         return RecallResult.from_response(data)
 
     def feedback(
@@ -198,7 +227,10 @@ class CogKOS:
         if note:
             args["note"] = note
 
-        data = self._call_tool("submit_feedback", args)
+        if self._use_rest:
+            data = self._rest_post("/api/v1/feedback", args)
+        else:
+            data = self._call_tool("submit_feedback", args)
         return FeedbackResult.from_response(data)
 
     def report_gap(
@@ -235,6 +267,33 @@ class CogKOS:
 
     def __exit__(self, *_: Any) -> None:
         self.close()
+
+    # ------------------------------------------------------------------
+    # REST API internals (bypass MCP protocol for lower latency)
+    # ------------------------------------------------------------------
+
+    def _rest_headers(self) -> dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "X-API-Key": self._api_key,
+            "X-Tenant-ID": self._tenant_id,
+        }
+
+    def _rest_post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Direct HTTP POST to REST API endpoint. No MCP framing."""
+        url = self._url + path
+        resp = self._http.post(url, json=payload, headers=self._rest_headers())
+        if resp.status_code >= 400:
+            try:
+                body = resp.json()
+                msg = body.get("error", resp.text[:500])
+            except Exception:
+                msg = resp.text[:500]
+            raise CogKOSError(
+                f"REST API error {resp.status_code}: {msg}",
+                code=resp.status_code,
+            )
+        return resp.json()
 
     # ------------------------------------------------------------------
     # MCP protocol internals

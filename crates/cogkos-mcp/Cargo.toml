@@ -33,6 +33,7 @@ lru.workspace = true
 http = "1"
 base64 = "0.22"
 tokio-util.workspace = true
+futures.workspace = true
 rand = "0.8"
 deadpool-redis = "0.23"
 

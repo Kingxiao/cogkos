@@ -39,6 +39,9 @@ fn build_state(
         RateLimiter::new(rate_limit)
     };
 
+    let activation_buffer = Arc::new(crate::tools::query::ActivationBuffer::new());
+    activation_buffer.spawn_flush_loop(Arc::clone(&stores.claims));
+
     McpServerState {
         stores,
         auth,
@@ -48,6 +51,7 @@ fn build_state(
         embedding_client,
         rate_limiter,
         security_mode,
+        activation_buffer,
     }
 }
 
@@ -129,6 +133,7 @@ async fn start_http_server(
     let cancel_token = CancellationToken::new();
 
     let state = build_state(stores, &config, llm_client, embedding_client, security_mode);
+    let rest_state = state.clone(); // Shared with REST API routes
 
     let http_config = StreamableHttpServerConfig {
         stateful_mode: true,
@@ -163,6 +168,17 @@ async fn start_http_server(
         tower_http::cors::CorsLayer::permissive()
     };
 
+    // REST API routes — bypass MCP protocol layer for lower latency
+    use super::rest_api;
+    let rest_routes = Router::new()
+        .route("/query", axum::routing::post(rest_api::rest_query_handler))
+        .route("/learn", axum::routing::post(rest_api::rest_learn_handler))
+        .route(
+            "/feedback",
+            axum::routing::post(rest_api::rest_feedback_handler),
+        )
+        .with_state(rest_state);
+
     let app = Router::new()
         .route(
             "/mcp",
@@ -171,11 +187,12 @@ async fn start_http_server(
                 async move { svc.handle(req).await }
             }),
         )
+        .nest("/api/v1", rest_routes)
         .layer(cors);
 
     info!(
         addr = %bind_addr,
-        "Starting MCP Server with Streamable HTTP transport on /mcp"
+        "Starting MCP Server with Streamable HTTP on /mcp + REST API on /api/v1"
     );
 
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;

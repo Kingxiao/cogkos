@@ -2,6 +2,7 @@
 
 mod handler;
 mod rate_limiter;
+pub mod rest_api;
 mod startup;
 mod tool_schemas;
 
@@ -55,6 +56,7 @@ pub struct McpServerState {
     pub embedding_client: Option<Arc<dyn LlmClient>>,
     pub rate_limiter: RateLimiter,
     pub security_mode: SecurityMode,
+    pub activation_buffer: Arc<crate::tools::query::ActivationBuffer>,
 }
 
 /// Sampling request types (MCP Sampling Protocol)

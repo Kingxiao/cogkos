@@ -539,6 +539,36 @@ async fn main() -> Result<()> {
             .map_err(|e| anyhow::anyhow!("PgVectorStore init failed: {}", e))?,
     );
 
+    // Warm in-process vector cache from PG (eliminates PG round-trips on read path).
+    {
+        let cache = cogkos_store::vector_cache::VectorCache::warm_from_pg(&pg_pool).await;
+        if cache.is_enabled() {
+            info!(vectors = cache.len(), "Vector cache warmed");
+            vector_store.set_cache(cache);
+        } else {
+            warn!("Vector cache disabled (data too large or warm-up timeout)");
+        }
+    }
+
+    // Warm in-process graph cache from FalkorDB.
+    {
+        let cache = cogkos_store::graph_cache::GraphCache::warm_from_falkor(
+            &redis_pool_health,
+            &falkordb_graph,
+        )
+        .await;
+        if cache.is_enabled() {
+            info!(
+                nodes = cache.node_count(),
+                edges = cache.edge_count(),
+                "Graph cache warmed"
+            );
+            graph_store.set_cache(cache);
+        } else {
+            warn!("Graph cache disabled (data too large or warm-up timeout)");
+        }
+    }
+
     // Create object store (S3 with local fallback)
     info!("Connecting to object store...");
     let object_store: Arc<dyn cogkos_store::ObjectStore> = Arc::new(

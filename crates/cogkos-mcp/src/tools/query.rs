@@ -8,9 +8,71 @@ use cogkos_ingest::EmbeddingService;
 use cogkos_llm::{LlmClient, LlmRequest, Message, Role};
 use cogkos_store::{CacheStore, ClaimStore, GapStore, GraphStore, KnowledgeGapRecord, VectorStore};
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::helpers::{self, calculate_query_hash, generate_query_vector};
 use super::types::*;
+
+/// Maximum number of claims to run graph diffusion on.
+/// Beyond this, marginal recall gain does not justify the FalkorDB round-trips.
+const MAX_GRAPH_DIFFUSION_CLAIMS: usize = 5;
+
+/// Activation weight buffer — batches PG updates to reduce write pressure on the read path.
+/// Flushed every `FLUSH_INTERVAL` by a background tokio task.
+pub struct ActivationBuffer {
+    inner: tokio::sync::Mutex<Vec<(uuid::Uuid, String, f64)>>,
+}
+
+impl ActivationBuffer {
+    pub fn new() -> Self {
+        Self {
+            inner: tokio::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Enqueue an activation delta (non-blocking: only contends with the flush task).
+    pub async fn push(&self, claim_id: uuid::Uuid, tenant_id: &str, delta: f64) {
+        self.inner
+            .lock()
+            .await
+            .push((claim_id, tenant_id.to_owned(), delta));
+    }
+
+    /// Drain all pending updates and apply them.
+    async fn flush(&self, claim_store: &dyn ClaimStore) {
+        let updates = {
+            let mut buf = self.inner.lock().await;
+            std::mem::take(&mut *buf)
+        };
+        if updates.is_empty() {
+            return;
+        }
+        tracing::debug!(count = updates.len(), "Flushing activation buffer");
+        for (id, tenant, delta) in updates {
+            claim_store.update_activation(id, &tenant, delta).await.ok();
+        }
+    }
+
+    /// Spawn a background flush loop. Returns a `JoinHandle` the caller can
+    /// abort on shutdown if desired.
+    pub fn spawn_flush_loop(
+        self: &Arc<Self>,
+        claim_store: Arc<dyn ClaimStore>,
+    ) -> tokio::task::JoinHandle<()> {
+        let buf = Arc::clone(self);
+        let flush_interval_secs: u64 = std::env::var("ACTIVATION_FLUSH_INTERVAL_SECS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(5);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(flush_interval_secs));
+            loop {
+                interval.tick().await;
+                buf.flush(claim_store.as_ref()).await;
+            }
+        })
+    }
+}
 
 /// Query knowledge handler
 #[allow(clippy::too_many_arguments)]
@@ -25,6 +87,7 @@ pub async fn handle_query_knowledge(
     gap_store: &dyn GapStore,
     llm_client: Option<Arc<dyn LlmClient>>,
     embedding_client: Option<Arc<dyn LlmClient>>,
+    activation_buffer: Option<&Arc<ActivationBuffer>>,
 ) -> Result<McpQueryResponse> {
     let start_time = std::time::Instant::now();
 
@@ -74,13 +137,19 @@ pub async fn handle_query_knowledge(
                 // === System 1: Fast path — high confidence, return immediately ===
                 cache_store.record_hit(tenant_id, query_hash).await?;
 
-                // S3 read-is-write: update activation for cached claims
+                // S3 read-is-write: buffer activation updates for cached claims
                 if let Some(ref belief) = cached.response.best_belief {
-                    for claim_id in &belief.claim_ids {
-                        claim_store
-                            .update_activation(*claim_id, tenant_id, 0.05)
-                            .await
-                            .ok();
+                    if let Some(buf) = activation_buffer {
+                        for claim_id in &belief.claim_ids {
+                            buf.push(*claim_id, tenant_id, 0.05).await;
+                        }
+                    } else {
+                        for claim_id in &belief.claim_ids {
+                            claim_store
+                                .update_activation(*claim_id, tenant_id, 0.05)
+                                .await
+                                .ok();
+                        }
                     }
                 }
 
@@ -205,29 +274,51 @@ pub async fn handle_query_knowledge(
     for claim in &claims {
         let layer = cogkos_core::models::MemoryLayer::from_metadata(&claim.metadata);
         let delta = layer.lambda() * 0.4;
-        claim_store
-            .update_activation(claim.id, tenant_id, delta)
-            .await
-            .ok();
+        if let Some(buf) = activation_buffer {
+            buf.push(claim.id, tenant_id, delta).await;
+        } else {
+            claim_store
+                .update_activation(claim.id, tenant_id, delta)
+                .await
+                .ok();
+        }
     }
 
     // 4. Graph activation diffusion with threshold
+    //    Limit to top-N claims by confidence to cap FalkorDB round-trips,
+    //    then run all find_related calls concurrently.
     let mut all_graph_nodes: Vec<GraphNode> = Vec::new();
     let threshold = req.activation_threshold.clamp(0.0, 1.0);
     let _decay_factor = 0.8;
     let _max_depth = 2;
 
-    for claim in &claims {
-        let related = match graph_store
-            .find_related(claim.id, tenant_id, 2, threshold)
-            .await
-        {
-            Ok(nodes) => nodes,
-            Err(e) => {
-                tracing::warn!(claim_id = %claim.id, error = %e, "Graph diffusion failed, degrading");
-                vec![]
+    // Select top-N claims by confidence for graph diffusion
+    let mut diffusion_claims: Vec<&EpistemicClaim> = claims.iter().collect();
+    diffusion_claims.sort_by(|a, b| {
+        b.confidence
+            .partial_cmp(&a.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    diffusion_claims.truncate(MAX_GRAPH_DIFFUSION_CLAIMS);
+
+    // Fire all graph queries concurrently
+    let graph_futures: Vec<_> = diffusion_claims
+        .iter()
+        .map(|claim| async {
+            let id = claim.id;
+            match graph_store.find_related(id, tenant_id, 2, threshold).await {
+                Ok(nodes) => (id, nodes),
+                Err(e) => {
+                    tracing::warn!(claim_id = %id, error = %e, "Graph diffusion failed, degrading");
+                    (id, vec![])
+                }
             }
-        };
+        })
+        .collect();
+
+    let graph_results = futures::future::join_all(graph_futures).await;
+
+    for (_claim_id, related) in graph_results {
         for mut node in related {
             if !all_graph_nodes
                 .iter()
@@ -495,12 +586,16 @@ pub async fn handle_query_knowledge(
     let cache_entry = QueryCacheEntry::new(query_hash, response.clone());
     cache_store.set_cached(tenant_id, &cache_entry).await?;
 
-    // 12. Update activation
+    // 12. Buffer activation updates (flushed by background task)
     for claim in &claims {
-        claim_store
-            .update_activation(claim.id, tenant_id, 0.1)
-            .await
-            .ok();
+        if let Some(buf) = activation_buffer {
+            buf.push(claim.id, tenant_id, 0.1).await;
+        } else {
+            claim_store
+                .update_activation(claim.id, tenant_id, 0.1)
+                .await
+                .ok();
+        }
     }
 
     Ok(response)

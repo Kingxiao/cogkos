@@ -133,6 +133,7 @@ impl ServerHandler for CogkosMcpHandler {
                         self.state.stores.gaps.as_ref(),
                         self.state.llm_client.clone(),
                         self.state.embedding_client.clone(),
+                        Some(&self.state.activation_buffer),
                     )
                     .await
                     .map_err(|e| rmcp::ErrorData::internal_error(e.to_string(), None))?;

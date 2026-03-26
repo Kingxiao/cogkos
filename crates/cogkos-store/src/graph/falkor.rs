@@ -39,9 +39,15 @@ pub(crate) fn validate_relation(rel: &str) -> Result<&str> {
 }
 
 /// FalkorDB (RedisGraph) store
+///
+/// When an in-process `GraphCache` is attached via `set_cache()`,
+/// read-path operations (`find_related`, `activation_diffusion`) are
+/// served from memory. Write operations write-through to both FalkorDB
+/// and the cache. Falls back to FalkorDB if the cache is unavailable.
 pub struct FalkorStore {
     pool: deadpool_redis::Pool,
     graph_name: String,
+    cache: std::sync::RwLock<Option<crate::graph_cache::GraphCache>>,
 }
 
 impl FalkorStore {
@@ -50,6 +56,14 @@ impl FalkorStore {
         Self {
             pool,
             graph_name: graph_name.to_string(),
+            cache: std::sync::RwLock::new(None),
+        }
+    }
+
+    /// Attach an in-process graph cache for fast reads.
+    pub fn set_cache(&self, cache: crate::graph_cache::GraphCache) {
+        if let Ok(mut slot) = self.cache.write() {
+            *slot = Some(cache);
         }
     }
 
@@ -104,6 +118,14 @@ impl crate::GraphStore for FalkorStore {
         );
 
         self.query(&cypher).await?;
+
+        // Write-through: sync cache.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                cache.upsert_node(claim);
+            }
+        }
+
         Ok(())
     }
 
@@ -117,6 +139,14 @@ impl crate::GraphStore for FalkorStore {
         );
 
         self.query(&cypher).await?;
+
+        // Write-through: sync cache.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                cache.add_edge(from, to, relation, weight);
+            }
+        }
+
         Ok(())
     }
 
@@ -127,7 +157,16 @@ impl crate::GraphStore for FalkorStore {
         depth: u32,
         min_activation: f64,
     ) -> Result<Vec<GraphNode>> {
-        // Support all known edge types for activation diffusion
+        // Try in-process cache first.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                if let Some(results) = cache.find_related(id, tenant_id, depth, min_activation) {
+                    return Ok(results);
+                }
+            }
+        }
+
+        // Fallback: FalkorDB query.
         let safe_id = validate_uuid(&id)?;
         let safe_tenant = cypher_escape(tenant_id);
         let cypher = format!(
@@ -208,11 +247,12 @@ impl crate::GraphStore for FalkorStore {
     }
 
     async fn upsert_node(&self, claim: &EpistemicClaim) -> Result<()> {
-        // Upsert is essentially add_node in FalkorDB
+        // add_node already handles write-through to cache
         self.add_node(claim).await
     }
 
     async fn create_edge(&self, from: Id, to: Id, relation: &str, weight: f64) -> Result<()> {
+        // add_edge already handles write-through to cache
         self.add_edge(from, to, relation, weight).await
     }
 
@@ -226,6 +266,23 @@ impl crate::GraphStore for FalkorStore {
         decay_factor: f64,
         min_threshold: f64,
     ) -> Result<Vec<GraphNode>> {
+        // Try in-process cache first.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                if let Some(results) = cache.activation_diffusion(
+                    start_id,
+                    tenant_id,
+                    initial_activation,
+                    depth,
+                    decay_factor,
+                    min_threshold,
+                ) {
+                    return Ok(results);
+                }
+            }
+        }
+
+        // Fallback: FalkorDB BFS.
         let safe_tenant = cypher_escape(tenant_id);
         // BFS-based activation diffusion with initial_activation and decay_factor
         let mut activations: std::collections::HashMap<String, (f64, String)> =

@@ -472,6 +472,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         &gap_store,
         None, // llm_client
         None, // No LLM client for testing
+        None, // activation_buffer
     )
     .await
     .expect("query_knowledge should succeed");
@@ -643,6 +644,7 @@ async fn test_submit_and_query_with_conflicts() {
         &gap_store,
         None, // llm_client
         None, // embedding_client
+        None, // activation_buffer
     )
     .await
     .expect("Query should succeed");
@@ -704,6 +706,7 @@ async fn test_query_returns_cached_result() {
         &gap_store,
         None, // llm_client
         None, // embedding_client
+        None, // activation_buffer
     )
     .await
     .expect("First query should succeed");

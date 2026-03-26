@@ -3,10 +3,12 @@
 //! Provides unified access to PostgreSQL, FalkorDB, Qdrant, and S3.
 
 pub mod graph;
+pub mod graph_cache;
 pub mod postgres;
 pub mod prediction_history;
 pub mod s3;
 pub mod vector;
+pub mod vector_cache;
 
 // Re-export audit types from cogkos-core
 pub use cogkos_core::audit::{

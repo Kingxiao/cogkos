@@ -4,7 +4,7 @@ mod feedback;
 mod helpers;
 mod ingest;
 mod manage;
-mod query;
+pub mod query;
 mod subscriptions;
 mod types;
 

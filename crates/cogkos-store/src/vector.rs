@@ -10,10 +10,18 @@ use uuid::Uuid;
 ///
 /// Vector dimension is not hardcoded — it is detected from the first
 /// embedding upsert or explicitly via `ensure_index()`.
+///
+/// When an in-process `VectorCache` is attached via `set_cache()`,
+/// read-path operations (`search`, `calculate_novelty`) are served from
+/// memory, eliminating PG round-trips. Write operations write-through
+/// to both PG and the cache. If the cache is unavailable, operations
+/// degrade transparently to PG.
 pub struct PgVectorStore {
     pool: PgPool,
     /// Detected embedding dimension (set on first upsert or explicit init)
     detected_dim: std::sync::atomic::AtomicI32,
+    /// Optional in-process vector cache for fast reads.
+    cache: std::sync::RwLock<Option<crate::vector_cache::VectorCache>>,
 }
 
 impl PgVectorStore {
@@ -28,6 +36,7 @@ impl PgVectorStore {
         let store = Self {
             pool,
             detected_dim: std::sync::atomic::AtomicI32::new(0),
+            cache: std::sync::RwLock::new(None),
         };
 
         // Try to detect dimension from existing data
@@ -83,6 +92,13 @@ impl PgVectorStore {
         tracing::info!(dim, "HNSW index ensured for embedding dimension");
         Ok(())
     }
+
+    /// Attach an in-process vector cache for fast reads.
+    pub fn set_cache(&self, cache: crate::vector_cache::VectorCache) {
+        if let Ok(mut slot) = self.cache.write() {
+            *slot = Some(cache);
+        }
+    }
 }
 
 #[async_trait]
@@ -112,10 +128,49 @@ impl super::VectorStore for PgVectorStore {
 
         sqlx::query("UPDATE epistemic_claims SET embedding = $2::vector WHERE id = $1")
             .bind(id)
-            .bind(vector_str)
+            .bind(&vector_str)
             .execute(&self.pool)
             .await
             .map_err(|e| CogKosError::Vector(e.to_string()))?;
+
+        // Write-through: sync cache after PG success.
+        // Extract memory_layer and t_valid_end from metadata for cache filtering.
+        let memory_layer = metadata
+            .get("memory_layer")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let t_valid_end = metadata
+            .get("t_valid_end")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc));
+
+        // Check if cache is present (release RwLock guard before async work).
+        let has_cache = self
+            .cache
+            .read()
+            .ok()
+            .and_then(|g| g.as_ref().map(|_| ()))
+            .is_some();
+
+        if has_cache {
+            // We need tenant_id for the cache, but upsert trait doesn't pass it.
+            // Query PG for tenant_id (cheap since we just wrote).
+            let tenant_row: Option<(String,)> =
+                sqlx::query_as("SELECT tenant_id FROM epistemic_claims WHERE id = $1")
+                    .bind(id)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .ok()
+                    .flatten();
+            if let Some((tenant_id,)) = tenant_row {
+                if let Ok(guard) = self.cache.read() {
+                    if let Some(cache) = guard.as_ref() {
+                        cache.upsert(id, &tenant_id, vector, memory_layer, t_valid_end);
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -136,7 +191,16 @@ impl super::VectorStore for PgVectorStore {
             )));
         }
 
-        // Convert vector to pgvector format
+        // Try in-process cache first (no PG round-trip).
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                if let Some(results) = cache.search(&vector, tenant_id, limit, memory_layer) {
+                    return Ok(results);
+                }
+            }
+        }
+
+        // Fallback: PG query.
         let vector_str = format!(
             "[{}]",
             vector
@@ -146,8 +210,6 @@ impl super::VectorStore for PgVectorStore {
                 .join(", ")
         );
 
-        // Use cosine distance (<=>), convert to similarity score
-        // Filter by memory_layer when specified (stored in metadata JSONB)
         let rows = if let Some(layer) = memory_layer {
             sqlx::query_as::<_, (Uuid, f64)>(
                 "SELECT id, 1 - (embedding <=> $1::vector) as score
@@ -194,11 +256,27 @@ impl super::VectorStore for PgVectorStore {
             .await
             .map_err(|e| CogKosError::Vector(e.to_string()))?;
 
+        // Write-through: remove from cache.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                cache.remove(&id);
+            }
+        }
+
         Ok(())
     }
 
     async fn calculate_novelty(&self, vector: Vec<f32>, tenant_id: &str) -> Result<f64> {
-        // Convert vector to pgvector format
+        // Try in-process cache first.
+        if let Ok(guard) = self.cache.read() {
+            if let Some(cache) = guard.as_ref() {
+                if let Some(novelty) = cache.calculate_novelty(&vector, tenant_id) {
+                    return Ok(novelty);
+                }
+            }
+        }
+
+        // Fallback: PG query.
         let vector_str = format!(
             "[{}]",
             vector

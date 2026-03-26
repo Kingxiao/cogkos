@@ -1381,6 +1381,7 @@ dependencies = [
  "config",
  "deadpool-redis",
  "fastembed",
+ "futures",
  "hex",
  "http 1.4.0",
  "lru",
