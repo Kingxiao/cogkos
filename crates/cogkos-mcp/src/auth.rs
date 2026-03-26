@@ -1,4 +1,4 @@
-use cogkos_core::Result;
+use cogkos_core::{Result, SecurityMode};
 use cogkos_store::AuthStore;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -43,15 +43,21 @@ pub struct AuthMiddleware {
     auth_store: Arc<dyn AuthStore>,
     cache: Arc<RwLock<HashMap<String, CacheEntry>>>,
     cache_ttl_seconds: i64,
+    security_mode: SecurityMode,
 }
 
 impl AuthMiddleware {
     /// Create new auth middleware
-    pub fn new(auth_store: Arc<dyn AuthStore>, cache_ttl_seconds: i64) -> Self {
+    pub fn new(
+        auth_store: Arc<dyn AuthStore>,
+        cache_ttl_seconds: i64,
+        security_mode: SecurityMode,
+    ) -> Self {
         Self {
             auth_store,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_ttl_seconds,
+            security_mode,
         }
     }
 
@@ -61,17 +67,19 @@ impl AuthMiddleware {
     /// matches, return a synthetic AuthContext without hitting the database.
     /// Tenant comes from `DEFAULT_MCP_TENANT` env var (defaults to "default").
     pub async fn authenticate(&self, api_key: &str) -> Result<AuthContext> {
-        // Dev mode: bypass DB when using the default key
-        if let Ok(default_key) = std::env::var("DEFAULT_MCP_API_KEY") {
-            if !default_key.is_empty() && api_key == default_key {
-                let tenant =
-                    std::env::var("DEFAULT_MCP_TENANT").unwrap_or_else(|_| "default".to_string());
-                tracing::warn!(tenant_id = %tenant, "Dev mode auth: DEFAULT_MCP_API_KEY matched, bypassing DB validation");
-                return Ok(AuthContext {
-                    tenant_id: tenant,
-                    permissions: vec!["read".to_string(), "write".to_string()],
-                    api_key_hash: self.hash_key(api_key),
-                });
+        // Dev mode API key bypass — DISABLED in production mode
+        if self.security_mode.is_development() {
+            if let Ok(default_key) = std::env::var("DEFAULT_MCP_API_KEY") {
+                if !default_key.is_empty() && api_key == default_key {
+                    let tenant = std::env::var("DEFAULT_MCP_TENANT")
+                        .unwrap_or_else(|_| "default".to_string());
+                    tracing::warn!(tenant_id = %tenant, "Dev mode auth: DEFAULT_MCP_API_KEY matched, bypassing DB validation");
+                    return Ok(AuthContext {
+                        tenant_id: tenant,
+                        permissions: vec!["read".to_string(), "write".to_string()],
+                        api_key_hash: self.hash_key(api_key),
+                    });
+                }
             }
         }
 
@@ -194,7 +202,8 @@ mod tests {
             .await
             .unwrap();
 
-        let middleware = AuthMiddleware::new(Arc::clone(&auth_store), 3600);
+        let middleware =
+            AuthMiddleware::new(Arc::clone(&auth_store), 3600, SecurityMode::Development);
 
         // First call populates cache
         let ctx1 = middleware.authenticate(&api_key).await.unwrap();

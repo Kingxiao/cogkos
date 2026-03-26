@@ -3,6 +3,7 @@
 mod polling;
 
 use anyhow::Result;
+use cogkos_core::SecurityMode;
 use cogkos_llm::{LlmClientBuilder, ProviderType};
 use cogkos_mcp::{McpConfig, McpTransport, start_mcp_server};
 use cogkos_store::{Stores, postgres::PostgresStore, postgres_audit::PostgresAuditStore};
@@ -344,6 +345,40 @@ async fn main() -> Result<()> {
     }
 
     info!("Starting CogKOS...");
+
+    // Determine security mode from COGKOS_ENV
+    let security_mode = SecurityMode::from_env();
+
+    if security_mode.is_production() {
+        // Warn if DEFAULT_MCP_API_KEY is set (ignored in production)
+        if std::env::var("DEFAULT_MCP_API_KEY").is_ok() {
+            warn!(
+                "DEFAULT_MCP_API_KEY is set but ignored in production mode. Use cogkos-admin to create API keys."
+            );
+        }
+
+        // Warn if DATABASE_URL doesn't contain sslmode
+        if let Ok(url) = std::env::var("DATABASE_URL") {
+            if !url.contains("sslmode=") {
+                warn!(
+                    "Production mode: DATABASE_URL has no sslmode parameter. Consider adding ?sslmode=require"
+                );
+            }
+        }
+
+        // Warn if FalkorDB URL has no password
+        if let Ok(url) = std::env::var("FALKORDB_URL") {
+            if !url.contains('@') && !url.contains(":@") {
+                warn!(
+                    "Production mode: FALKORDB_URL has no password. Configure FalkorDB requirepass"
+                );
+            }
+        }
+
+        info!("CogKOS starting in PRODUCTION mode — security enforced");
+    } else {
+        warn!("CogKOS starting in DEVELOPMENT mode — NOT suitable for production");
+    }
 
     // Load configuration
     let config = load_config().unwrap_or_else(|e| {
@@ -754,7 +789,7 @@ async fn main() -> Result<()> {
     };
 
     tokio::select! {
-        result = start_mcp_server(stores, mcp_config, llm_client, embedding_client) => {
+        result = start_mcp_server(stores, mcp_config, llm_client, embedding_client, security_mode) => {
             result?;
         }
         _ = shutdown_signal => {}

@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use cogkos_core::SecurityMode;
 use cogkos_llm::{LlmClient, LlmClientBuilder, PredictionService, ProviderType};
 use cogkos_store::Stores;
 use rmcp::service::ServiceExt;
@@ -16,10 +17,12 @@ fn build_state(
     config: &McpConfig,
     llm_client: Option<Arc<dyn LlmClient>>,
     embedding_client: Option<Arc<dyn LlmClient>>,
+    security_mode: SecurityMode,
 ) -> McpServerState {
     let auth = Arc::new(AuthMiddleware::new(
         stores.auth.clone(),
         config.auth_cache_ttl_seconds,
+        security_mode,
     ));
 
     let cache = Arc::new(QueryCache::new(
@@ -44,6 +47,7 @@ fn build_state(
         llm_client,
         embedding_client,
         rate_limiter,
+        security_mode,
     }
 }
 
@@ -77,13 +81,14 @@ pub async fn start_mcp_server(
     config: McpConfig,
     llm_client: Option<Arc<dyn LlmClient>>,
     embedding_client: Option<Arc<dyn LlmClient>>,
+    security_mode: SecurityMode,
 ) -> anyhow::Result<()> {
     match config.transport {
         McpTransport::Stdio => {
-            start_stdio_server(stores, config, llm_client, embedding_client).await
+            start_stdio_server(stores, config, llm_client, embedding_client, security_mode).await
         }
         McpTransport::StreamableHttp => {
-            start_http_server(stores, config, llm_client, embedding_client).await
+            start_http_server(stores, config, llm_client, embedding_client, security_mode).await
         }
     }
 }
@@ -94,8 +99,9 @@ async fn start_stdio_server(
     config: McpConfig,
     llm_client: Option<Arc<dyn LlmClient>>,
     embedding_client: Option<Arc<dyn LlmClient>>,
+    security_mode: SecurityMode,
 ) -> anyhow::Result<()> {
-    let state = build_state(stores, &config, llm_client, embedding_client);
+    let state = build_state(stores, &config, llm_client, embedding_client, security_mode);
     let handler = CogkosMcpHandler::new(state);
     let (stdin, stdout) = rmcp::transport::stdio();
 
@@ -110,8 +116,10 @@ async fn start_http_server(
     config: McpConfig,
     llm_client: Option<Arc<dyn LlmClient>>,
     embedding_client: Option<Arc<dyn LlmClient>>,
+    security_mode: SecurityMode,
 ) -> anyhow::Result<()> {
     use axum::Router;
+    use http::{Method, header};
     use rmcp::transport::streamable_http_server::{
         StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
     };
@@ -120,7 +128,7 @@ async fn start_http_server(
     let bind_addr = format!("{}:{}", config.host, config.port);
     let cancel_token = CancellationToken::new();
 
-    let state = build_state(stores, &config, llm_client, embedding_client);
+    let state = build_state(stores, &config, llm_client, embedding_client, security_mode);
 
     let http_config = StreamableHttpServerConfig {
         stateful_mode: true,
@@ -139,6 +147,22 @@ async fn start_http_server(
         http_config,
     );
 
+    // CORS: restrictive in production, permissive in development
+    let cors = if security_mode.is_production() {
+        let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
+            .unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let origins: Vec<http::HeaderValue> = allowed_origins
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        tower_http::cors::CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods([Method::GET, Method::POST])
+            .allow_headers([header::CONTENT_TYPE, header::ACCEPT])
+    } else {
+        tower_http::cors::CorsLayer::permissive()
+    };
+
     let app = Router::new()
         .route(
             "/mcp",
@@ -147,7 +171,7 @@ async fn start_http_server(
                 async move { svc.handle(req).await }
             }),
         )
-        .layer(tower_http::cors::CorsLayer::permissive());
+        .layer(cors);
 
     info!(
         addr = %bind_addr,

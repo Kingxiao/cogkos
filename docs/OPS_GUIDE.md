@@ -730,6 +730,33 @@ roles = ["admin", "editor", "viewer"]
 require_api_key = true
 ```
 
+### Security Mode
+
+CogKOS 通过 `COGKOS_ENV` 环境变量控制安全级别，一个开关联动所有安全行为。
+
+#### Production Deployment Checklist
+
+设置 `COGKOS_ENV=production` 启用全部安全控制：
+
+- **DEFAULT_MCP_API_KEY 失效** — 生产模式忽略 dev key，使用 `cogkos-admin create-key` 创建 API key
+- **CORS 限制** — 仅允许 `CORS_ALLOWED_ORIGINS` 配置的来源（逗号分隔）
+- **启动警告** — 检测 DATABASE_URL 缺少 sslmode、FalkorDB 无密码等安全隐患
+- **审计日志持久化** — 审计日志写入 PostgreSQL
+
+```bash
+# 生产模式启动
+COGKOS_ENV=production \
+CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com \
+./target/release/cogkos
+```
+
+#### Infrastructure Security (handled outside CogKOS)
+
+- **TLS 终止**: nginx/traefik 反向代理
+- **FalkorDB 密码**: redis.conf `requirepass`
+- **PostgreSQL SSL**: 连接字符串 `sslmode=require`
+- **网络隔离**: Docker internal network 或 VPC
+
 ---
 
 ## 扩展阅读

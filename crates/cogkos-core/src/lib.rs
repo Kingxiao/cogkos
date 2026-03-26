@@ -12,6 +12,7 @@ pub mod models;
 pub mod monitoring;
 pub mod rbac;
 pub mod retry;
+pub mod security;
 pub mod transactional_memory;
 
 // Explicitly handle Result to avoid ambiguity
@@ -23,4 +24,5 @@ pub use errors::{CogKosError, Result};
 pub use models::*;
 pub use rbac::*;
 pub use retry::*;
+pub use security::SecurityMode;
 pub use transactional_memory::*;

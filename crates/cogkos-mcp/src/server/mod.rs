@@ -7,6 +7,7 @@ mod tool_schemas;
 
 use std::sync::Arc;
 
+use cogkos_core::SecurityMode;
 use cogkos_llm::LlmClient;
 use cogkos_store::Stores;
 use serde::{Deserialize, Serialize};
@@ -53,6 +54,7 @@ pub struct McpServerState {
     pub llm_client: Option<Arc<dyn LlmClient>>,
     pub embedding_client: Option<Arc<dyn LlmClient>>,
     pub rate_limiter: RateLimiter,
+    pub security_mode: SecurityMode,
 }
 
 /// Sampling request types (MCP Sampling Protocol)

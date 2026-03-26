@@ -195,7 +195,8 @@ async fn main() {
 
     println!("🚀 Starting MCP server...\n");
 
-    match start_mcp_server(stores, config, llm_client, embedding_client).await {
+    let security_mode = cogkos_core::SecurityMode::from_env();
+    match start_mcp_server(stores, config, llm_client, embedding_client, security_mode).await {
         Ok(_) => println!("\n✅ Server stopped"),
         Err(e) => println!("\n❌ Server error: {:?}", e),
     }
