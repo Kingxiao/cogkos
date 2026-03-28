@@ -191,6 +191,8 @@ pub struct RestLearnRequest {
     pub memory_layer: Option<String>,
     #[serde(default)]
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub session_date: Option<String>,
 }
 
 pub async fn rest_learn_handler(
@@ -213,6 +215,7 @@ pub async fn rest_learn_handler(
         namespace: req.namespace,
         memory_layer: req.memory_layer,
         session_id: req.session_id,
+        session_date: req.session_date,
         structured_content: None,
         entity_refs: vec![],
         valid_from: None,

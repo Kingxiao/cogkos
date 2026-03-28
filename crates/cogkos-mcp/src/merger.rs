@@ -14,6 +14,8 @@ pub struct MergeConfig {
     pub authority_weight: f64,
     /// Weight for feedback quality signal (0.0-1.0)
     pub feedback_weight: f64,
+    /// Weight for exact keyword match ratio (0.0-1.0)
+    pub exact_match_weight: f64,
     /// Minimum combined score to include in results
     pub min_score: f64,
     /// Maximum results to return
@@ -25,16 +27,29 @@ impl Default for MergeConfig {
         let authority_weight: f64 = std::env::var("MERGE_AUTHORITY_WEIGHT")
             .ok()
             .and_then(|v| v.parse().ok())
-            .unwrap_or(0.2);
+            .unwrap_or(0.15);
         let feedback_weight: f64 = std::env::var("MERGE_FEEDBACK_WEIGHT")
             .ok()
             .and_then(|v| v.parse().ok())
+            .unwrap_or(0.15);
+        let vector_weight: f64 = std::env::var("MERGE_VECTOR_WEIGHT")
+            .ok()
+            .and_then(|v| v.parse().ok())
             .unwrap_or(0.25);
+        let graph_weight: f64 = std::env::var("MERGE_GRAPH_WEIGHT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.25);
+        let exact_match_weight: f64 = std::env::var("MERGE_EXACT_MATCH_WEIGHT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.2);
         Self {
-            vector_weight: 0.35,
-            graph_weight: 0.2,
+            vector_weight,
+            graph_weight,
             authority_weight,
             feedback_weight,
+            exact_match_weight,
             min_score: 0.1,
             max_results: 20,
         }
@@ -64,6 +79,34 @@ pub enum ResultSource {
     Both,
 }
 
+/// Compute the fraction of query keywords that appear in the claim content.
+/// Keywords are words longer than 3 characters that are not common stop words.
+fn exact_match_score(query: &str, content: &str) -> f64 {
+    const STOP_WORDS: &[&str] = &[
+        "what", "when", "where", "which", "who", "how", "does", "did", "the", "and", "for", "that",
+        "this", "with", "from", "have", "has", "been", "was", "were", "are", "would", "could",
+        "should", "about", "into", "more", "than", "also", "just", "some", "other", "will", "they",
+        "them", "their", "your", "you", "can", "not", "but",
+    ];
+    let query_lower = query.to_lowercase();
+    let content_lower = content.to_lowercase();
+
+    let query_words: Vec<&str> = query_lower
+        .split_whitespace()
+        .filter(|w| w.len() > 3 && !STOP_WORDS.contains(w))
+        .collect();
+
+    if query_words.is_empty() {
+        return 0.0;
+    }
+
+    let matches = query_words
+        .iter()
+        .filter(|w| content_lower.contains(**w))
+        .count();
+    matches as f64 / query_words.len() as f64
+}
+
 /// Merge vector search results with graph activation diffusion results
 ///
 /// # Arguments
@@ -71,6 +114,7 @@ pub enum ResultSource {
 /// * `graph_nodes` - Results from graph activation diffusion
 /// * `claims` - Full claim objects for vector matches
 /// * `config` - Merge configuration
+/// * `query` - Original query string for exact-match scoring
 ///
 /// # Returns
 /// * Sorted vector of merged results (highest score first)
@@ -80,6 +124,7 @@ pub fn merge_results(
     graph_nodes: &[GraphNode],
     claims: &[(Id, EpistemicClaim)],
     config: &MergeConfig,
+    query: &str,
 ) -> (Vec<MergedResult>, Vec<GraphRelation>) {
     // Build results map from scratch
     let mut results: std::collections::HashMap<Id, MergedResult> = std::collections::HashMap::new();
@@ -91,11 +136,14 @@ pub fn merge_results(
             let feedback_quality = (claim.confidence
                 * (claim.activation_weight / 0.5_f64.max(claim.activation_weight)))
             .clamp(0.0, 1.0);
-            let remaining_weight = 1.0 - config.authority_weight - config.feedback_weight;
+            let em_score = exact_match_score(query, &claim.content);
+            let remaining_weight =
+                1.0 - config.authority_weight - config.feedback_weight - config.exact_match_weight;
             let combined = vm.score * config.vector_weight * remaining_weight
                 + claim.confidence * config.graph_weight * remaining_weight
                 + authority_boost * config.authority_weight
-                + feedback_quality * config.feedback_weight;
+                + feedback_quality * config.feedback_weight
+                + em_score * config.exact_match_weight;
 
             results.insert(
                 vm.id,
@@ -127,22 +175,25 @@ pub fn merge_results(
             .map(|(_, c)| c.confidence)
             .unwrap_or(0.5);
 
-        // Calculate combined score using activation, confidence, authority, and feedback quality
-        let (authority_boost, feedback_quality) = claims
+        // Calculate combined score using activation, confidence, authority, feedback, and exact match
+        let (authority_boost, feedback_quality, claim_content) = claims
             .iter()
             .find(|(_, c)| c.id == gn.id)
             .map(|(_, c)| {
                 let ab = AuthorityTier::resolve(c).score_boost();
                 let fq = (c.confidence * (c.activation_weight / 0.5_f64.max(c.activation_weight)))
                     .clamp(0.0, 1.0);
-                (ab, fq)
+                (ab, fq, c.content.as_str())
             })
-            .unwrap_or((0.0, 0.0));
-        let remaining_weight = 1.0 - config.authority_weight - config.feedback_weight;
+            .unwrap_or((0.0, 0.0, ""));
+        let em_score = exact_match_score(query, claim_content);
+        let remaining_weight =
+            1.0 - config.authority_weight - config.feedback_weight - config.exact_match_weight;
         let combined = gn.activation * config.graph_weight * remaining_weight
             + confidence * config.vector_weight * remaining_weight
             + authority_boost * config.authority_weight
-            + feedback_quality * config.feedback_weight;
+            + feedback_quality * config.feedback_weight
+            + em_score * config.exact_match_weight;
 
         if let Some(existing) = results.get_mut(&gn.id) {
             // Already exists - update to Both and combine scores
@@ -324,7 +375,13 @@ mod tests {
         ];
 
         let config = MergeConfig::default();
-        let (merged, relations) = merge_results(&vector_matches, &graph_nodes, &claims, &config);
+        let (merged, relations) = merge_results(
+            &vector_matches,
+            &graph_nodes,
+            &claims,
+            &config,
+            "test query content",
+        );
 
         // Should have 3 results
         assert_eq!(merged.len(), 3);

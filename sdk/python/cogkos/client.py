@@ -95,6 +95,7 @@ class CogKOS:
         source_agent: str | None = None,
         memory_layer: str | None = None,
         session_id: str | None = None,
+        session_date: str | None = None,
         namespace: str | None = None,
     ) -> LearnResult:
         """Submit knowledge to CogKOS.
@@ -108,6 +109,10 @@ class CogKOS:
             source_agent: Override the default source agent name.
             memory_layer: Memory layer (working/episodic/semantic).
             session_id: Session ID for working/episodic scoping.
+            session_date: Session date for resolving relative time references
+                (e.g. "May 8, 2023" or "2023-05-08"). When set, relative
+                references like "yesterday" or "last week" in content are
+                resolved to absolute dates before storage.
             namespace: Namespace for intra-tenant isolation (e.g. client project scoping).
 
         Returns:
@@ -127,6 +132,8 @@ class CogKOS:
             args["memory_layer"] = memory_layer
         if session_id:
             args["session_id"] = session_id
+        if session_date:
+            args["session_date"] = session_date
         if namespace:
             args["namespace"] = namespace
 

@@ -3,7 +3,10 @@
 use cogkos_core::authority::AuthorityTier;
 use cogkos_core::models::*;
 use cogkos_core::{CogKosError, Result};
-use cogkos_ingest::{EmbeddingService, IngestionPipeline, UploadedFile};
+use cogkos_ingest::{
+    EmbeddingService, IngestionPipeline, UploadedFile, extract_entities_regex,
+    resolve_relative_dates,
+};
 use cogkos_llm::LlmClient;
 use cogkos_store::{ClaimStore, GraphStore, ObjectStore, VectorStore};
 use std::sync::Arc;
@@ -32,6 +35,13 @@ pub async fn handle_submit_experience(
     // Extract domain before consuming req.content
     let domain = extract_domain(&req.content);
 
+    // Resolve relative dates if session_date is provided
+    let content = if let Some(ref date) = req.session_date {
+        resolve_relative_dates(&req.content, date)
+    } else {
+        req.content.clone()
+    };
+
     let provenance = ProvenanceRecord {
         source_id: match &claimant {
             Claimant::Agent { agent_id, .. } => agent_id.clone(),
@@ -42,13 +52,13 @@ pub async fn handle_submit_experience(
         source_type: "experience".to_string(),
         ingestion_method: "mcp_submit".to_string(),
         original_url: None,
-        audit_hash: calculate_hash(&req.content),
+        audit_hash: calculate_hash(&content),
     };
 
     let access_envelope = AccessEnvelope::new(tenant_id).with_visibility(Visibility::Tenant);
 
     let mut claim = EpistemicClaim::new(
-        req.content,
+        content,
         tenant_id,
         req.node_type,
         claimant,
@@ -93,6 +103,12 @@ pub async fn handle_submit_experience(
         claim.metadata.insert(
             "session_id".to_string(),
             serde_json::Value::String(sid.clone()),
+        );
+    }
+    if let Some(ref sd) = req.session_date {
+        claim.metadata.insert(
+            "session_date".to_string(),
+            serde_json::Value::String(sd.clone()),
         );
     }
 
@@ -210,6 +226,66 @@ pub async fn handle_submit_experience(
         // 3. Graph upsert
         if let Err(e) = graph_store.upsert_node(&bg_claim).await {
             tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background graph upsert failed");
+        }
+
+        // 3b. Regex entity extraction → MENTIONS edges
+        // Lightweight, no LLM — extracts persons, dates, places from claim content
+        let regex_entities = extract_entities_regex(&bg_claim.content);
+        if !regex_entities.is_empty() {
+            // Store extracted entities as metadata for downstream consumers
+            let entity_json: Vec<serde_json::Value> = regex_entities
+                .iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "name": e.name,
+                        "type": format!("{:?}", e.entity_type),
+                    })
+                })
+                .collect();
+
+            let mut patched = bg_claim.clone();
+            patched.metadata.insert(
+                "extracted_entities".to_string(),
+                serde_json::Value::Array(entity_json),
+            );
+            claim_store.update_claim(&patched).await.ok();
+
+            // Create entity nodes and MENTIONS edges in graph
+            for entity in &regex_entities {
+                // Create a synthetic entity claim for the graph node
+                let entity_node = cogkos_core::models::EpistemicClaim::new(
+                    entity.name.clone(),
+                    bg_tenant.clone(),
+                    cogkos_core::models::NodeType::Entity,
+                    cogkos_core::models::Claimant::System,
+                    cogkos_core::models::AccessEnvelope::new(&bg_tenant)
+                        .with_visibility(cogkos_core::models::Visibility::Tenant),
+                    cogkos_core::models::ProvenanceRecord {
+                        source_id: "regex_extraction".to_string(),
+                        source_type: "entity".to_string(),
+                        ingestion_method: "regex".to_string(),
+                        original_url: None,
+                        audit_hash: String::new(),
+                    },
+                );
+                let entity_id = entity_node.id;
+
+                // Upsert entity node (non-fatal)
+                graph_store.upsert_node(&entity_node).await.ok();
+
+                // Create MENTIONS edge: claim → entity
+                let relation = entity.entity_type.relation_label();
+                graph_store
+                    .create_edge(bg_claim_id, entity_id, relation, 0.9)
+                    .await
+                    .ok();
+            }
+
+            tracing::debug!(
+                claim_id = %bg_claim_id,
+                entity_count = regex_entities.len(),
+                "Regex entity extraction complete"
+            );
         }
 
         // 4. Semantic conflict detection + graph edge building

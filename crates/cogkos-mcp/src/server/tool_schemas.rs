@@ -82,6 +82,10 @@ pub fn build_tools() -> Vec<Tool> {
         serde_json::json!({"type": "string", "description": "Session ID for working/episodic memory scoping"}),
     );
     input_schema.insert(
+        "session_date".to_string(),
+        serde_json::json!({"type": "string", "description": "Session date for resolving relative time references (e.g. 'May 8, 2023' or '2023-05-08')"}),
+    );
+    input_schema.insert(
         "namespace".to_string(),
         serde_json::json!({"type": "string", "description": "Namespace for intra-tenant isolation (e.g. client project scoping)"}),
     );

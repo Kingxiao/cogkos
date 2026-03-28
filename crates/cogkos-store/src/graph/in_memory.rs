@@ -208,17 +208,25 @@ impl crate::GraphStore for InMemoryGraphStore {
                 "SIMILAR_TO" => 0.6,
                 "DERIVED_FROM" => 0.7,
                 "RELATED" => 0.4,
+                "MENTIONS_PERSON" | "MENTIONS_DATE" | "MENTIONS_PLACE" | "MENTIONS_ORG" => 0.7,
                 "CONTRADICTS" | "IN_CONFLICT" => -0.3,
                 _ => 0.5,
             }
         };
 
-        // Only propagate along CAUSES, SIMILAR_TO, and DERIVED_FROM edges
-        let allowed_relations: std::collections::HashSet<&str> =
-            ["CAUSES", "SIMILAR_TO", "DERIVED_FROM"]
-                .iter()
-                .cloned()
-                .collect();
+        // Propagate along structural and entity-mention edges
+        let allowed_relations: std::collections::HashSet<&str> = [
+            "CAUSES",
+            "SIMILAR_TO",
+            "DERIVED_FROM",
+            "MENTIONS_PERSON",
+            "MENTIONS_DATE",
+            "MENTIONS_PLACE",
+            "MENTIONS_ORG",
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         while let Some((current_id, current_depth)) = queue.pop() {
             if current_depth >= depth {

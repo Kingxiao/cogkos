@@ -17,6 +17,132 @@ use super::types::*;
 /// Beyond this, marginal recall gain does not justify the FalkorDB round-trips.
 const MAX_GRAPH_DIFFUSION_CLAIMS: usize = 5;
 
+/// RRF boost factor for entity-constrained search results.
+/// Higher = stronger preference for claims that mention query entities.
+const ENTITY_RRF_BOOST: f64 = 1.5;
+
+/// Extract proper nouns (entity names) from a query string.
+///
+/// Uses a simple heuristic: capitalized words that are not at sentence start
+/// and not common English question/function words.
+/// Tulving's encoding specificity principle: retrieval cues must match
+/// the encoding context — entity names are the strongest cues.
+fn extract_query_entities(query: &str) -> Vec<String> {
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let mut entities = Vec::new();
+
+    // Common question/function words that happen to be capitalized at sentence start
+    const SKIP: &[&str] = &[
+        "What", "When", "Where", "Which", "Who", "How", "Does", "Did", "Is", "Are", "Was", "Were",
+        "Has", "Have", "Would", "Could", "Should", "Can", "Will", "Do", "The", "A", "An", "In",
+        "On", "At", "To", "For", "Of", "With", "By", "From", "About", "Into", "After", "Before",
+        "During", "Between", "Through", "And", "Or", "But", "Not", "If", "Then", "So", "That",
+        "This", "It", "They", "He", "She", "We", "You", "My", "Your", "His", "Her", "Its", "Our",
+        "Their",
+    ];
+
+    for word in &words {
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'');
+        if clean.is_empty() || clean.len() <= 1 {
+            continue;
+        }
+
+        // Must start with uppercase
+        if !clean.chars().next().map_or(false, |c| c.is_uppercase()) {
+            continue;
+        }
+
+        // Skip common function words
+        if SKIP.contains(&clean) {
+            continue;
+        }
+
+        // Skip ALL-CAPS words (likely acronyms in questions, e.g. "API", "SLA")
+        // unless they're short enough to be names
+        if clean.len() > 2 && clean.chars().all(|c| c.is_uppercase()) {
+            continue;
+        }
+
+        entities.push(clean.to_string());
+    }
+
+    entities.dedup();
+    entities
+}
+
+/// Query granularity — heuristic classification to boost results matching the
+/// expected level of detail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryGranularity {
+    /// "When/Where/Who" questions — favour fine-grained episodic/working claims
+    Precise,
+    /// "What about/How does" questions — no layer preference
+    Thematic,
+    /// "What kind of/Describe/Summarize" questions — favour aggregated semantic claims
+    General,
+}
+
+/// Detect query granularity from the raw query string.
+fn detect_query_granularity(query: &str) -> QueryGranularity {
+    let q = query.to_lowercase();
+
+    // Precise: temporal, spatial, identity questions
+    if q.starts_with("when ")
+        || q.starts_with("where ")
+        || q.starts_with("who ")
+        || q.contains("what date")
+        || q.contains("what time")
+        || q.contains("how long ago")
+        || q.contains("how old")
+        || q.contains("what year")
+        || q.contains("what month")
+    {
+        return QueryGranularity::Precise;
+    }
+
+    // General: personality, description, summary questions
+    if q.starts_with("describe ")
+        || q.starts_with("summarize ")
+        || q.contains("what kind of")
+        || q.contains("what type of")
+        || q.contains("personality")
+        || q.contains("character")
+    {
+        return QueryGranularity::General;
+    }
+
+    // Default: thematic
+    QueryGranularity::Thematic
+}
+
+/// Score boost for a claim based on whether its memory_layer matches the query
+/// granularity. Returns an additive bonus to the combined_score.
+fn granularity_boost(granularity: QueryGranularity, claim: &EpistemicClaim) -> f64 {
+    let layer = claim
+        .metadata
+        .get("memory_layer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("semantic");
+
+    match granularity {
+        QueryGranularity::Precise => {
+            if layer == "episodic" || layer == "working" {
+                0.15
+            } else {
+                0.0
+            }
+        }
+        QueryGranularity::General => {
+            if layer == "semantic" {
+                0.1
+            } else {
+                0.0
+            }
+        }
+        QueryGranularity::Thematic => 0.0,
+    }
+}
+
 /// Activation weight buffer — batches PG updates to reduce write pressure on the read path.
 /// Flushed every `FLUSH_INTERVAL` by a background tokio task.
 pub struct ActivationBuffer {
@@ -236,7 +362,26 @@ pub async fn handle_query_knowledge(
         .await
         .unwrap_or_default();
 
-    // 2c. Merge via RRF (Reciprocal Rank Fusion) — k=60 is the standard constant
+    // 2c. Entity-constrained retrieval (Tulving encoding specificity)
+    //     Extract proper nouns from query, search for claims mentioning them.
+    //     This is an additive 4th retrieval path — does NOT replace vector/text/graph.
+    let query_entities = extract_query_entities(&req.query);
+    let entity_matches = if !query_entities.is_empty() {
+        let entity_query = query_entities.join(" ");
+        tracing::debug!(
+            entities = ?query_entities,
+            entity_query = %entity_query,
+            "Entity-constrained retrieval: searching for entity mentions"
+        );
+        claim_store
+            .search_claims(tenant_id, &entity_query, 30) // larger pool — will be RRF-ranked
+            .await
+            .unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    // 2d. Merge via RRF (Reciprocal Rank Fusion) — k=60 is the standard constant
     let rrf_k = 60.0_f64;
     let mut rrf_scores: std::collections::HashMap<uuid::Uuid, f64> =
         std::collections::HashMap::new();
@@ -247,10 +392,17 @@ pub async fn handle_query_knowledge(
     for (rank, c) in text_matches.iter().enumerate() {
         *rrf_scores.entry(c.id).or_default() += 1.0 / (rrf_k + rank as f64);
     }
+    // Entity-constrained results get a boosted RRF contribution
+    for (rank, c) in entity_matches.iter().enumerate() {
+        *rrf_scores.entry(c.id).or_default() += ENTITY_RRF_BOOST / (rrf_k + rank as f64);
+    }
 
-    // Build a quick lookup of text-matched claims to avoid redundant DB round-trips
-    let text_claim_map: std::collections::HashMap<uuid::Uuid, &EpistemicClaim> =
-        text_matches.iter().map(|c| (c.id, c)).collect();
+    // Build a quick lookup of text-matched + entity-matched claims to avoid redundant DB round-trips
+    let text_claim_map: std::collections::HashMap<uuid::Uuid, &EpistemicClaim> = text_matches
+        .iter()
+        .chain(entity_matches.iter())
+        .map(|c| (c.id, c))
+        .collect();
 
     // 3. Get claims from merged results with comprehensive permission filtering
     let mut claims = Vec::new();
@@ -331,29 +483,31 @@ pub async fn handle_query_knowledge(
         }
     }
 
-    // 4. Graph activation diffusion with threshold
-    //    Limit to top-N claims by confidence to cap FalkorDB round-trips,
-    //    then run all find_related calls concurrently.
+    // 4. Graph activation diffusion as independent retrieval path
+    //    Use activation_diffusion (BFS with decay) instead of find_related,
+    //    and expand seed set to ALL claims from vector+text search (not just top-5).
+    //    Graph-discovered claims are added back to the main result set.
     let mut all_graph_nodes: Vec<GraphNode> = Vec::new();
     let threshold = req.activation_threshold.clamp(0.0, 1.0);
-    let _decay_factor = 0.8;
-    let _max_depth = 2;
+    let decay_factor = 0.8;
+    let max_depth = 2;
 
-    // Select top-N claims by confidence for graph diffusion
-    let mut diffusion_claims: Vec<&EpistemicClaim> = claims.iter().collect();
-    diffusion_claims.sort_by(|a, b| {
-        b.confidence
-            .partial_cmp(&a.confidence)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    diffusion_claims.truncate(MAX_GRAPH_DIFFUSION_CLAIMS);
-
-    // Fire all graph queries concurrently
-    let graph_futures: Vec<_> = diffusion_claims
+    // Use all seed claim IDs (from vector + text search) for graph diffusion,
+    // capped at MAX_GRAPH_DIFFUSION_CLAIMS sorted by RRF rank (already sorted).
+    let diffusion_ids: Vec<uuid::Uuid> = claim_ids
         .iter()
-        .map(|claim| async {
-            let id = claim.id;
-            match graph_store.find_related(id, tenant_id, 2, threshold).await {
+        .take(MAX_GRAPH_DIFFUSION_CLAIMS)
+        .copied()
+        .collect();
+
+    // Fire all graph activation_diffusion queries concurrently
+    let graph_futures: Vec<_> = diffusion_ids
+        .iter()
+        .map(|&id| async move {
+            match graph_store
+                .activation_diffusion(id, tenant_id, 1.0, max_depth, decay_factor, threshold)
+                .await
+            {
                 Ok(nodes) => (id, nodes),
                 Err(e) => {
                     tracing::warn!(claim_id = %id, error = %e, "Graph diffusion failed, degrading");
@@ -365,24 +519,30 @@ pub async fn handle_query_knowledge(
 
     let graph_results = futures::future::join_all(graph_futures).await;
 
+    let seed_id_set: std::collections::HashSet<uuid::Uuid> = claim_ids.iter().copied().collect();
+
     for (_claim_id, related) in graph_results {
         for mut node in related {
-            if !all_graph_nodes
-                .iter()
-                .any(|n: &GraphNode| n.content == node.content)
-            {
-                // Enrich with live activation from PG (FalkorDB stores stale initial value)
-                // Also filter: only include nodes from the same memory layer as the query
-                if let Ok(live_claim) = claim_store.get_claim(node.id, tenant_id).await {
-                    let node_layer = live_claim.memory_layer().to_string();
-                    let target_layer = effective_layer.unwrap_or("semantic");
-                    if node_layer != target_layer {
-                        continue;
-                    }
-                    node.activation = live_claim.activation_weight;
-                }
-                all_graph_nodes.push(node);
+            if all_graph_nodes.iter().any(|n: &GraphNode| n.id == node.id) {
+                continue;
             }
+            // Enrich with live activation from PG (FalkorDB stores stale initial value)
+            // Also filter: only include nodes from the same memory layer as the query
+            if let Ok(live_claim) = claim_store.get_claim(node.id, tenant_id).await {
+                let node_layer = live_claim.memory_layer().to_string();
+                let target_layer = effective_layer.unwrap_or("semantic");
+                if node_layer != target_layer {
+                    continue;
+                }
+                node.activation = live_claim.activation_weight;
+
+                // Graph-discovered claims not in the seed set: add to main claims list
+                if !seed_id_set.contains(&node.id) && seen_ids.insert(node.id) {
+                    claim_ids.push(live_claim.id);
+                    claims.push(live_claim);
+                }
+            }
+            all_graph_nodes.push(node);
         }
     }
 
@@ -395,12 +555,53 @@ pub async fn handle_query_knowledge(
     let claim_tuples: Vec<(uuid::Uuid, EpistemicClaim)> =
         claims.iter().map(|c| (c.id, c.clone())).collect();
 
-    let (merged_results, related_by_graph) = merge_results(
+    let (mut merged_results, related_by_graph) = merge_results(
         &vector_matches,
         &all_graph_nodes,
         &claim_tuples,
         &merge_config,
+        &req.query,
     );
+
+    // 5b. Apply query-granularity boost — rewards claims whose memory_layer
+    //     matches the expected level of detail for the query type.
+    let granularity = detect_query_granularity(&req.query);
+    for mr in &mut merged_results {
+        if let Some(claim) = claims.iter().find(|c| c.id == mr.claim_id) {
+            mr.combined_score += granularity_boost(granularity, claim);
+        }
+    }
+
+    // 5c. Entity-presence boost (Tulving encoding specificity post-filter)
+    //     Claims whose content contains query entities get a score bonus.
+    //     This re-ranks without removing any results.
+    if !query_entities.is_empty() {
+        let entity_boost: f64 = std::env::var("ENTITY_PRESENCE_BOOST")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.2);
+
+        for mr in &mut merged_results {
+            if let Some(claim) = claims.iter().find(|c| c.id == mr.claim_id) {
+                let entity_hit_count = query_entities
+                    .iter()
+                    .filter(|e| claim.content.contains(e.as_str()))
+                    .count();
+                if entity_hit_count > 0 {
+                    // Proportional boost: more entity matches = higher boost
+                    let ratio = entity_hit_count as f64 / query_entities.len() as f64;
+                    mr.combined_score += entity_boost * ratio;
+                }
+            }
+        }
+    }
+
+    // Re-sort after boosting
+    merged_results.sort_by(|a, b| {
+        b.combined_score
+            .partial_cmp(&a.combined_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // 6. Find best belief from merged results
     let best_belief = if !merged_results.is_empty() {
@@ -1031,4 +1232,75 @@ fn strip_yaml_frontmatter(content: &str) -> String {
         }
     }
     content.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_entities_from_person_query() {
+        let entities = extract_query_entities("What did Caroline research?");
+        assert_eq!(entities, vec!["Caroline"]);
+    }
+
+    #[test]
+    fn test_extract_entities_multiple() {
+        let entities = extract_query_entities("Did Caroline and Melanie go to Paris together?");
+        assert_eq!(entities, vec!["Caroline", "Melanie", "Paris"]);
+    }
+
+    #[test]
+    fn test_extract_entities_skips_question_words() {
+        let entities = extract_query_entities("What is the API rate limit?");
+        assert!(entities.is_empty(), "got: {:?}", entities);
+    }
+
+    #[test]
+    fn test_extract_entities_skips_pronouns() {
+        let entities = extract_query_entities("Where did He go after the meeting?");
+        assert!(entities.is_empty(), "got: {:?}", entities);
+    }
+
+    #[test]
+    fn test_extract_entities_handles_punctuation() {
+        let entities = extract_query_entities("When was Dr. Sarah Chen hired?");
+        assert!(entities.contains(&"Sarah".to_string()));
+        assert!(entities.contains(&"Chen".to_string()));
+    }
+
+    #[test]
+    fn test_extract_entities_empty_query() {
+        let entities = extract_query_entities("");
+        assert!(entities.is_empty());
+    }
+
+    #[test]
+    fn test_extract_entities_no_caps() {
+        let entities = extract_query_entities("what is the weather today?");
+        assert!(entities.is_empty());
+    }
+
+    #[test]
+    fn test_extract_entities_location() {
+        let entities = extract_query_entities("Who founded the company in San Francisco?");
+        assert!(entities.contains(&"San".to_string()));
+        assert!(entities.contains(&"Francisco".to_string()));
+    }
+
+    #[test]
+    fn test_granularity_detection() {
+        assert_eq!(
+            detect_query_granularity("When did Caroline arrive?"),
+            QueryGranularity::Precise
+        );
+        assert_eq!(
+            detect_query_granularity("Describe the company culture"),
+            QueryGranularity::General
+        );
+        assert_eq!(
+            detect_query_granularity("What did Caroline research?"),
+            QueryGranularity::Thematic
+        );
+    }
 }

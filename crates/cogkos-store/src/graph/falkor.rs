@@ -170,7 +170,7 @@ impl crate::GraphStore for FalkorStore {
         let safe_id = validate_uuid(&id)?;
         let safe_tenant = cypher_escape(tenant_id);
         let cypher = format!(
-            "MATCH (start:Claim {{id: '{}'}})-[:CAUSES|SIMILAR_TO|DERIVED_FROM|RELATED|SIMILAR*1..{}]->(related:Claim)
+            "MATCH (start:Claim {{id: '{}'}})-[:CAUSES|SIMILAR_TO|DERIVED_FROM|RELATED|SIMILAR|MENTIONS_PERSON|MENTIONS_DATE|MENTIONS_PLACE|MENTIONS_ORG*1..{}]->(related:Claim)
              WHERE related.activation >= {} AND related.tenant_id = '{}'
              RETURN related.id as id, related.content as content, related.activation as activation",
             safe_id, depth, min_activation, safe_tenant
@@ -299,6 +299,7 @@ impl crate::GraphStore for FalkorStore {
                 "SIMILAR_TO" => 0.6,
                 "DERIVED_FROM" => 0.7,
                 "RELATED" => 0.4,
+                "MENTIONS_PERSON" | "MENTIONS_DATE" | "MENTIONS_PLACE" | "MENTIONS_ORG" => 0.7,
                 "CONTRADICTS" | "IN_CONFLICT" => -0.3,
                 _ => 0.5,
             }
@@ -328,12 +329,12 @@ impl crate::GraphStore for FalkorStore {
                     continue;
                 }
 
-                // Find neighbors via CAUSES/SIMILAR_TO/DERIVED_FROM edges
+                // Find neighbors via structural + entity-mention edges
                 // current_id comes from previous Cypher results (validated UUID) or start_id (validated above)
                 let safe_current_id = validate_uuid(&current_id)?;
                 let neighbor_cypher = format!(
-                    "MATCH (current:Claim {{id: '{}'}})-[r:CAUSES|SIMILAR_TO|DERIVED_FROM]->(neighbor:Claim)
-                     WHERE neighbor.tenant_id = '{}'
+                    "MATCH (current:Claim {{id: '{}'}})-[r:CAUSES|SIMILAR_TO|DERIVED_FROM|MENTIONS_PERSON|MENTIONS_DATE|MENTIONS_PLACE|MENTIONS_ORG]-(neighbor:Claim)
+                     WHERE neighbor.tenant_id = '{}' AND neighbor.id <> current.id
                      RETURN neighbor.id as id, neighbor.content as content, type(r) as rel_type, r.weight as weight",
                     safe_current_id, safe_tenant
                 );

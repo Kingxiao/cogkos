@@ -364,6 +364,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 
@@ -420,6 +421,7 @@ async fn test_submit_experience_to_query_knowledge_flow() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 
@@ -567,6 +569,7 @@ async fn test_submit_and_query_with_conflicts() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 
@@ -598,6 +601,7 @@ async fn test_submit_and_query_with_conflicts() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 
@@ -746,6 +750,7 @@ async fn test_submit_experience_with_all_fields() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 
@@ -811,6 +816,7 @@ async fn test_submit_experience_with_knowledge_type() {
         related_to: vec![],
         memory_layer: None,
         session_id: None,
+        session_date: None,
         namespace: None,
     };
 

@@ -119,6 +119,9 @@ pub struct SubmitExperienceRequest {
     /// Session ID for working/episodic memory scoping
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Session date for resolving relative time references (e.g. "May 8, 2023" or "2023-05-08")
+    #[serde(default)]
+    pub session_date: Option<String>,
     /// Optional namespace for intra-tenant isolation (e.g. client projects).
     /// Claims with a namespace are only visible within that namespace.
     #[serde(default)]
