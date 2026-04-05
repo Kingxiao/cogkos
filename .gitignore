@@ -1,0 +1,45 @@
+
+# Audit docs (local only)
+backups/
+bin/test_*.rs
+build/
+# Build artifacts
+config/local.toml
+data/
+local-storage/
+scripts/cogkos-bg.sh
+# Data directories
+*.db
+dist/
+docs/archive/audit/
+docs/audit/
+.DS_Store
+.env
+# Environment
+.env.local
+examples/test_*.rs
+# IDE
+.idea/
+*.log
+logs/
+# Logs
+# OS
+**/*.rs.bk
+# Rust
+*.swo
+*.swp
+target/
+# Test artifacts
+test_embedding.rs
+test_output/
+Thumbs.db
+.vscode/
+# 测试文件
+sdk/python/**/__pycache__/
+
+# Internal dev process (competitive analysis, experiment logs, local tooling)
+CLAUDE.md
+PROGRESS.md
+benchmarks/
+docs/superpowers/
+.mcp.json

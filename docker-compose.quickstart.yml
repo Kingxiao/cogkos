@@ -1,0 +1,98 @@
+# CogKOS Quickstart — zero-config one-command startup
+# Usage: docker compose -f docker-compose.quickstart.yml up -d
+# No .env file required. Embedding runs in fallback mode (pseudo-vectors).
+#
+# After startup:
+#   MCP endpoint: http://localhost:3000/mcp
+#   Health check: http://localhost:8081/healthz
+#   API Key:      cogkos-quickstart-key
+#   Tenant:       default
+#
+# Test with curl:
+#   curl -X POST http://localhost:3000/mcp \
+#     -H "Content-Type: application/json" \
+#     -H "X-API-Key: cogkos-quickstart-key" \
+#     -H "Accept: application/json, text/event-stream" \
+#     -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: cogkos-qs-postgres
+    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: cogkos
+      POSTGRES_PASSWORD: cogkos_dev
+      POSTGRES_DB: cogkos
+    volumes:
+      - cogkos-qs-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cogkos -d cogkos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: cogkos-qs-falkordb
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --save 900 1 --save 300 10"
+    volumes:
+      - cogkos-qs-falkordata:/var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  cogkos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cogkos-qs-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "8081:8081"
+    environment:
+      RUST_LOG: info
+      DATABASE_URL: postgres://cogkos:cogkos_dev@postgres:5432/cogkos
+      FALKORDB_URL: redis://falkordb:6379
+      FALKORDB_GRAPH: cogkos
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "3000"
+      MCP_TRANSPORT: http
+      HEALTH_PORT: "8081"
+      LOCAL_STORAGE_PATH: /app/data/objects
+      # Quickstart auth — hardcoded dev key, no DB validation needed
+      DEFAULT_MCP_API_KEY: cogkos-quickstart-key
+      DEFAULT_MCP_TENANT: default
+      # Embedding disabled — fallback to pseudo-vectors (no API key needed)
+      API_302_KEY: ""
+      EMBEDDING_API_KEY: ""
+      EMBEDDING_BASE_URL: ""
+      EMBEDDING_MODEL: ""
+      EMBEDDING_PROVIDER: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+    volumes:
+      - cogkos-qs-objects:/app/data/objects
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  cogkos-qs-pgdata:
+  cogkos-qs-falkordata:
+  cogkos-qs-objects:

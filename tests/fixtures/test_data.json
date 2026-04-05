@@ -1,0 +1,49 @@
+{
+  "name": "CogKOS Test Fixtures",
+  "version": "1.0.0",
+  "claims": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "tenant_id": "test_tenant",
+      "content": "Competitor X has lower customer satisfaction than industry average",
+      "confidence": 0.78,
+      "consolidation_stage": "Consolidated",
+      "claimant": {
+        "source_id": "market_research_2024",
+        "source_type": "Document",
+        "base_trust": 0.85
+      },
+      "provenance": {
+        "extraction_method": "pdf_parse",
+        "extracted_at": "2024-01-15T10:30:00Z"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "tenant_id": "test_tenant",
+      "content": "Competitor X's support response time is slower than competitors",
+      "confidence": 0.72,
+      "consolidation_stage": "FastTrack",
+      "claimant": {
+        "source_id": "support_analysis",
+        "source_type": "Agent",
+        "base_trust": 0.75
+      },
+      "provenance": {
+        "extraction_method": "agent_report",
+        "extracted_at": "2024-01-20T14:22:00Z"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query": "How does Competitor X compare for SMB customers?",
+      "context": {
+        "domain": "competitive_analysis",
+        "urgency": "normal",
+        "max_results": 10
+      },
+      "expected_claim_count": 2
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+[package]
+name = "cogkos-store"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Storage abstraction layer for CogKOS"
+
+[dependencies]
+cogkos-core = { path = "../cogkos-core" }
+
+# Database - PostgreSQL
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "json", "migrate"] }
+pgvector = { workspace = true }
+deadpool = "0.13"
+
+# Database - Redis/FalkorDB
+deadpool-redis = "0.23"
+redis = { version = "1.0", features = ["tokio-comp", "json", "cluster"] }
+
+# Database - Qdrant
+tonic = "0.11"
+prost = "0.12"
+
+# Object Storage - S3
+aws-config = { version = "=1.1.7", features = ["rustls"] }
+aws-sdk-s3 = { version = "=1.15.0", features = ["rustls"] }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Caching
+lru = "0.12"
+
+[dev-dependencies]
+tokio-test.workspace = true
+mockall.workspace = true
+tokio = { workspace = true }
+uuid = { workspace = true }

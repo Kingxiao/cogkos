@@ -1,0 +1,671 @@
+//! Ingest handlers: submit_experience, upload_document, get_meta_directory
+
+use cogkos_core::authority::AuthorityTier;
+use cogkos_core::models::*;
+use cogkos_core::{CogKosError, Result};
+use cogkos_ingest::{
+    EmbeddingService, IngestionPipeline, UploadedFile, extract_entities_regex,
+    resolve_relative_dates,
+};
+use cogkos_llm::LlmClient;
+use cogkos_store::{ClaimStore, GraphStore, ObjectStore, VectorStore};
+use std::sync::Arc;
+
+use super::helpers::{
+    self, calculate_content_hash, calculate_hash, extract_domain, generate_query_vector,
+};
+use super::types::*;
+
+/// Submit experience handler
+pub async fn handle_submit_experience(
+    req: SubmitExperienceRequest,
+    tenant_id: &str,
+    claim_store: Arc<dyn ClaimStore>,
+    vector_store: Arc<dyn VectorStore>,
+    graph_store: Arc<dyn GraphStore>,
+    embedding_client: Option<Arc<dyn LlmClient>>,
+) -> Result<serde_json::Value> {
+    // Convert source
+    let claimant = match req.source {
+        SourceInfo::Human { user_id, role } => Claimant::Human { user_id, role },
+        SourceInfo::Agent { agent_id, model } => Claimant::Agent { agent_id, model },
+        SourceInfo::External { source_name } => Claimant::ExternalPublic { source_name },
+    };
+
+    // Extract domain before consuming req.content
+    let domain = extract_domain(&req.content);
+
+    // Resolve relative dates if session_date is provided
+    let content = if let Some(ref date) = req.session_date {
+        resolve_relative_dates(&req.content, date)
+    } else {
+        req.content.clone()
+    };
+
+    let provenance = ProvenanceRecord {
+        source_id: match &claimant {
+            Claimant::Agent { agent_id, .. } => agent_id.clone(),
+            Claimant::Human { user_id, .. } => user_id.clone(),
+            Claimant::ExternalPublic { source_name } => source_name.clone(),
+            Claimant::System => "system".to_string(),
+        },
+        source_type: "experience".to_string(),
+        ingestion_method: "mcp_submit".to_string(),
+        original_url: None,
+        audit_hash: calculate_hash(&content),
+    };
+
+    let access_envelope = AccessEnvelope::new(tenant_id).with_visibility(Visibility::Tenant);
+
+    let mut claim = EpistemicClaim::new(
+        content,
+        tenant_id,
+        req.node_type,
+        claimant,
+        access_envelope,
+        provenance,
+    );
+
+    claim.confidence = req.confidence.unwrap_or(0.5).clamp(0.0, 1.0);
+    claim.t_valid_start = req.valid_from.unwrap_or(claim.t_valid_start);
+    claim.t_valid_end = req.valid_to;
+    claim.derived_from = req.related_to;
+
+    // Consume knowledge_type from request
+    if let Some(ref kt) = req.knowledge_type {
+        match kt.to_lowercase().as_str() {
+            "business" => claim.knowledge_type = KnowledgeType::Business,
+            _ => claim.knowledge_type = KnowledgeType::Experiential,
+        }
+    }
+
+    // Resolve authority tier and set durability + metadata
+    let tier = AuthorityTier::resolve(&claim);
+    claim.durability = tier.recommended_durability();
+    claim.metadata.insert(
+        "authority_tier".to_string(),
+        serde_json::Value::String(tier.as_str().to_string()),
+    );
+
+    // Save domain to metadata
+    claim
+        .metadata
+        .insert("domain".to_string(), serde_json::Value::String(domain));
+
+    // Memory layer + session scoping
+    if let Some(ref layer) = req.memory_layer {
+        claim.metadata.insert(
+            "memory_layer".to_string(),
+            serde_json::Value::String(layer.clone()),
+        );
+    }
+    if let Some(ref sid) = req.session_id {
+        claim.metadata.insert(
+            "session_id".to_string(),
+            serde_json::Value::String(sid.clone()),
+        );
+    }
+    if let Some(ref sd) = req.session_date {
+        claim.metadata.insert(
+            "session_date".to_string(),
+            serde_json::Value::String(sd.clone()),
+        );
+    }
+
+    // Namespace isolation — write namespace to metadata for intra-tenant scoping
+    if let Some(ref ns) = req.namespace {
+        claim.metadata.insert(
+            "namespace".to_string(),
+            serde_json::Value::String(ns.clone()),
+        );
+    }
+
+    // === Write consistency check: only for semantic layer ===
+    // Skip conflict check for working/episodic layers — they are ephemeral.
+    let is_semantic = req
+        .memory_layer
+        .as_deref()
+        .map_or(true, |l| l == "semantic");
+
+    if is_semantic {
+        if let Ok(similar_claims) = claim_store
+            .search_claims(tenant_id, &claim.content, 5)
+            .await
+        {
+            for existing in &similar_claims {
+                let existing_tier = AuthorityTier::resolve(existing);
+                if matches!(
+                    existing_tier,
+                    AuthorityTier::Canonical | AuthorityTier::Curated
+                ) {
+                    // T1/T2 authority: reject if conflict detected
+                    if cogkos_core::evolution::conflict::detect_conflict(&claim, existing).is_some()
+                    {
+                        return Ok(serde_json::json!({
+                            "status": "rejected",
+                            "reason": "conflicts_with_authority",
+                            "conflicting_claim_id": existing.id.to_string(),
+                            "conflicting_content": existing.content.chars().take(200).collect::<String>()
+                        }));
+                    }
+                }
+            }
+
+            // T3/T4 conflict check: accept but mark as contested
+            let t3t4_conflicts: usize = similar_claims
+                .iter()
+                .filter(|existing| {
+                    let et = AuthorityTier::resolve(existing);
+                    matches!(et, AuthorityTier::Verified | AuthorityTier::Observed)
+                        && cogkos_core::evolution::conflict::detect_conflict(&claim, existing)
+                            .is_some()
+                })
+                .count();
+
+            if t3t4_conflicts > 0 {
+                claim.epistemic_status = EpistemicStatus::Contested;
+                claim.confidence *= 0.5;
+            }
+        }
+    }
+
+    let t0 = std::time::Instant::now();
+    let claim_id = claim_store.insert_claim(&claim).await?;
+    cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
+    tracing::info!(claim_id = %claim_id, pg_ms = t0.elapsed().as_millis() as u64, "Fast-track: claim persisted");
+
+    // S2: Fast capture / slow consolidation
+    // Return immediately after PG write, spawn background task for embedding + vector + graph + conflict
+    let bg_claim = claim.clone();
+    let bg_tenant = tenant_id.to_string();
+    let bg_claim_id = claim_id;
+    let bg_claim_store = Arc::clone(&claim_store);
+    let bg_vector_store = Arc::clone(&vector_store);
+    let bg_graph_store = Arc::clone(&graph_store);
+
+    tokio::spawn(async move {
+        let claim_store = bg_claim_store;
+        let vector_store = bg_vector_store;
+        let graph_store = bg_graph_store;
+        let t_bg = std::time::Instant::now();
+
+        // 1. Embedding
+        let content_vector: Vec<f32> = if let Some(ref client) = embedding_client {
+            let embedding_service = EmbeddingService::new(client.clone());
+            match embedding_service.embed(&bg_claim.content).await {
+                Ok(vec) => vec,
+                Err(e) => {
+                    tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background embedding failed, using fallback");
+                    generate_query_vector(&bg_claim.content, helpers::DEFAULT_FALLBACK_DIM)
+                }
+            }
+        } else {
+            generate_query_vector(&bg_claim.content, helpers::DEFAULT_FALLBACK_DIM)
+        };
+        let t_embed = t_bg.elapsed();
+
+        // 2. Vector upsert
+        let payload = serde_json::json!({
+            "tenant_id": bg_tenant,
+            "content": bg_claim.content,
+            "node_type": bg_claim.node_type.as_db_str(),
+        });
+        if let Err(e) = vector_store
+            .upsert(bg_claim_id, content_vector.clone(), payload)
+            .await
+        {
+            tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background vector upsert failed");
+            // Mark for sleep-time reindex
+            let mut patched = bg_claim.clone();
+            patched
+                .metadata
+                .insert("needs_reindex".into(), serde_json::Value::Bool(true));
+            claim_store.update_claim(&patched).await.ok();
+        }
+
+        // 3. Graph upsert
+        if let Err(e) = graph_store.upsert_node(&bg_claim).await {
+            tracing::warn!(claim_id = %bg_claim_id, error = %e, "Background graph upsert failed");
+        }
+
+        // 3b. Regex entity extraction → MENTIONS edges
+        // Lightweight, no LLM — extracts persons, dates, places from claim content
+        let regex_entities = extract_entities_regex(&bg_claim.content);
+        if !regex_entities.is_empty() {
+            // Store extracted entities as metadata for downstream consumers
+            let entity_json: Vec<serde_json::Value> = regex_entities
+                .iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "name": e.name,
+                        "type": format!("{:?}", e.entity_type),
+                    })
+                })
+                .collect();
+
+            let mut patched = bg_claim.clone();
+            patched.metadata.insert(
+                "extracted_entities".to_string(),
+                serde_json::Value::Array(entity_json),
+            );
+            claim_store.update_claim(&patched).await.ok();
+
+            // Create entity nodes and MENTIONS edges in graph
+            for entity in &regex_entities {
+                // Create a synthetic entity claim for the graph node
+                let entity_node = cogkos_core::models::EpistemicClaim::new(
+                    entity.name.clone(),
+                    bg_tenant.clone(),
+                    cogkos_core::models::NodeType::Entity,
+                    cogkos_core::models::Claimant::System,
+                    cogkos_core::models::AccessEnvelope::new(&bg_tenant)
+                        .with_visibility(cogkos_core::models::Visibility::Tenant),
+                    cogkos_core::models::ProvenanceRecord {
+                        source_id: "regex_extraction".to_string(),
+                        source_type: "entity".to_string(),
+                        ingestion_method: "regex".to_string(),
+                        original_url: None,
+                        audit_hash: String::new(),
+                    },
+                );
+                let entity_id = entity_node.id;
+
+                // Upsert entity node (non-fatal)
+                graph_store.upsert_node(&entity_node).await.ok();
+
+                // Create MENTIONS edge: claim → entity
+                let relation = entity.entity_type.relation_label();
+                graph_store
+                    .create_edge(bg_claim_id, entity_id, relation, 0.9)
+                    .await
+                    .ok();
+            }
+
+            tracing::debug!(
+                claim_id = %bg_claim_id,
+                entity_count = regex_entities.len(),
+                "Regex entity extraction complete"
+            );
+        }
+
+        // 4. Semantic conflict detection + graph edge building
+        if let Ok(matches) = vector_store
+            .search(content_vector, &bg_tenant, 20, None)
+            .await
+        {
+            let scored_matches: Vec<_> = matches
+                .into_iter()
+                .filter(|m| m.id != bg_claim_id && m.score > 0.3)
+                .take(10)
+                .collect();
+
+            if !scored_matches.is_empty() {
+                let mut candidate_claims: Vec<EpistemicClaim> = Vec::new();
+                for m in &scored_matches {
+                    if let Ok(c) = claim_store.get_claim(m.id, &bg_tenant).await {
+                        candidate_claims.push(c);
+                    }
+                }
+
+                for m in &scored_matches {
+                    if m.score > 0.5 {
+                        let relation = if m.score > 0.8 { "SIMILAR" } else { "RELATED" };
+                        graph_store
+                            .create_edge(bg_claim_id, m.id, relation, m.score)
+                            .await
+                            .ok();
+                    }
+                }
+
+                let conflicts = cogkos_core::evolution::conflict::detect_conflicts_batch(
+                    &bg_claim,
+                    &candidate_claims,
+                );
+                for conflict in &conflicts {
+                    claim_store.insert_conflict(conflict).await.ok();
+                    notify_conflict_webhook(conflict, &bg_claim.content);
+                }
+
+                tracing::debug!(
+                    claim_id = %bg_claim_id,
+                    edges = scored_matches.iter().filter(|m| m.score > 0.5).count(),
+                    conflicts = conflicts.len(),
+                    "Background: graph edges + conflict detection"
+                );
+            }
+        }
+
+        tracing::info!(
+            claim_id = %bg_claim_id,
+            embedding_ms = t_embed.as_millis() as u64,
+            total_bg_ms = t_bg.elapsed().as_millis() as u64,
+            "Background consolidation complete"
+        );
+    });
+
+    let status = if matches!(claim.epistemic_status, EpistemicStatus::Contested) {
+        "accepted_contested"
+    } else {
+        "accepted"
+    };
+
+    let mut resp = serde_json::json!({
+        "claim_id": claim_id.to_string(),
+        "status": status,
+        "consolidation": "async",
+        "estimated_consolidation_time": "5s"
+    });
+
+    if status == "accepted_contested" {
+        resp.as_object_mut()
+            .unwrap()
+            .insert("conflicts_detected".to_string(), serde_json::json!(true));
+    }
+
+    Ok(resp)
+}
+
+/// Upload document handler
+pub async fn handle_upload_document(
+    req: UploadDocumentRequest,
+    tenant_id: &str,
+    claim_store: &dyn ClaimStore,
+    graph_store: &dyn GraphStore,
+    vector_store: &dyn VectorStore,
+    object_store: &dyn ObjectStore,
+    embedding_service: Option<EmbeddingService>,
+    llm_client: Option<Arc<dyn LlmClient>>,
+) -> Result<DocumentUploadResponse> {
+    // Decode base64 content
+    let file_data =
+        match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &req.content) {
+            Ok(data) => data,
+            Err(e) => return Err(CogKosError::InvalidInput(format!("Invalid base64: {}", e))),
+        };
+
+    // Calculate content hash for duplicate detection
+    let content_hash = calculate_content_hash(&file_data);
+
+    // Check for duplicate using hash-based key
+    let hash_key = format!("{}/by_hash/{}", tenant_id, content_hash);
+
+    if object_store.download(&hash_key).await.is_ok() {
+        tracing::info!("Duplicate document detected, hash: {}", &content_hash[..16]);
+        return Ok(DocumentUploadResponse {
+            file_id: content_hash[..8].to_string(),
+            status: "duplicate".to_string(),
+            estimated_time: "0ms".to_string(),
+            pipeline_id: None,
+            is_duplicate: true,
+        });
+    }
+
+    // Determine content type from filename
+    let content_type = match req.filename.rsplit('.').next() {
+        Some("pdf") => "application/pdf",
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        Some("md") => "text/markdown",
+        Some("txt") => "text/plain",
+        Some("csv") => "text/csv",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Some("pptx") => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _ => "application/octet-stream",
+    };
+
+    let file_id = uuid::Uuid::new_v4();
+
+    let claimant = match req.source {
+        SourceInfo::Human { user_id, role } => Claimant::Human { user_id, role },
+        SourceInfo::Agent { agent_id, model } => Claimant::Agent { agent_id, model },
+        SourceInfo::External { source_name } => Claimant::ExternalPublic { source_name },
+    };
+
+    let hash_upload_key = format!("{}/by_hash/{}", tenant_id, content_hash);
+
+    let (status, pipeline_id, estimated_time) = if req.auto_process {
+        if let Some(embedding_svc) = embedding_service {
+            if let Err(e) = object_store
+                .upload(&hash_upload_key, &file_data, content_type)
+                .await
+            {
+                tracing::warn!(key = %hash_upload_key, error = %e, "Failed to store hash-keyed duplicate detection copy");
+            }
+
+            let uploaded_file = UploadedFile {
+                filename: req.filename.clone(),
+                content_type: content_type.to_string(),
+                data: file_data,
+                source: claimant,
+                tenant_id: tenant_id.to_string(),
+                namespace: req.namespace.clone(),
+            };
+
+            let pipeline = IngestionPipeline::with_llm(embedding_svc.clone(), llm_client.clone());
+
+            match pipeline
+                .ingest(
+                    uploaded_file,
+                    claim_store,
+                    graph_store,
+                    vector_store,
+                    object_store,
+                )
+                .await
+            {
+                Ok(result) => {
+                    // Webhook notification for pipeline-detected conflicts
+                    for conflict in &result.conflicts_detected {
+                        notify_conflict_webhook(conflict, &req.filename);
+                    }
+                    (
+                        "completed",
+                        Some(format!("pipe-{}", &file_id.to_string()[..8])),
+                        format!("{}ms", result.chunk_claim_ids.len() * 100),
+                    )
+                }
+                Err(e) => {
+                    tracing::error!("Ingestion pipeline error: {}", e);
+                    (
+                        "failed",
+                        Some(format!("pipe-{}", &file_id.to_string()[..8])),
+                        "0s".to_string(),
+                    )
+                }
+            }
+        } else {
+            let s3_key = format!("{}/raw/{}/{}", tenant_id, file_id, req.filename);
+            object_store
+                .upload(&s3_key, &file_data, content_type)
+                .await?;
+            if let Err(e) = object_store
+                .upload(&hash_upload_key, &file_data, content_type)
+                .await
+            {
+                tracing::warn!(key = %hash_upload_key, error = %e, "Failed to store hash-keyed duplicate detection copy");
+            }
+
+            ("uploaded_no_processing", None, "0s".to_string())
+        }
+    } else {
+        let s3_key = format!("{}/raw/{}/{}", tenant_id, file_id, req.filename);
+        object_store
+            .upload(&s3_key, &file_data, content_type)
+            .await?;
+        if let Err(e) = object_store
+            .upload(&hash_upload_key, &file_data, content_type)
+            .await
+        {
+            tracing::warn!(key = %hash_upload_key, error = %e, "Failed to store hash-keyed duplicate detection copy");
+        }
+
+        let domain = extract_domain(&req.filename);
+
+        let provenance = ProvenanceRecord {
+            source_id: "upload".to_string(),
+            source_type: "document".to_string(),
+            ingestion_method: "mcp_upload".to_string(),
+            original_url: Some(format!("s3://{}", s3_key)),
+            audit_hash: content_hash.clone(),
+        };
+
+        let access_envelope = AccessEnvelope::new(tenant_id).with_visibility(Visibility::Tenant);
+
+        let mut claim = EpistemicClaim::new(
+            format!("Document: {}", req.filename),
+            tenant_id,
+            NodeType::File,
+            Claimant::System,
+            access_envelope,
+            provenance,
+        );
+
+        claim
+            .metadata
+            .insert("domain".to_string(), serde_json::Value::String(domain));
+        claim.metadata.insert(
+            "content_hash".to_string(),
+            serde_json::Value::String(content_hash),
+        );
+
+        // Namespace isolation for uploaded document
+        if let Some(ref ns) = req.namespace {
+            claim.metadata.insert(
+                "namespace".to_string(),
+                serde_json::Value::String(ns.clone()),
+            );
+        }
+
+        let _claim_id = claim_store.insert_claim(&claim).await?;
+        cogkos_core::monitoring::METRICS.inc_counter("cogkos_claims_total", 1);
+
+        ("uploaded", None, "0s".to_string())
+    };
+
+    Ok(DocumentUploadResponse {
+        file_id: file_id.to_string(),
+        status: status.to_string(),
+        estimated_time,
+        pipeline_id,
+        is_duplicate: false,
+    })
+}
+
+/// Get meta directory handler
+#[allow(clippy::type_complexity)]
+pub async fn handle_get_meta_directory(
+    req: GetMetaDirectoryRequest,
+    tenant_id: &str,
+    claim_store: &dyn ClaimStore,
+) -> Result<serde_json::Value> {
+    let claims = claim_store
+        .query_claims(tenant_id, &[])
+        .await
+        .map_err(|e| CogKosError::Database(format!("Failed to query claims: {}", e)))?;
+
+    if claims.is_empty() {
+        return Ok(serde_json::json!({
+            "entries": [],
+            "total_domains": 0,
+            "total_claims": 0
+        }));
+    }
+
+    let mut domain_map: std::collections::HashMap<
+        String,
+        (
+            Vec<cogkos_core::models::EpistemicClaim>,
+            std::collections::HashMap<String, usize>,
+        ),
+    > = std::collections::HashMap::new();
+
+    for claim in &claims {
+        let domain = claim
+            .metadata
+            .get("domain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("general")
+            .to_string();
+
+        let entry = domain_map
+            .entry(domain)
+            .or_insert((Vec::new(), std::collections::HashMap::new()));
+        entry.0.push(claim.clone());
+
+        let node_type_str = format!("{:?}", claim.node_type);
+        *entry.1.entry(node_type_str).or_insert(0) += 1;
+    }
+
+    let filtered_domains: Vec<(
+        String,
+        (
+            Vec<cogkos_core::models::EpistemicClaim>,
+            std::collections::HashMap<String, usize>,
+        ),
+    )> = if let Some(ref query_domain) = req.query_domain {
+        domain_map
+            .into_iter()
+            .filter(|(d, _)| d == query_domain)
+            .collect()
+    } else {
+        domain_map.into_iter().collect()
+    };
+
+    let mut entries: Vec<MetaDirectoryEntry> = filtered_domains
+        .into_iter()
+        .map(|(domain, (claims_in_domain, node_types))| {
+            let claim_count = claims_in_domain.len();
+            let avg_confidence: f64 = if claim_count > 0 {
+                claims_in_domain.iter().map(|c| c.confidence).sum::<f64>() / claim_count as f64
+            } else {
+                0.0
+            };
+
+            let expertise_score = (claim_count as f64 * avg_confidence / 10.0).min(1.0);
+            let latest_update = claims_in_domain.iter().map(|c| c.updated_at).max();
+
+            MetaDirectoryEntry {
+                domain,
+                claim_count,
+                expertise_score,
+                node_types,
+                avg_confidence,
+                latest_update,
+            }
+        })
+        .collect();
+
+    entries.sort_by(|a, b| {
+        b.expertise_score
+            .partial_cmp(&a.expertise_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    if let Some(min_score) = req.min_expertise_score {
+        entries.retain(|e| e.expertise_score >= min_score);
+    }
+
+    let total_claims: usize = entries.iter().map(|e| e.claim_count).sum();
+    let total_domains = entries.len();
+
+    Ok(serde_json::json!({
+        "entries": entries,
+        "total_domains": total_domains,
+        "total_claims": total_claims
+    }))
+}
+
+/// Log conflict detection event.
+/// When CONFLICT_WEBHOOK_URL is set, logs at info level for external monitoring integration.
+fn notify_conflict_webhook(conflict: &cogkos_core::models::ConflictRecord, context_hint: &str) {
+    if std::env::var("CONFLICT_WEBHOOK_URL").is_ok() {
+        tracing::info!(
+            conflict_id = %conflict.id,
+            conflict_type = ?conflict.conflict_type,
+            severity = conflict.severity,
+            claim_a = %conflict.claim_a_id,
+            claim_b = %conflict.claim_b_id,
+            context = context_hint,
+            "Conflict detected — external webhook dispatch pending"
+        );
+    }
+}

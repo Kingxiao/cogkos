@@ -1,0 +1,91 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+max_connections = 10000
+request_timeout_secs = 300
+
+[database]
+url = "postgres://cogkos:cogkos_dev@localhost:5435/cogkos"
+max_connections = 20
+min_connections = 2
+idle_timeout_secs = 600
+acquire_timeout_secs = 15
+
+[cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 10000
+
+[evolution]
+conflict_detection_enabled = true
+decay_interval_hours = 24
+consolidation_interval_hours = 6
+
+[activation]
+sample_rate = 1.0
+batch_flush_interval_ms = 5000
+batch_max_size = 1000
+
+[ingest]
+max_file_size_mb = 500
+supported_formats = ["pdf", "docx", "md", "txt", "xlsx", "pptx", "csv", "tsv", "json", "xml", "yaml", "yml", "html", "htm", "toml", "ini", "cfg", "conf", "log", "properties", "jpg", "jpeg", "png", "gif", "webp", "bmp"]
+
+[telemetry]
+metrics_enabled = true
+tracing_enabled = true
+jaeger_endpoint = "http://jaeger:4317"
+
+[security]
+# In production, restrict to specific domains via CORS_ORIGINS env var (comma-separated)
+# For dev, set to "http://localhost:5173,http://localhost:3000"
+cors_allow_origins = ["${CORS_ORIGINS}"]
+rate_limit_requests_per_minute = 1000
+
+# ============================================
+# Multi-type LLM configuration
+# Priority: config file > env vars > defaults
+# Env var mapping:
+#   - KIMI_API_KEY → text
+#   - AI302_API_KEY → embedding
+#   - DOUBAO_API_KEY → image
+#   - OPENAI_API_KEY → audio
+#   - OPENROUTER_API_KEY → other
+# ============================================
+
+# Text generation LLM
+[llm.text]
+provider = "kimi"
+model = "moonshot-v1-8k"  # verified: 2026-03-21
+api_key = ""
+base_url = "https://api.moonshot.cn/v1"  # verified: 2026-03-21
+
+# Embedding LLM
+# Options: "text-embedding-3-large" (OpenAI/302.ai, 3072d) or "BAAI/bge-m3" (local TEI/DeepInfra, 1024d)
+# For local TEI: base_url = "http://localhost:8090/v1", no api_key needed
+# For DeepInfra: base_url = "https://api.deepinfra.com/v1/openai"
+[llm.embedding]
+provider = "openai"
+model = "BAAI/bge-m3"  # verified: 2026-03-22
+api_key = ""
+base_url = "http://localhost:8090/v1"  # verified: 2026-03-22
+
+# Image understanding LLM
+[llm.image]
+provider = "doubao"
+model = "doubao-vision-lite"  # verified: 2026-03-21
+api_key = ""
+base_url = "https://ark.cn-beijing.volces.com/api/v3"  # verified: 2026-03-21
+
+# Speech recognition LLM (Whisper)
+[llm.audio]
+provider = "openai"
+model = "whisper-1"  # verified: 2026-03-21
+api_key = ""
+base_url = "https://api.openai.com/v1"  # verified: 2026-03-21
+
+# Other LLM type (fallback)
+[llm.other]
+provider = "openrouter"
+model = "anthropic/claude-sonnet-4-6"  # verified: 2026-03-21
+api_key = ""
+base_url = "https://openrouter.ai/api/v1"  # verified: 2026-03-21

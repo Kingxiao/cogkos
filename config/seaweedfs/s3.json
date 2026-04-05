@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "cogkos",
+      "credentials": [
+        {
+          "accessKey": "cogkos",
+          "secretKey": "cogkos_dev_secret_key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

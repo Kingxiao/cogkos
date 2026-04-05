@@ -1,0 +1,29 @@
+[package]
+name = "cogkos-external"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+url = { workspace = true }
+regex = { workspace = true }
+scraper = { workspace = true }
+feed-rs = { workspace = true }
+percent-encoding = "2.3"
+html-escape = "0.2"
+futures = { workspace = true }
+hex = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+lru = { workspace = true }
+serde_yaml = { workspace = true }
